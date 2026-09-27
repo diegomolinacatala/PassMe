@@ -27,7 +27,7 @@ jobs:
         run: npm run lint
 
       - name: Typecheck
-        run: npx next typegen && npm run typecheck
+        run: npm run typecheck
 
       - name: Unit + database tests
         run: npm test

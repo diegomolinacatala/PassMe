@@ -84,7 +84,7 @@ Sin tocar nada, `npm run dev` ya funciona en **modo demo**: landing, tarjeta de 
 
 1. [vercel.com](https://vercel.com) → *Add New → Project* → importa `diegomolinacatala/PassMe`. Framework: Next.js (automático).
 2. *Environment Variables*: copia todas las de `.env.local` **excepto** `NEXT_PUBLIC_SITE_URL`, que en producción debe ser la URL pública final (`https://passme-xxx.vercel.app` o tu dominio). Márcalas para *Production* y *Preview*.
-3. *Settings → Functions → Function Region*: **Frankfurt (fra1)** (misma zona que Supabase = menos latencia).
+3. La región de las funciones ya viene fijada a **Frankfurt (fra1)** en `vercel.json` (misma zona que Supabase = menos latencia). Si creaste Supabase en otra región, cámbiala ahí (p. ej. `dub1` para Irlanda).
 4. *Deploy*. Después:
    - Abre `https://TU-URL/api/health` → debe devolver `"supabase": true`.
    - En Supabase → *URL Configuration*, cambia *Site URL* a tu URL de producción.
