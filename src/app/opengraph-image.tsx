@@ -1,0 +1,50 @@
+import { ImageResponse } from "next/og";
+import { BRAND, markSvg } from "@/lib/brand";
+import { loadOgFonts, OG_SIZE, SERIF } from "@/lib/og";
+
+export const alt = "PassMe — tu tarjeta de visita en la cartera del móvil";
+export const size = OG_SIZE;
+export const contentType = "image/png";
+
+export default async function Image() {
+  const mark = `data:image/svg+xml;base64,${Buffer.from(
+    markSvg({ foreground: BRAND.ink, cutout: BRAND.paper, size: 96 }),
+  ).toString("base64")}`;
+
+  return new ImageResponse(
+    (
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+          background: BRAND.paper,
+          padding: "72px 80px",
+          fontFamily: "Geist",
+          color: BRAND.ink,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+          {/* eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text -- Satori renders <img> */}
+          <img src={mark} width={64} height={64} />
+          <div style={{ display: "flex", fontFamily: SERIF, fontSize: 52 }}>
+            Pass<span style={{ fontStyle: "italic", color: BRAND.signal }}>Me</span>
+          </div>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          <div style={{ display: "flex", flexWrap: "wrap", fontFamily: SERIF, fontSize: 112, lineHeight: 0.92, letterSpacing: -2 }}>
+            <span>Tu tarjeta de visita,&nbsp;</span>
+            <span style={{ fontStyle: "italic", color: BRAND.signal }}>en la cartera</span>
+            <span>&nbsp;del móvil.</span>
+          </div>
+          <div style={{ display: "flex", marginTop: 36, fontFamily: "Geist Mono", fontSize: 22, letterSpacing: 4, color: "#6b665c" }}>
+            APPLE WALLET · GOOGLE WALLET · QR · VCARD
+          </div>
+        </div>
+      </div>
+    ),
+    { ...size, fonts: await loadOgFonts() },
+  );
+}

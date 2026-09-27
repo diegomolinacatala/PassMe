@@ -17,7 +17,6 @@ export const LIMITS = {
 } as const;
 
 const LINK_ID_RE = /^[A-Za-z0-9_-]{6,40}$/;
-// eslint-disable-next-line no-control-regex
 const CONTROL_CHARS_RE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
 
 const tooLong = (max: number) => `Máximo ${max} caracteres.`;
