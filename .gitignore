@@ -39,3 +39,17 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# allow the documented env template
+!.env.example
+
+# wallet certificates & keys — never commit these
+/certs/
+*.p12
+*.cer
+*.key
+*.pkpass
+service-account*.json
+
+# local tooling
+/.claude/settings.local.json
