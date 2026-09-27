@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Copy, ExternalLink, LoaderCircle, Smartphone, Wallet } from "lucide-react";
+import { Check, Copy, Download, ExternalLink, LoaderCircle, Smartphone, Wallet } from "lucide-react";
 import { useState, useTransition } from "react";
 import { createHandoffLinkAction } from "@/app/dashboard/actions";
 import { QrCode } from "@/components/card/qr-code";
@@ -168,6 +168,12 @@ export function WalletPanel({ slug, profileUrl, availability, demo, blockedReaso
           {copied ? <Check className="size-4" aria-hidden /> : <Copy className="size-4" aria-hidden />}
           {copied ? "Copiado" : "Copiar enlace"}
         </button>
+        <a
+          href={`/u/${encodeURIComponent(slug)}/qr`}
+          className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line px-3.5 text-sm transition-colors hover:border-ink"
+        >
+          <Download className="size-4" aria-hidden /> QR para imprimir
+        </a>
       </div>
     </div>
   );

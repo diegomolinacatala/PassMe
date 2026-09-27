@@ -62,6 +62,13 @@ test.describe("public card", () => {
     expect(body).not.toContain("600");
   });
 
+  test("serves a printable SVG QR", async ({ request }) => {
+    const response = await request.get("/u/demo/qr");
+    expect(response.status()).toBe(200);
+    expect(response.headers()["content-type"]).toContain("image/svg+xml");
+    expect(await response.text()).toContain("<svg");
+  });
+
   test("returns 404 for unknown cards", async ({ page }) => {
     const response = await page.goto("/u/esta-tarjeta-no-existe");
     expect(response?.status()).toBe(404);
