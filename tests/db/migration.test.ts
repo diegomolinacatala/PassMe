@@ -69,8 +69,9 @@ describe("profiles constraints", () => {
 
 describe("row level security", () => {
   it("hides the profiles table from anonymous visitors", async () => {
-    const rows = await asRole(db, "anon", null, () => db.query(`select * from public.profiles`));
-    expect(rows.rows).toHaveLength(0);
+    await expect(asRole(db, "anon", null, () => db.query(`select * from public.profiles`))).rejects.toThrow(
+      /permission denied/,
+    );
   });
 
   it("lets owners read only their own profile", async () => {
@@ -97,15 +98,15 @@ describe("row level security", () => {
 
   it("keeps wallet secrets server-only", async () => {
     await db.query(`insert into public.wallet_pass_secrets (profile_id) values ($1)`, [ALICE]);
-    const anon = await asRole(db, "anon", null, () => db.query(`select * from public.wallet_pass_secrets`));
-    const owner = await asRole(db, "authenticated", ALICE, () =>
-      db.query(`select * from public.wallet_pass_secrets`),
+    await expect(asRole(db, "anon", null, () => db.query(`select * from public.wallet_pass_secrets`))).rejects.toThrow(
+      /permission denied/,
     );
+    await expect(
+      asRole(db, "authenticated", ALICE, () => db.query(`select * from public.wallet_pass_secrets`)),
+    ).rejects.toThrow(/permission denied/);
     const server = await asRole(db, "service_role", null, () =>
       db.query<{ apple_auth_token: string }>(`select apple_auth_token from public.wallet_pass_secrets`),
     );
-    expect(anon.rows).toHaveLength(0);
-    expect(owner.rows).toHaveLength(0);
     expect(server.rows[0].apple_auth_token).toMatch(/^[0-9a-f]{64}$/);
   });
 
@@ -199,8 +200,9 @@ describe("get_card_stats", () => {
   });
 
   it("does not let visitors read events", async () => {
-    const rows = await asRole(db, "anon", null, () => db.query(`select * from public.profile_events`));
-    expect(rows.rows).toHaveLength(0);
+    await expect(asRole(db, "anon", null, () => db.query(`select * from public.profile_events`))).rejects.toThrow(
+      /permission denied/,
+    );
   });
 });
 
@@ -210,10 +212,35 @@ describe("auth_otp_attempts", () => {
       db.query(`insert into public.auth_otp_attempts (email_hash) values ('alice@example.com')`),
     ).rejects.toThrow(/auth_otp_attempts_hash_format/);
     await db.query(`insert into public.auth_otp_attempts (email_hash) values ($1)`, ["a".repeat(64)]);
-    const anon = await asRole(db, "anon", null, () => db.query(`select * from public.auth_otp_attempts`));
-    const user = await asRole(db, "authenticated", BOB, () => db.query(`select * from public.auth_otp_attempts`));
-    expect(anon.rows).toHaveLength(0);
-    expect(user.rows).toHaveLength(0);
+    for (const role of ["anon", "authenticated"] as const) {
+      await expect(
+        asRole(db, role, role === "anon" ? null : BOB, () => db.query(`select * from public.auth_otp_attempts`)),
+      ).rejects.toThrow(/permission denied/);
+    }
+  });
+});
+
+describe("privileges", () => {
+  it("denies anonymous access to private tables even without RLS", async () => {
+    for (const table of ["profiles", "wallet_pass_secrets", "apple_pass_registrations", "auth_otp_attempts"]) {
+      await expect(asRole(db, "anon", null, () => db.query(`select 1 from public.${table}`)), table).rejects.toThrow(
+        /permission denied/,
+      );
+    }
+  });
+
+  it("does not let signed-in users write analytics directly", async () => {
+    await expect(
+      asRole(db, "authenticated", BOB, () =>
+        db.query(`insert into public.profile_events (profile_id, kind) values ($1, 'view')`, [BOB]),
+      ),
+    ).rejects.toThrow(/permission denied/);
+  });
+
+  it("keeps stats private to signed-in owners", async () => {
+    await expect(asRole(db, "anon", null, () => db.query(`select public.get_card_stats(30)`))).rejects.toThrow(
+      /permission denied/,
+    );
   });
 });
 

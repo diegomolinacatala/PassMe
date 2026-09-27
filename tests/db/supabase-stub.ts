@@ -44,6 +44,8 @@ const SUPABASE_STUB_SQL = `
   grant execute on function storage.foldername(text) to anon, authenticated, service_role;
   alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
   alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
+  -- Supabase also grants EXECUTE on new functions to the API roles by default.
+  alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
   grant all on storage.objects to anon, authenticated, service_role;
 `;
 

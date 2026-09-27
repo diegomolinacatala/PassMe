@@ -315,6 +315,22 @@ alter table public.auth_otp_attempts enable row level security;
 -- No policies on purpose: only the server (secret key) can read or write.
 
 -- -----------------------------------------------------------------------------
+-- Privileges (defense in depth on top of RLS)
+-- -----------------------------------------------------------------------------
+-- Supabase grants ALL on new tables and EXECUTE on new functions to anon and
+-- authenticated by default. Narrow that down to exactly what the app uses.
+revoke all on public.profiles from anon;
+revoke all on public.profile_events from anon;
+revoke insert, update, delete, truncate on public.profile_events from authenticated;
+revoke all on public.wallet_pass_secrets from anon, authenticated;
+revoke all on public.apple_pass_registrations from anon, authenticated;
+revoke all on public.auth_otp_attempts from anon, authenticated;
+
+revoke execute on function public.is_slug_available(text) from anon;
+revoke execute on function public.get_card_stats(integer) from anon;
+revoke execute on function public.set_updated_at() from anon, authenticated;
+
+-- -----------------------------------------------------------------------------
 -- Storage: avatars
 -- -----------------------------------------------------------------------------
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)

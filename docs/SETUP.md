@@ -177,4 +177,5 @@ Necesitas el **Apple Developer Program** (99 $/año). Si te das de alta como emp
 | El iPhone dice que el pase no es válido | WWDR incorrecto o Pass Type ID distinto al del certificado | `npm run doctor` te dice cuál |
 | El pase de Apple no se actualiza solo | Sitio sin https, falta `SUPABASE_SECRET_KEY` o certificado de otro Pass Type ID | Logs de Vercel (`apple pass push`) |
 | Google Wallet: «No se puede añadir» | Tu cuenta no es *test user* o la cuenta de servicio no es *Developer* | Paso 6.4 y 6.7 |
+| Usuarios nuevos: el enlace del email falla pero el código funciona | Tu versión de Supabase quiere `type=signup` en *Confirm signup* | En esa plantilla cambia `type=email` por `type=signup` (la app acepta ambos) |
 | La foto no se sube | Migración sin el bucket o políticas | Re-ejecuta la migración; `npm run doctor` |
