@@ -71,9 +71,13 @@ create table public.profiles (
   constraint profiles_pronouns_length check (char_length(pronouns) <= 30),
   constraint profiles_bio_length check (char_length(bio) <= 280),
   constraint profiles_accent_color_format check (accent_color ~ '^#[0-9a-fA-F]{6}$'),
+  -- Keep in sync with src/lib/card/avatar.ts
   constraint profiles_avatar_path_owner check (
     avatar_path is null
-    or (avatar_path like (id::text || '/%') and char_length(avatar_path) <= 200)
+    or (
+      split_part(avatar_path, '/', 1) = id::text
+      and avatar_path ~ '^[0-9a-f-]{36}/[A-Za-z0-9_-]{1,64}\.(jpg|jpeg|png|webp)$'
+    )
   ),
   constraint profiles_links_shape check (
     jsonb_typeof(links) = 'array' and jsonb_array_length(links) <= 20
