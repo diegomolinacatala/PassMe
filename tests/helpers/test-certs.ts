@@ -9,8 +9,8 @@ export interface TestCerts {
 function makeCert(
   subject: forge.pki.CertificateField[],
   issuer: forge.pki.CertificateField[],
-  publicKey: forge.pki.PublicKey,
-  signingKey: forge.pki.PrivateKey,
+  publicKey: forge.pki.rsa.PublicKey,
+  signingKey: forge.pki.rsa.PrivateKey,
   isCa: boolean,
 ): forge.pki.Certificate {
   const cert = forge.pki.createCertificate();

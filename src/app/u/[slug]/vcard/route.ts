@@ -1,0 +1,51 @@
+import { after, type NextRequest } from "next/server";
+import { buildVCard, vcardFilename } from "@/lib/card/vcard";
+import { getPublicCard } from "@/lib/data/cards";
+import { recordEventBySlug } from "@/lib/data/events";
+import { profileUrl } from "@/lib/env";
+import { log } from "@/lib/log";
+import { avatarForVCard, fetchAvatar } from "@/lib/pass/images";
+import { createRateLimiter } from "@/lib/rate-limit";
+import { getClientIp, isBot, parseVisitSource } from "@/lib/request";
+
+export const runtime = "nodejs";
+
+const limiter = createRateLimiter({ limit: 30, windowMs: 60_000 });
+
+/** "Guardar contacto": a vCard with only the links the owner made visible. */
+export async function GET(request: NextRequest, ctx: RouteContext<"/u/[slug]/vcard">) {
+  const rate = limiter.check(getClientIp(request.headers));
+  if (!rate.ok) {
+    return new Response("Demasiadas peticiones", { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } });
+  }
+
+  const { slug } = await ctx.params;
+  const card = await getPublicCard(slug);
+  if (!card) return new Response("Tarjeta no encontrada", { status: 404 });
+
+  let photo = null;
+  const avatar = await fetchAvatar(card.avatarUrl);
+  if (avatar) {
+    try {
+      photo = { base64: await avatarForVCard(avatar), type: "JPEG" as const };
+    } catch (error) {
+      log.warn("vcard photo conversion failed", { slug }, error);
+    }
+  }
+
+  const body = buildVCard(card, { profileUrl: profileUrl(card.slug), photo });
+
+  if (!isBot(request.headers.get("user-agent"))) {
+    const source = parseVisitSource(request.nextUrl.searchParams.get("src"));
+    after(() => recordEventBySlug(card.slug, { kind: "vcard", source }));
+  }
+
+  return new Response(body, {
+    headers: {
+      "Content-Type": "text/vcard; charset=utf-8",
+      "Content-Disposition": `attachment; filename="${vcardFilename(card.slug)}"`,
+      "Cache-Control": "private, no-store",
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
+}
