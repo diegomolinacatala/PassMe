@@ -34,7 +34,7 @@ export function ProfileCard({ card, preview = false, className }: ProfileCardPro
       {/* Stub */}
       <header className="relative bg-[var(--card-bg)] px-6 pt-5 pb-9 text-[var(--card-fg)]">
         <div className="flex items-center justify-between">
-          <span className="inline-flex items-center gap-1.5 font-mono text-[10px] tracking-[0.16em] uppercase opacity-70">
+          <span className="inline-flex items-center gap-1.5 font-mono text-[10px] tracking-[0.16em] uppercase">
             <Mark className="size-4" cutout="var(--card-bg)" />
             Tarjeta de contacto
           </span>

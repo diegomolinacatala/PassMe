@@ -21,7 +21,7 @@ export function Section({ number, title, description, children, aside }: Section
     <section aria-labelledby={id} className="rounded-[26px] border hairline bg-card/70 p-5 shadow-[0_1px_0_rgb(255_255_255/0.6)_inset] sm:p-7">
       <header className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <p className="font-mono text-[11px] tracking-[0.16em] text-signal">{number}</p>
+          <p className="font-mono text-[11px] tracking-[0.16em] text-signal-deep">{number}</p>
           <h2 id={id} className="mt-1 font-display text-[1.9rem] leading-none tracking-tight">
             {title}
           </h2>
@@ -74,9 +74,9 @@ export function TextField({
       <div className="mb-1.5 flex items-baseline justify-between gap-2">
         <label htmlFor={id} className="text-sm font-medium text-ink-soft">
           {label}
-          {required ? <span className="text-signal"> *</span> : null}
+          {required ? <span className="text-signal-deep"> *</span> : null}
         </label>
-        <span className={cn("font-mono text-[10px] tabular-nums", nearLimit ? "text-signal" : "text-muted/70")} aria-hidden="true">
+        <span className={cn("font-mono text-[10px] tabular-nums", nearLimit ? "text-signal-deep" : "text-muted/70")} aria-hidden="true">
           {value.length}/{maxLength}
         </span>
       </div>

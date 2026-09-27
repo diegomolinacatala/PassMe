@@ -68,7 +68,7 @@ export function HowItWorks() {
         <ol className="mt-16 grid gap-px overflow-hidden rounded-[28px] border hairline bg-ink/10 md:grid-cols-3">
           {STEPS.map((step) => (
             <li key={step.n} className="group relative bg-paper p-8 transition-colors duration-500 hover:bg-card sm:p-10">
-              <span className="font-display text-[5.5rem] leading-none text-ink/12 transition-colors duration-500 group-hover:text-signal">
+              <span className="font-display text-[5.5rem] leading-none text-muted transition-colors duration-500 group-hover:text-signal">
                 {step.n}
               </span>
               <h3 className="mt-6 text-xl font-medium tracking-tight">{step.title}</h3>
@@ -143,7 +143,7 @@ export function PrivacySection() {
               {PRIVACY_ROWS.map((row) => (
                 <li
                   key={row.label}
-                  className={`flex items-center gap-3 rounded-2xl px-3 py-3 ${row.visible ? "bg-paper text-ink" : "bg-paper/[0.06] text-paper/45"}`}
+                  className={`flex items-center gap-3 rounded-2xl px-3 py-3 ${row.visible ? "bg-paper text-ink" : "bg-paper/[0.06] text-paper/75"}`}
                 >
                   <span
                     className={`grid size-9 shrink-0 place-items-center rounded-xl ${row.visible ? "bg-signal text-white" : "bg-paper/10"}`}
@@ -151,7 +151,7 @@ export function PrivacySection() {
                     <LinkIcon kind={row.kind} size={17} />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block font-mono text-[10px] tracking-[0.14em] uppercase opacity-60">{row.label}</span>
+                    <span className={`block font-mono text-[10px] tracking-[0.14em] uppercase ${row.visible ? "text-muted" : ""}`}>{row.label}</span>
                     <span className={`block truncate text-sm ${row.visible ? "" : "line-through decoration-paper/30"}`}>
                       {row.value}
                     </span>
@@ -198,7 +198,7 @@ export function AlwaysUpdated({ card }: { card: PublicCard }) {
         </div>
 
         <div className="relative flex items-center justify-center gap-4 sm:gap-8 lg:col-span-7" aria-hidden="true">
-          <div className="w-[46%] max-w-[270px] -rotate-3 opacity-70 grayscale-[35%]">
+          <div className="w-[46%] max-w-[270px] -rotate-3 scale-95">
             <WalletPass card={before} />
           </div>
           <span className="grid size-11 shrink-0 place-items-center rounded-full bg-ink text-paper shadow-soft">
@@ -216,16 +216,16 @@ export function AlwaysUpdated({ card }: { card: PublicCard }) {
 export function FinalCta({ ctaHref }: { ctaHref: string }) {
   return (
     <section aria-labelledby="cta-title" className="px-5 pb-24 sm:px-8">
-      <div className="relative mx-auto max-w-[1240px] overflow-hidden rounded-[36px] bg-signal px-6 py-20 text-center text-white sm:px-12 sm:py-28">
+      <div className="relative mx-auto max-w-[1240px] overflow-hidden rounded-[36px] bg-signal-strong px-6 py-20 text-center text-white sm:px-12 sm:py-28">
         <div
           className="pointer-events-none absolute inset-0 opacity-[0.12] [background-image:radial-gradient(circle_at_1px_1px,#fff_1px,transparent_0)] [background-size:22px_22px]"
           aria-hidden="true"
         />
-        <p className="eyebrow relative text-white/75">Empieza hoy</p>
+        <p className="eyebrow relative text-white">Empieza hoy</p>
         <h2 id="cta-title" className="relative mx-auto mt-4 max-w-3xl font-display text-[length:var(--text-display)] leading-[0.95] tracking-tight">
           Deja de repartir papel. <em>Pásate.</em>
         </h2>
-        <ul className="relative mx-auto mt-8 flex max-w-xl flex-wrap justify-center gap-x-6 gap-y-2 text-white/85">
+        <ul className="relative mx-auto mt-8 flex max-w-xl flex-wrap justify-center gap-x-6 gap-y-2 text-white">
           {["Gratis", "Listo en 2 minutos", "iPhone y Android"].map((item) => (
             <li key={item} className="inline-flex items-center gap-1.5">
               <Check className="size-4" aria-hidden /> {item}

@@ -199,7 +199,7 @@ function IconButton({ label, onClick, disabled, danger, active, children }: Icon
       className={cn(
         "grid size-8 place-items-center rounded-lg text-muted transition-colors disabled:opacity-25",
         danger ? "hover:bg-danger-wash hover:text-danger" : "hover:bg-ink/[0.06] hover:text-ink",
-        active && "text-signal",
+        active && "text-signal-deep",
       )}
     >
       {children}

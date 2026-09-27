@@ -8,7 +8,7 @@ type Size = "sm" | "md" | "lg";
 const VARIANTS: Record<Variant, string> = {
   ink: "bg-ink text-paper shadow-[0_1px_0_rgb(255_255_255/0.12)_inset,0_6px_16px_-8px_rgb(20_20_20/0.6)] hover:bg-ink-soft",
   signal:
-    "bg-signal text-white shadow-[0_1px_0_rgb(255_255_255/0.25)_inset,0_8px_20px_-10px_rgb(201_51_13/0.9)] hover:bg-signal-deep",
+    "bg-signal-strong text-white shadow-[0_1px_0_rgb(255_255_255/0.25)_inset,0_8px_20px_-10px_rgb(201_51_13/0.9)] hover:bg-signal-deep",
   outline: "border border-ink/80 text-ink hover:bg-ink hover:text-paper",
   ghost: "text-ink hover:bg-ink/[0.06]",
   danger: "border border-danger/40 text-danger hover:bg-danger hover:text-white",

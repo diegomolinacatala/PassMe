@@ -188,3 +188,12 @@ describe("vcard", () => {
     expect(vcardFilename("../../etc")).toBe("etc.vcf");
   });
 });
+
+describe("card palette labels", () => {
+  it("keeps small labels at WCAG AA contrast on every swatch and on extremes", () => {
+    for (const hex of [...ACCENT_SWATCHES.map((s) => s.hex), "#FFFFFF", "#000000", "#808080", "#FF0000", "#00FF00"]) {
+      const p = cardPalette(hex);
+      expect(contrastRatio(p.label, p.background), hex).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+});

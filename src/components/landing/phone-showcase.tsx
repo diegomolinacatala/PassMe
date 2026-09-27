@@ -42,7 +42,7 @@ export function PhoneShowcase({ card }: { card: PublicCard }) {
               </span>
             </div>
 
-            <p className="mt-5 px-1 text-[11px] font-semibold tracking-wide text-ink/50 uppercase">Cartera</p>
+            <p className="mt-5 px-1 text-[11px] font-semibold tracking-wide text-ink/75 uppercase">Cartera</p>
 
             <div className="relative mt-2">
               <WalletPass card={card} style="apple" className="max-w-none" />
@@ -53,7 +53,7 @@ export function PhoneShowcase({ card }: { card: PublicCard }) {
               />
             </div>
 
-            <p className="mt-4 text-center text-[11px] text-ink/45">Acerca el QR a la cámara</p>
+            <p className="mt-4 text-center text-[11px] text-ink/75">Acerca el QR a la cámara</p>
           </div>
         </div>
       </div>

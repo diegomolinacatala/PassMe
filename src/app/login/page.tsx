@@ -43,7 +43,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
                   Supabase todavía no está configurado, así que el login está desactivado. Puedes probar el editor en modo
                   demo (no se guarda nada).
                 </p>
-                <a href="/dashboard" className="mt-4 inline-block font-medium text-signal underline underline-offset-4">
+                <a href="/dashboard" className="mt-4 inline-block font-medium text-signal-deep underline underline-offset-4">
                   Abrir el editor demo →
                 </a>
               </div>

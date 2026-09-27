@@ -85,6 +85,18 @@ export interface CardPalette {
   isDark: boolean;
 }
 
+/** Small label text must stay ≥ 4.5:1 (WCAG AA); soften it only as far as that allows. */
+const LABEL_MIN_CONTRAST = 4.5;
+const LABEL_MAX_SOFTENING = 0.4;
+
+function softLabel(foreground: Rgb, background: Rgb): Rgb {
+  for (let t = LABEL_MAX_SOFTENING; t > 0; t -= 0.05) {
+    const candidate = mix(foreground, background, t);
+    if (contrastRatio(candidate, background) >= LABEL_MIN_CONTRAST) return candidate;
+  }
+  return foreground;
+}
+
 export function cardPalette(accentHex: string): CardPalette {
   const background = parseHex(accentHex) ?? parseHex(DEFAULT_ACCENT)!;
   const foreground = readableOn(background);
@@ -92,7 +104,7 @@ export function cardPalette(accentHex: string): CardPalette {
   return {
     background,
     foreground,
-    label: mix(foreground, background, 0.38),
+    label: softLabel(foreground, background),
     isDark,
   };
 }

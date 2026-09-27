@@ -13,8 +13,11 @@
   --color-muted: #6b665c;
   --color-line: #d8d0c0;
   --color-line-strong: #b9b0a0;
-  --color-signal: #ff4a1c;
-  --color-signal-deep: #c9330d;
+  /* signal: accents & large text (3.3:1 on paper). signal-strong: fills behind white text (4.6:1).
+     signal-deep: small text on paper/wash (≥4.8:1). */
+  --color-signal: #f24418;
+  --color-signal-strong: #d8390f;
+  --color-signal-deep: #bd300c;
   --color-signal-wash: #ffe3d8;
   --color-ok: #1f7a4d;
   --color-danger: #b42318;
