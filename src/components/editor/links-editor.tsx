@@ -13,6 +13,8 @@ const LABELLED_KINDS: ReadonlySet<LinkKind> = new Set(["custom", "website", "boo
 
 interface LinksEditorProps {
   links: CardLink[];
+  /** Login email offered as a one-click first contact on empty cards. */
+  suggestedEmail?: string | null;
   errors: FieldErrors;
   showErrors: boolean;
   onAdd: (kind: LinkKind) => string;
@@ -21,7 +23,7 @@ interface LinksEditorProps {
   onMove: (id: string, direction: -1 | 1) => void;
 }
 
-export function LinksEditor({ links, errors, showErrors, onAdd, onUpdate, onRemove, onMove }: LinksEditorProps) {
+export function LinksEditor({ links, suggestedEmail, errors, showErrors, onAdd, onUpdate, onRemove, onMove }: LinksEditorProps) {
   // Id of a just-added link whose input should receive focus once it mounts.
   const pendingFocus = useRef<string | null>(null);
   const [touched, setTouched] = useState<ReadonlySet<string>>(new Set());
@@ -147,9 +149,18 @@ export function LinksEditor({ links, errors, showErrors, onAdd, onUpdate, onRemo
           })}
         </ol>
       ) : (
-        <p className="rounded-2xl border border-dashed border-line-strong px-4 py-8 text-center text-sm text-muted">
-          Añade al menos un contacto: es lo que la gente verá al escanear tu QR.
-        </p>
+        <div className="rounded-2xl border border-dashed border-line-strong px-4 py-8 text-center text-sm text-muted">
+          <p>Añade al menos un contacto: es lo que la gente verá al escanear tu QR.</p>
+          {suggestedEmail ? (
+            <button
+              type="button"
+              onClick={() => onUpdate(onAdd("email"), { value: suggestedEmail })}
+              className="mt-4 inline-flex h-9 items-center gap-2 rounded-full bg-ink px-4 font-medium text-paper transition-colors hover:bg-ink-soft"
+            >
+              <Plus className="size-4" aria-hidden /> Añadir {suggestedEmail}
+            </button>
+          ) : null}
+        </div>
       )}
 
       <div className="mt-5">

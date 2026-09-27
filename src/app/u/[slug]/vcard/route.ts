@@ -34,6 +34,10 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/u/[slug]/vca
   }
 
   const body = buildVCard(card, { profileUrl: profileUrl(card.slug), photo });
+  // iOS Safari shows its native "add contact" sheet for inline vCards; other browsers
+  // (Android Chrome would render text/* inline) get a download that opens Contacts.
+  const isIos = /iPhone|iPad|iPod/i.test(request.headers.get("user-agent") ?? "");
+  const disposition = isIos ? "inline" : "attachment";
 
   if (!isBot(request.headers.get("user-agent"))) {
     const source = parseVisitSource(request.nextUrl.searchParams.get("src"));
@@ -43,7 +47,7 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/u/[slug]/vca
   return new Response(body, {
     headers: {
       "Content-Type": "text/vcard; charset=utf-8",
-      "Content-Disposition": `attachment; filename="${vcardFilename(card.slug)}"`,
+      "Content-Disposition": `${disposition}; filename="${vcardFilename(card.slug)}"`,
       "Cache-Control": "private, no-store",
       "X-Content-Type-Options": "nosniff",
     },

@@ -62,6 +62,17 @@ test.describe("public card", () => {
     expect(body).not.toContain("600");
   });
 
+  test("opens the vCard inline on iPhone and downloads it elsewhere", async ({ request }) => {
+    const iphone = await request.get("/u/demo/vcard", {
+      headers: { "user-agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1" },
+    });
+    expect(iphone.headers()["content-disposition"]).toMatch(/^inline/);
+    const android = await request.get("/u/demo/vcard", {
+      headers: { "user-agent": "Mozilla/5.0 (Linux; Android 15; Pixel 9) Chrome/140 Mobile Safari/537.36" },
+    });
+    expect(android.headers()["content-disposition"]).toMatch(/^attachment/);
+  });
+
   test("serves a printable SVG QR", async ({ request }) => {
     const response = await request.get("/u/demo/qr");
     expect(response.status()).toBe(200);

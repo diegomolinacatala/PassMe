@@ -208,6 +208,7 @@ export function CardEditor({ initialCard, stats, wallet, siteUrl, email, demo }:
           >
             <LinksEditor
               links={draft.links}
+              suggestedEmail={email}
               errors={errors}
               showErrors={submitted}
               onAdd={editor.addLink}
