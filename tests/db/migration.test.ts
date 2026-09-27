@@ -40,10 +40,12 @@ describe("profiles constraints", () => {
     ).rejects.toThrow(/profiles_slug/);
   });
 
-  it("rejects avatars outside the owner's folder", async () => {
-    await expect(
-      db.query(`update public.profiles set avatar_path = $1 where id = $2`, [`${BOB}/x.jpg`, ALICE]),
-    ).rejects.toThrow(/profiles_avatar_path_owner/);
+  it("rejects avatars outside the owner's folder or with traversal", async () => {
+    for (const path of [`${BOB}/x.jpg`, `${ALICE}/../x.jpg`, `${ALICE}/a/b.jpg`, `${ALICE}/x.gif`]) {
+      await expect(
+        db.query(`update public.profiles set avatar_path = $1 where id = $2`, [path, ALICE]),
+      ).rejects.toThrow(/profiles_avatar_path_owner/);
+    }
   });
 
   it("rejects non-array or oversized links", async () => {
@@ -199,6 +201,19 @@ describe("get_card_stats", () => {
   it("does not let visitors read events", async () => {
     const rows = await asRole(db, "anon", null, () => db.query(`select * from public.profile_events`));
     expect(rows.rows).toHaveLength(0);
+  });
+});
+
+describe("auth_otp_attempts", () => {
+  it("only accepts sha-256 hashes and is server-only", async () => {
+    await expect(
+      db.query(`insert into public.auth_otp_attempts (email_hash) values ('alice@example.com')`),
+    ).rejects.toThrow(/auth_otp_attempts_hash_format/);
+    await db.query(`insert into public.auth_otp_attempts (email_hash) values ($1)`, ["a".repeat(64)]);
+    const anon = await asRole(db, "anon", null, () => db.query(`select * from public.auth_otp_attempts`));
+    const user = await asRole(db, "authenticated", BOB, () => db.query(`select * from public.auth_otp_attempts`));
+    expect(anon.rows).toHaveLength(0);
+    expect(user.rows).toHaveLength(0);
   });
 });
 

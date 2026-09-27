@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 import { getCardById } from "@/lib/data/wallet";
 import { log } from "@/lib/log";
 import { PKPASS_CONTENT_TYPE } from "@/lib/pass/apple";
-import { buildApplePassForProfile, PassError } from "@/lib/pass/service";
+import { buildApplePassForCard, PassError } from "@/lib/pass/service";
 import { authorizePass, emptyResponse, getWebServiceContext } from "@/lib/pass/web-service";
 
 export const runtime = "nodejs";
@@ -29,7 +29,7 @@ export async function GET(
     const ifModifiedSince = Date.parse(request.headers.get("if-modified-since") ?? "");
     if (!Number.isNaN(ifModifiedSince) && lastModified.getTime() <= ifModifiedSince) return emptyResponse(304);
 
-    const pass = await buildApplePassForProfile(serialNumber);
+    const pass = await buildApplePassForCard(card);
     return new Response(new Uint8Array(pass.buffer), {
       headers: {
         "Content-Type": PKPASS_CONTENT_TYPE,

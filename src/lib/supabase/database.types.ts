@@ -108,6 +108,12 @@ export type Database = {
         };
         Relationships: [];
       };
+      auth_otp_attempts: {
+        Row: { id: number; email_hash: string; created_at: string };
+        Insert: { id?: never; email_hash: string; created_at?: string };
+        Update: { id?: never; email_hash?: string; created_at?: string };
+        Relationships: [];
+      };
       apple_pass_registrations: {
         Row: {
           device_library_id: string;

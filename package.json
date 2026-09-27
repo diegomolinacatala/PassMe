@@ -10,9 +10,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "brand": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/generate-brand-assets.mts",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "doctor": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/doctor.mts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
@@ -50,5 +51,8 @@
   },
   "overrides": {
     "joi": "17.13.8"
+  },
+  "engines": {
+    "node": ">=20.9"
   }
 }

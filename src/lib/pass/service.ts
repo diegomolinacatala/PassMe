@@ -54,11 +54,17 @@ export interface GeneratedApplePass {
 }
 
 export async function buildApplePassForProfile(profileId: string): Promise<GeneratedApplePass> {
+  return buildApplePassForCard(await loadOwnerCard(profileId));
+}
+
+/** Builds the pass for an already-loaded card (avoids a second read in the web service). */
+export async function buildApplePassForCard(card: OwnerCard): Promise<GeneratedApplePass> {
   const config = getAppleWalletConfig();
   if (!config) throw new PassError(503, "not_configured", "Apple Wallet no está configurado todavía.");
+  if (!card.fullName) throw new PassError(409, "incomplete", "Añade tu nombre y guarda la tarjeta primero.");
 
-  const card = await loadOwnerCard(profileId);
-  const admin = createAdminSupabase()!;
+  const admin = createAdminSupabase();
+  if (!admin) throw new PassError(503, "not_configured", "Falta SUPABASE_SECRET_KEY en el servidor.");
   const [authenticationToken, avatar] = await Promise.all([
     config.webServiceEnabled ? ensureApplePassToken(admin, card.id) : Promise.resolve(undefined),
     fetchAvatar(card.avatarUrl),

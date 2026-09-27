@@ -11,7 +11,6 @@ import type { TypedSupabaseClient } from "@/lib/supabase/server";
  */
 
 const DEVICE_ID_RE = /^[A-Za-z0-9]{1,128}$/;
-const PUSH_TOKEN_RE = /^[A-Za-z0-9]{32,200}$/;
 
 export interface WebServiceContext {
   config: AppleWalletConfig;
@@ -33,10 +32,6 @@ export function isValidDeviceId(value: string): boolean {
   return DEVICE_ID_RE.test(value);
 }
 
-export function isValidPushToken(value: unknown): value is string {
-  return typeof value === "string" && PUSH_TOKEN_RE.test(value);
-}
-
 /** Checks pass type + serial shape and the ApplePass authorization header. */
 export async function authorizePass(
   ctx: WebServiceContext,
@@ -51,3 +46,4 @@ export async function authorizePass(
 }
 
 export { empty as emptyResponse };
+export { isValidPushToken } from "./apns";

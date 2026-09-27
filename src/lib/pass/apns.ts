@@ -10,7 +10,12 @@ import { log } from "@/lib/log";
  */
 
 const REQUEST_TIMEOUT_MS = 10_000;
+/** APNs device tokens are hex strings (64 chars today; allow some headroom). */
 const PUSH_TOKEN_RE = /^[0-9a-fA-F]{32,200}$/;
+
+export function isValidPushToken(value: unknown): value is string {
+  return typeof value === "string" && PUSH_TOKEN_RE.test(value);
+}
 
 export interface PushSummary {
   sent: number;
@@ -38,7 +43,7 @@ function pushOne(session: http2.ClientHttp2Session, config: AppleWalletConfig, t
 }
 
 export async function sendPassUpdatePushes(config: AppleWalletConfig, pushTokens: string[]): Promise<PushSummary> {
-  const tokens = pushTokens.filter((t) => PUSH_TOKEN_RE.test(t));
+  const tokens = pushTokens.filter(isValidPushToken);
   const summary: PushSummary = { sent: 0, failed: 0, invalidTokens: [] };
   if (tokens.length === 0) return summary;
 

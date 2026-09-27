@@ -51,8 +51,7 @@ export default async function DashboardPage() {
   const user = await getSessionUser(supabase);
   if (!user) redirect("/login?next=/dashboard");
 
-  const card = await getOrCreateOwnerCard(supabase, user);
-  const stats = await getOwnStats(supabase);
+  const [card, stats] = await Promise.all([getOrCreateOwnerCard(supabase, user), getOwnStats(supabase)]);
   const status = getConfigStatus();
 
   return (

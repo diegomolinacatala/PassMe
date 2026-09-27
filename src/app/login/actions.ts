@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { clearOtpFailures, isOtpLocked, recordOtpFailure } from "@/lib/data/otp-attempts";
 import { getSiteUrl } from "@/lib/env";
 import { log } from "@/lib/log";
 import { createRateLimiter } from "@/lib/rate-limit";
@@ -20,6 +21,7 @@ const emailLimiter = createRateLimiter({ limit: 5, windowMs: 10 * 60_000 });
 const verifyLimiter = createRateLimiter({ limit: 10, windowMs: 10 * 60_000 });
 
 const NOT_CONFIGURED = "El login aún no está conectado (falta configurar Supabase).";
+const LOCKED = "Demasiados códigos incorrectos. Usa el enlace del email o espera 15 minutos.";
 
 async function clientKey(prefix: string): Promise<string> {
   return `${prefix}:${getClientIp(await headers())}`;
@@ -76,9 +78,18 @@ export async function verifyLoginCode(_prev: LoginState, formData: FormData): Pr
   const supabase = await createServerSupabase();
   if (!supabase) return { step: "email", email, error: NOT_CONFIGURED };
 
-  const { error } = await supabase.auth.verifyOtp({ email, token: parsedCode.data, type: "email" });
-  if (error) return { step: "code", email, error: "Código incorrecto o caducado." };
+  // Per-email lockout (shared across instances): stops distributed brute force of the code.
+  if (await isOtpLocked(email)) {
+    return { step: "code", email, error: LOCKED };
+  }
 
+  const { error } = await supabase.auth.verifyOtp({ email, token: parsedCode.data, type: "email" });
+  if (error) {
+    await recordOtpFailure(email);
+    return { step: "code", email, error: "Código incorrecto o caducado." };
+  }
+
+  await clearOtpFailures(email);
   redirect(next);
 }
 

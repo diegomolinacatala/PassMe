@@ -295,6 +295,26 @@ alter table public.apple_pass_registrations enable row level security;
 -- No policies on purpose: only the server (secret key) can read these.
 
 -- -----------------------------------------------------------------------------
+-- Login hardening: failed one-time-code attempts per email
+-- -----------------------------------------------------------------------------
+-- The in-app limiter keys on IP and lives in each serverless instance's memory.
+-- This table gives a shared, per-email lockout so a 6-digit code cannot be
+-- brute-forced from many IPs/instances. Emails are stored as SHA-256 hashes.
+create table public.auth_otp_attempts (
+  id bigint generated always as identity primary key,
+  email_hash text not null,
+  created_at timestamptz not null default now(),
+
+  constraint auth_otp_attempts_hash_format check (email_hash ~ '^[0-9a-f]{64}$')
+);
+
+create index auth_otp_attempts_email_created_idx
+  on public.auth_otp_attempts (email_hash, created_at desc);
+
+alter table public.auth_otp_attempts enable row level security;
+-- No policies on purpose: only the server (secret key) can read or write.
+
+-- -----------------------------------------------------------------------------
 -- Storage: avatars
 -- -----------------------------------------------------------------------------
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
