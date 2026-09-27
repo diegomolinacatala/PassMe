@@ -165,6 +165,10 @@ export function CardEditor({ initialCard, stats, wallet, siteUrl, email, demo }:
 
       <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_400px] xl:gap-12">
         <div className="space-y-6">
+          {/* On phones the live preview sits on top; on desktop it lives in the sticky aside. */}
+          <div className="lg:hidden">
+            <PreviewPanel card={preview} />
+          </div>
           <Section number="01" title="Quién eres" description="Lo básico que aparece en el pase y en tu página.">
             <div className="space-y-5">
               <AvatarField
@@ -239,7 +243,9 @@ export function CardEditor({ initialCard, stats, wallet, siteUrl, email, demo }:
         </div>
 
         <aside className="space-y-6 lg:sticky lg:top-6">
-          <PreviewPanel card={preview} />
+          <div className="hidden lg:block">
+            <PreviewPanel card={preview} />
+          </div>
           <Section number="05" title="A la cartera">
             <WalletPanel
               slug={savedSlug}

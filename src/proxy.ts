@@ -12,7 +12,7 @@ import { getSupabasePublicConfig } from "@/lib/env";
 const PROTECTED_PREFIXES = ["/dashboard"];
 const AUTH_PAGES = ["/login"];
 
-function buildCsp(nonce: string, supabaseUrl: string | null): string {
+function buildCsp(nonce: string, supabaseUrl: string | null, isHttps: boolean): string {
   const isDev = process.env.NODE_ENV === "development";
   const supabase = supabaseUrl ? ` ${supabaseUrl}` : "";
   const supabaseRealtime = supabaseUrl ? ` ${supabaseUrl.replace(/^http/, "ws")}` : "";
@@ -30,7 +30,7 @@ function buildCsp(nonce: string, supabaseUrl: string | null): string {
     "base-uri 'self'",
     "object-src 'none'",
   ];
-  if (!isDev) directives.push("upgrade-insecure-requests");
+  if (!isDev && isHttps) directives.push("upgrade-insecure-requests");
   return directives.join("; ");
 }
 
@@ -41,7 +41,7 @@ function startsWithAny(pathname: string, prefixes: string[]): boolean {
 export async function proxy(request: NextRequest) {
   const config = getSupabasePublicConfig();
   const nonce = btoa(crypto.randomUUID());
-  const csp = buildCsp(nonce, config?.url ?? null);
+  const csp = buildCsp(nonce, config?.url ?? null, request.nextUrl.protocol === "https:");
 
   // Rebuilt after every cookie refresh so rendering sees the new session.
   const forwardedHeaders = () => {

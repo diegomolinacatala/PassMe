@@ -17,7 +17,7 @@ export default function HomePage() {
       <SiteHeader ctaHref={ctaHref} />
       <main>
         <section aria-labelledby="hero-title" className="relative overflow-hidden">
-          <div className="mx-auto grid max-w-[1240px] items-center gap-16 px-5 pt-8 pb-24 sm:px-8 lg:grid-cols-12 lg:gap-8 lg:pt-14 lg:pb-32">
+          <div className="mx-auto grid max-w-[1240px] grid-cols-1 items-center gap-16 px-5 pt-8 pb-24 sm:px-8 lg:grid-cols-12 lg:gap-8 lg:pt-14 lg:pb-32">
             <div className="animate-rise lg:col-span-7">
               <p className="eyebrow flex items-center gap-2">
                 <span className="inline-block size-1.5 rounded-full bg-signal" aria-hidden="true" />

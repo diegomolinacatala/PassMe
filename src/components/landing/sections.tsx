@@ -58,7 +58,7 @@ export function HowItWorks() {
   return (
     <section id="como-funciona" aria-labelledby="como-funciona-title" className="scroll-mt-10">
       <div className="mx-auto max-w-[1240px] px-5 py-24 sm:px-8 sm:py-32">
-        <div className="grid gap-6 lg:grid-cols-12">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
           <p className="eyebrow lg:col-span-3">Cómo funciona</p>
           <h2 id="como-funciona-title" className="font-display text-[length:var(--text-display)] leading-[0.95] tracking-tight lg:col-span-9">
             Del bolsillo a su agenda <em className="text-signal">sin teclear nada.</em>
@@ -110,7 +110,7 @@ const PRIVACY_POINTS = [
 export function PrivacySection() {
   return (
     <section id="privacidad" aria-labelledby="privacidad-title" className="scroll-mt-10 bg-ink text-paper">
-      <div className="mx-auto grid max-w-[1240px] gap-16 px-5 py-24 sm:px-8 sm:py-32 lg:grid-cols-12 lg:gap-10">
+      <div className="mx-auto grid max-w-[1240px] grid-cols-1 gap-16 px-5 py-24 sm:px-8 sm:py-32 lg:grid-cols-12 lg:gap-10">
         <div className="lg:col-span-6">
           <p className="eyebrow text-paper/55">Privacidad</p>
           <h2 id="privacidad-title" className="mt-4 font-display text-[length:var(--text-display)] leading-[0.95] tracking-tight">
@@ -180,8 +180,8 @@ export function AlwaysUpdated({ card }: { card: PublicCard }) {
   const after: PublicCard = { ...card, headline: "Head of Design", company: "Norte & Co.", accentColor: "#2340F5" };
 
   return (
-    <section aria-labelledby="actualizada-title">
-      <div className="mx-auto grid max-w-[1240px] items-center gap-14 px-5 py-24 sm:px-8 sm:py-32 lg:grid-cols-12">
+    <section aria-labelledby="actualizada-title" className="overflow-x-clip">
+      <div className="mx-auto grid max-w-[1240px] grid-cols-1 items-center gap-14 px-5 py-24 sm:px-8 sm:py-32 lg:grid-cols-12">
         <div className="lg:col-span-5">
           <p className="eyebrow">Siempre al día</p>
           <h2 id="actualizada-title" className="mt-4 font-display text-[length:var(--text-display)] leading-[0.95] tracking-tight">

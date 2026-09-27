@@ -3,6 +3,7 @@
 import { ArrowLeft, LoaderCircle, MailCheck } from "lucide-react";
 import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/cn";
 import { requestLoginCode, signInWithGoogle, verifyLoginCode, type LoginState } from "./actions";
 
 interface LoginFormProps {
@@ -51,7 +52,7 @@ export function LoginForm({ next, googleEnabled, initialError }: LoginFormProps)
               placeholder="123456"
               aria-invalid={Boolean(error)}
               aria-describedby={error ? "code-error" : undefined}
-              className={`${INPUT} mt-2 text-center font-mono text-2xl tracking-[0.4em]`}
+              className={cn(INPUT, "mt-2 text-center font-mono text-2xl tracking-[0.4em]")}
             />
           </label>
           {error ? (
@@ -96,7 +97,7 @@ export function LoginForm({ next, googleEnabled, initialError }: LoginFormProps)
             placeholder="tu@empresa.com"
             aria-invalid={Boolean(error)}
             aria-describedby={error ? "email-error" : undefined}
-            className={`${INPUT} mt-2`}
+            className={cn(INPUT, "mt-2")}
           />
         </label>
         {error ? (

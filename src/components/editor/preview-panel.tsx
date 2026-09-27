@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { ProfileCard } from "@/components/card/profile-card";
 import { WalletPass } from "@/components/card/wallet-pass";
 import type { PublicCard } from "@/lib/card/types";
@@ -16,6 +16,7 @@ type TabId = (typeof TABS)[number]["id"];
 
 export function PreviewPanel({ card }: { card: PublicCard }) {
   const [tab, setTab] = useState<TabId>("apple");
+  const id = useId();
 
   return (
     <div>
@@ -25,9 +26,9 @@ export function PreviewPanel({ card }: { card: PublicCard }) {
             key={t.id}
             type="button"
             role="tab"
-            id={`preview-tab-${t.id}`}
+            id={`${id}-tab-${t.id}`}
             aria-selected={tab === t.id}
-            aria-controls="preview-panel"
+            aria-controls={`${id}-panel`}
             onClick={() => setTab(t.id)}
             className={cn(
               "flex-1 rounded-full px-3 py-1.5 text-[13px] font-medium transition-[background-color,color,box-shadow] duration-300",
@@ -40,9 +41,9 @@ export function PreviewPanel({ card }: { card: PublicCard }) {
       </div>
 
       <div
-        id="preview-panel"
+        id={`${id}-panel`}
         role="tabpanel"
-        aria-labelledby={`preview-tab-${tab}`}
+        aria-labelledby={`${id}-tab-${tab}`}
         className="relative mt-5 flex min-h-[460px] justify-center rounded-[28px] bg-[#e6e1d7] px-4 py-8 shadow-[inset_0_2px_12px_rgb(20_20_20/0.08)]"
       >
         {tab === "web" ? (

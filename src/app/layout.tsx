@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
+import { connection } from "next/server";
 import { getSiteUrl } from "@/lib/env";
 import "./globals.css";
 
@@ -36,7 +37,10 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  // Every page is rendered per request so Next.js can stamp the CSP nonce from
+  // src/proxy.ts onto its scripts (static HTML cannot carry a fresh nonce).
+  await connection();
   return (
     <html lang="es" className={`${geist.variable} ${geistMono.variable} ${instrumentSerif.variable}`}>
       <body>{children}</body>
