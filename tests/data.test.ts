@@ -38,8 +38,9 @@ function row(overrides: Partial<ProfileRow> = {}): ProfileRow {
     bio: "",
     accent_color: "#ff4a1c",
     detail_color: "#ffe3d1",
-    pattern: "ondas",
+    pattern: "relieve",
     pattern_seed: 123,
+    typeface: "cursiva",
     avatar_path: null,
     links: [
       { id: "l-email-1", kind: "email", value: "alex@example.com", visible: true },
@@ -63,8 +64,9 @@ const input: ValidCardInput = {
   bio: "",
   accentColor: "#FF4A1C",
   detailColor: null,
-  pattern: "senal",
+  pattern: "trama",
   patternSeed: 77,
+  typeface: "moderna",
   avatarPath: null,
   isPublished: true,
   links: [],
@@ -76,12 +78,19 @@ describe("row mapping", () => {
   it("normalizes colors, drops invalid links and hides hidden ones publicly", () => {
     const card = rowToOwnerCard(row({ accent_color: "nonsense" }));
     expect(card.accentColor).toBe("#EF7A4A");
-    expect(card).toMatchObject({ detailColor: "#FFE3D1", pattern: "ondas", patternSeed: 123 });
+    expect(card).toMatchObject({ detailColor: "#FFE3D1", pattern: "relieve", patternSeed: 123, typeface: "cursiva" });
 
-    const odd = rowToOwnerCard(row({ detail_color: "lime", pattern: "tartan", pattern_seed: -4 }));
-    expect(odd).toMatchObject({ detailColor: null, pattern: "sello", patternSeed: 0 });
+    const odd = rowToOwnerCard(row({ detail_color: "lime", pattern: "tartan", pattern_seed: -4, typeface: "comic" }));
+    expect(odd).toMatchObject({ detailColor: null, pattern: "orbitas", patternSeed: 0, typeface: "clasica" });
     expect(card.links.map((l) => l.id)).toEqual(["l-email-1", "l-phone-1"]);
     expect(toPublicCard(card).links.map((l) => l.id)).toEqual(["l-email-1"]);
+  });
+
+  it("reads cards saved before the redesign", () => {
+    const legacy = { ...row({ pattern: "ondas" }) } as Partial<ProfileRow>;
+    delete legacy.typeface;
+    expect(rowToOwnerCard(legacy as ProfileRow)).toMatchObject({ pattern: "cinta", typeface: "clasica" });
+    expect(rowToOwnerCard(row({ pattern: "sello" })).pattern).toBe("orbitas");
   });
 });
 
@@ -111,7 +120,7 @@ describe("getOrCreateOwnerCard", () => {
       return { data: null };
     });
     const card = await getOrCreateOwnerCard(client, { id: USER, email: "Jose.Nunez@example.com" });
-    expect(inserted).toMatchObject({ id: USER, accent_color: "#EF7A4A", detail_color: "#FFE3D1", pattern: "sello" });
+    expect(inserted).toMatchObject({ id: USER, accent_color: "#EF7A4A", detail_color: "#FFE3D1", pattern: "orbitas", typeface: "clasica" });
     expect((inserted as unknown as { pattern_seed: number }).pattern_seed).toBeGreaterThanOrEqual(0);
     expect(card.slug).toMatch(/^jose-nunez-[0-9a-f]{6}$/);
   });
@@ -129,6 +138,7 @@ describe("getOrCreateOwnerCard", () => {
     expect(card.id).toBe(USER);
     expect(payloads[0]).toHaveProperty("pattern_seed");
     expect(payloads[1]).not.toHaveProperty("pattern_seed");
+    expect(payloads[1]).not.toHaveProperty("typeface");
     expect(payloads[1]!.slug).toBe(payloads[0]!.slug);
   });
 
@@ -172,11 +182,41 @@ describe("saveOwnerCard", () => {
       return updates === 1 ? { error: missing } : { data: row({ slug: "alex-new" }) };
     });
     const result = await saveOwnerCard(client, USER, input);
-    expect(result).toMatchObject({ ok: true });
+    // Saved, and the owner is told their new design didn't make it.
+    expect(result).toMatchObject({ ok: true, designPending: true });
     const [withDesign, withoutDesign] = queries.filter((q) => first(q) === "update");
-    expect(withDesign!.calls[0]![1][0]).toHaveProperty("pattern", "senal");
+    expect(withDesign!.calls[0]![1][0]).toHaveProperty("pattern", "trama");
     expect(withoutDesign!.calls[0]![1][0]).not.toHaveProperty("pattern");
     expect(withoutDesign!.calls[0]![1][0]).toHaveProperty("slug", "alex-new");
+  });
+
+  it("drops only what a database without the redesign migration can't store", async () => {
+    // First the unknown typeface column, then the motif the old check rejects.
+    const errors = [
+      { message: "Could not find the 'typeface' column of 'profiles' in the schema cache", code: "PGRST204" },
+      { message: 'new row for relation "profiles" violates check constraint "profiles_pattern_kind"', code: "23514" },
+    ];
+    let updates = 0;
+    const { client, queries } = fakeSupabase((q) => {
+      if (first(q) !== "update") return { data: row() };
+      updates += 1;
+      return updates <= errors.length ? { error: errors[updates - 1] } : { data: row({ slug: "alex-new" }) };
+    });
+    expect(await saveOwnerCard(client, USER, input)).toMatchObject({ ok: true, designPending: true });
+    const payloads = queries.filter((q) => first(q) === "update").map((q) => q.calls[0]![1][0] as Record<string, unknown>);
+    expect(payloads).toHaveLength(3);
+    expect(payloads[0]).toMatchObject({ pattern: "trama", typeface: "moderna" });
+    expect(payloads[1]).not.toHaveProperty("typeface");
+    expect(payloads[1]).toHaveProperty("pattern", "trama");
+    expect(payloads[2]).not.toHaveProperty("pattern");
+    expect(payloads[2]).toMatchObject({ pattern_seed: 77, detail_color: null, slug: "alex-new" });
+  });
+
+  it("doesn't retry other check violations", async () => {
+    const violation = { message: 'violates check constraint "profiles_slug_format"', code: "23514" };
+    const { client, queries } = fakeSupabase((q) => (first(q) === "update" ? { error: violation } : { data: row() }));
+    expect(await saveOwnerCard(client, USER, input)).toMatchObject({ ok: false });
+    expect(queries.filter((q) => first(q) === "update")).toHaveLength(1);
   });
 
   it("maps a unique violation to a slug error", async () => {
@@ -192,7 +232,13 @@ describe("saveOwnerCard", () => {
         : { data: row({ avatar_path: `${USER}/avatar-1.jpg` }) },
     );
     const result = await saveOwnerCard(client, USER, { ...input, avatarPath: newAvatar });
-    expect(result).toMatchObject({ ok: true, slugChanged: true, previousSlug: "alex", previousAvatarPath: `${USER}/avatar-1.jpg` });
+    expect(result).toMatchObject({
+      ok: true,
+      slugChanged: true,
+      previousSlug: "alex",
+      previousAvatarPath: `${USER}/avatar-1.jpg`,
+      designPending: false,
+    });
     const update = queries.find((q) => first(q) === "update")!;
     expect(has(update, "eq", "id", USER)).toBe(true);
   });

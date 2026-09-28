@@ -35,7 +35,13 @@ interface CardEditorProps {
   demo: boolean;
 }
 
-type SaveStatus = { kind: "idle" } | { kind: "saved"; at: number } | { kind: "error"; message: string } | { kind: "demo" };
+type SaveStatus =
+  | { kind: "idle" }
+  | { kind: "saved"; at: number }
+  // Saved, but the database couldn't store the new design yet (a migration is pending).
+  | { kind: "partial" }
+  | { kind: "error"; message: string }
+  | { kind: "demo" };
 
 export function CardEditor({ initialCard, stats, wallet, siteUrl, email, demo }: CardEditorProps) {
   const initialDraft = useMemo(() => draftFromCard(initialCard), [initialCard]);
@@ -88,7 +94,7 @@ export function CardEditor({ initialCard, stats, wallet, siteUrl, email, demo }:
         setSavedName(result.card.fullName);
         setServerResult(null);
         setSubmitted(false);
-        setStatus({ kind: "saved", at: Date.now() });
+        setStatus(result.designPending ? { kind: "partial" } : { kind: "saved", at: Date.now() });
       } else {
         setServerResult({ draft, errors: result.errors });
         setStatus({ kind: "error", message: result.errors._form ?? "Revisa los campos marcados en rojo." });
@@ -221,7 +227,7 @@ export function CardEditor({ initialCard, stats, wallet, siteUrl, email, demo }:
           <Section
             number="03"
             title="Estilo"
-            description="Colores, motivo y sello de tu pase. Se aplican también a tu página. El texto se ajusta solo para que se lea."
+            description="Motivo, colores y letra de tu pase. Se aplican también a tu página. El texto se ajusta solo para que se lea."
           >
             <DesignField
               value={{
@@ -229,7 +235,9 @@ export function CardEditor({ initialCard, stats, wallet, siteUrl, email, demo }:
                 detailColor: draft.detailColor,
                 pattern: draft.pattern,
                 patternSeed: draft.patternSeed,
+                typeface: draft.typeface,
               }}
+              card={preview}
               onChange={editor.setDesign}
             />
           </Section>
@@ -298,13 +306,16 @@ function SaveBar({ dirty, saving, status, errorCount, onSave }: SaveBarProps) {
       ? status.message
       : dirty
         ? "Cambios sin guardar"
-        : status.kind === "saved"
-          ? "Guardado. Los pases se actualizarán en unos segundos."
-          : status.kind === "demo"
-            ? "Modo demo: los cambios no se guardan."
-            : "Todo guardado";
+        : status.kind === "partial"
+          ? "Guardado, salvo el diseño nuevo: falta actualizar la base de datos."
+          : status.kind === "saved"
+            ? "Guardado. Los pases se actualizarán en unos segundos."
+            : status.kind === "demo"
+              ? "Modo demo: los cambios no se guardan."
+              : "Todo guardado";
 
-  const tone = status.kind === "error" && (dirty || errorCount > 0) ? "error" : dirty ? "dirty" : "ok";
+  const tone =
+    status.kind === "error" && (dirty || errorCount > 0) ? "error" : dirty ? "dirty" : status.kind === "partial" ? "warn" : "ok";
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 px-3 pb-3 sm:px-6 sm:pb-5">
@@ -317,6 +328,7 @@ function SaveBar({ dirty, saving, status, errorCount, onSave }: SaveBarProps) {
         aria-live="polite"
       >
         {tone === "error" ? <TriangleAlert className="size-4 shrink-0 text-danger" aria-hidden /> : null}
+        {tone === "warn" ? <TriangleAlert className="size-4 shrink-0 text-signal-deep" aria-hidden /> : null}
         {tone === "ok" ? <CircleCheck className="size-4 shrink-0 text-ok" aria-hidden /> : null}
         {tone === "dirty" ? <span className="size-2 shrink-0 animate-pulse rounded-full bg-signal" aria-hidden /> : null}
         <p className="min-w-0 flex-1 truncate text-sm">{message}</p>

@@ -2,9 +2,9 @@
 
 /* ---------------------------------------------------------------------------
    PassMe design tokens — "papelería cálida" (warm stationery). See docs/BRAND.md.
-   Papel beige, Café ink, one Naranja signal and a pastel Melocotón. Guilloché,
-   microtext and seal numbers are the graphic language of the pass; serif
-   display, grotesk UI, mono marks.
+   Papel beige, Café ink, one Naranja signal and a pastel Melocotón. Fine-line
+   generative motifs are the graphic language of the pass; serif display,
+   grotesk UI, mono marks.
    --------------------------------------------------------------------------- */
 @theme {
   --color-paper: #f3efe6;
@@ -89,7 +89,7 @@
   }
 }
 
-/* Deferred guilloché fading in after hydration (see DeferredPatternSvg).
+/* Deferred motif fading in after hydration (see DeferredPatternSvg).
    Outside @theme so it is always emitted: it's only referenced from inline styles. */
 @keyframes pattern-in {
   from {
@@ -151,16 +151,6 @@
 
   .hairline {
     border-color: color-mix(in oklab, var(--color-ink) 14%, transparent);
-  }
-
-  /* Microtext rule: the printed security line under headings and cards. */
-  .microtext {
-    font-family: var(--font-mono);
-    font-size: 0.47rem;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    white-space: nowrap;
-    overflow: hidden;
   }
 
   /* Registration crop marks around showcase objects. */

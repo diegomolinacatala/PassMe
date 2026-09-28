@@ -26,7 +26,9 @@ async function requireUser() {
   return user ? { supabase, user } : null;
 }
 
-export type SaveCardResult = { ok: true; card: OwnerCard } | { ok: false; errors: FieldErrors };
+export type SaveCardResult =
+  | { ok: true; card: OwnerCard; /** Part of the design couldn't be stored yet (pending migration). */ designPending: boolean }
+  | { ok: false; errors: FieldErrors };
 
 export async function saveCardAction(input: unknown): Promise<SaveCardResult> {
   const session = await requireUser();
@@ -47,7 +49,7 @@ export async function saveCardAction(input: unknown): Promise<SaveCardResult> {
     await Promise.allSettled([notifyWalletsOfUpdate(userId), cleanupAvatars(session.supabase, userId, currentAvatar)]);
   });
 
-  return { ok: true, card: result.card };
+  return { ok: true, card: result.card, designPending: result.designPending };
 }
 
 /** Removes replaced or abandoned uploads from the user's avatar folder. */

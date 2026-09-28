@@ -6,7 +6,7 @@ import { initials } from "@/components/card/avatar";
 import { HERO_BOX, PassArt, STRIP_BOX, type ArtVariant } from "@/components/card/pass-art";
 import { designVersion, resolveDesign } from "@/lib/card/design";
 import type { PublicCard } from "@/lib/card/types";
-import { loadOgFonts, OG_MONO, SERIF } from "@/lib/og";
+import { loadOgFonts, OG_SANS, SERIF } from "@/lib/og";
 
 /**
  * Server-side twin of <PassArt>: renders the artwork to PNG with Satori so the
@@ -46,13 +46,16 @@ function memo(key: string, build: () => Promise<Buffer>): Promise<Buffer> {
 /** Everything the artwork depends on; changes to anything else don't re-render it. */
 export function artVersion(card: PublicCard, variant: ArtVariant): string {
   const design = resolveDesign(card);
+  // The hero has no text, except the monogram's initial.
+  const hasText = variant === "strip" || design.pattern === "monograma";
   return designVersion([
     variant,
     design.background,
     design.detail,
     design.pattern,
     design.seed,
-    variant === "strip" ? card.fullName : "",
+    hasText ? design.typeface : "",
+    hasText ? card.fullName : "",
     variant === "strip" ? card.avatarUrl : "",
   ]);
 }
@@ -75,7 +78,7 @@ async function renderPng(card: PublicCard, variant: ArtVariant, width: number, h
         initials={initials(card.fullName)}
         avatarSrc={avatarSrc}
         unit={(points) => points * scale}
-        fonts={{ serif: SERIF, mono: OG_MONO }}
+        fonts={{ serif: SERIF, sans: OG_SANS }}
         pixelSize={{ width, height }}
       />
     ),

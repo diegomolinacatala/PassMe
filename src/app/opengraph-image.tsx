@@ -1,19 +1,22 @@
 import { ImageResponse } from "next/og";
 import { PatternSvg } from "@/components/card/pattern-svg";
 import { BRAND, markSvg } from "@/lib/brand";
-import { resolveDesign } from "@/lib/card/design";
+import { DEFAULT_TYPEFACE, resolveDesign } from "@/lib/card/design";
 import { loadOgFonts, OG_MONO, OG_SIZE, SERIF } from "@/lib/og";
 
 export const alt = "PassMe — tu tarjeta de visita en la cartera del móvil";
 export const size = OG_SIZE;
 export const contentType = "image/png";
 
-/** Site link preview: warm paper, a Naranja guilloché seal and the promise. */
+/** Site link preview: warm paper, Naranja orbits and the promise. */
 export default async function Image() {
   const mark = `data:image/svg+xml;base64,${Buffer.from(
     markSvg({ foreground: BRAND.ink, cutout: BRAND.paper, echo: BRAND.signal, size: 96 }),
   ).toString("base64")}`;
-  const seal = { ...resolveDesign({ accentColor: BRAND.paper, detailColor: BRAND.signal, pattern: "sello", patternSeed: 48213 }), detail: BRAND.signal };
+  const seal = {
+    ...resolveDesign({ accentColor: BRAND.paper, detailColor: BRAND.signal, pattern: "orbitas", patternSeed: 2026, typeface: DEFAULT_TYPEFACE }),
+    detail: BRAND.signal,
+  };
 
   return new ImageResponse(
     (

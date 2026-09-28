@@ -25,7 +25,7 @@ sequenceDiagram
 
 | Capa | Dónde | Responsabilidad |
 | --- | --- | --- |
-| Dominio | `src/lib/card/*` | Tipos de enlace (validación + href seguro), esquema Zod, vCard 3.0, colores legibles, diseño (`design.ts`: temas, tintas, sello) y motivos generativos (`pattern.ts`), slugs. Isomórfico: la misma validación en navegador y servidor. |
+| Dominio | `src/lib/card/*` | Tipos de enlace (validación + href seguro), esquema Zod, vCard 3.0, colores legibles, diseño (`design.ts`: temas, tintas, letra, variación) y motivos generativos (`pattern.ts`), slugs. Isomórfico: la misma validación en navegador y servidor. |
 | Datos | `src/lib/data/*` | Lecturas/escrituras en Supabase. Cliente con sesión (RLS) para el dueño, cliente anónimo para lo público y cliente *admin* solo donde es imprescindible. |
 | Pases | `src/lib/pass/*` | `apple.ts` (pass.json + firma), `google.ts` (objeto genérico + JWT + sync REST), `apns.ts` (push HTTP/2), `web-service.ts` (protocolo de Apple), `handoff.ts` (tokens de 30 min), `images.ts` (logo/icono con sharp), `art.tsx` (banda de Apple y *hero* de Google con Satori). |
 | Rutas | `src/app/**` | Páginas (landing, tarjeta, login, editor, handoff) y API (`/api/pass/*`, `/api/wallet/v1/*`, `/api/events`, `/api/health`). |
@@ -48,8 +48,9 @@ erDiagram
         text company
         text accent_color "fondo #RRGGBB"
         text detail_color "tinta de detalle o null (auto)"
-        text pattern "sello|ondas|senal|liso"
-        int pattern_seed "0..999999 = Nº de sello"
+        text pattern "orbitas|relieve|halo|trama|cinta|rayos|monograma|liso"
+        int pattern_seed "0..999999 = variación (no se muestra)"
+        text typeface "clasica|cursiva|editorial|moderna"
         text avatar_path "uid/archivo.jpg"
         jsonb links "[{id, kind, value, label?, visible}]"
         bool is_published
@@ -107,7 +108,7 @@ El número de serie del pase es el `id` del perfil; el `lastUpdated` es el `upda
 
 ```mermaid
 flowchart LR
-    D["design.ts<br/>tema · tintas · motivo · Nº sello"] --> P["pattern.ts<br/>rutas SVG deterministas"]
+    D["design.ts<br/>tema · tintas · motivo · variación · letra"] --> P["pattern.ts<br/>rutas SVG deterministas"]
     P --> A["PassArt (JSX, estilos en línea)"]
     A -->|navegador| E["Vista previa del editor,<br/>landing, página pública"]
     A -->|Satori + sharp| S["strip.png @1x/2x/3x<br/>(Apple store card)"]
@@ -115,7 +116,7 @@ flowchart LR
     A -->|Satori| O["opengraph-image"]
 ```
 
-Las imágenes se memorizan por versión del arte (colores, motivo, semilla, nombre y foto). La guía visual completa está en [`BRAND.md`](BRAND.md).
+Las imágenes se memorizan por versión del arte (colores, motivo, semilla, letra, nombre y foto). La guía visual completa está en [`BRAND.md`](BRAND.md).
 
 ## Decisiones
 
@@ -123,9 +124,11 @@ Las imágenes se memorizan por versión del arte (colores, motivo, semilla, nomb
 | --- | --- |
 | Next.js en Vercel + Supabase | Lo pedido; cero servidores que mantener, plan gratuito suficiente para el MVP. |
 | Perfiles creados en la app (no trigger en `auth.users`) | Un fallo al generar el slug nunca puede bloquear un registro. |
-| Pase *store card* de Apple | Es el único estilo con banda de imagen a todo el ancho (375×144 pt): ahí va el arte de la tarjeta (guilloché, foto y nombre en nuestra tipografía). Los campos de texto reales (cargo, ubicación) siguen debajo para VoiceOver y el Apple Watch. |
+| Pase *store card* de Apple | Es el único estilo con banda de imagen a todo el ancho (375×144 pt): ahí va el arte de la tarjeta (motivo, foto y nombre en la letra elegida). Los campos de texto reales (cargo, ubicación) siguen debajo para VoiceOver y el Apple Watch. |
 | Un solo componente de arte (`components/card/pass-art.tsx`) | Estilos en línea y flexbox: el mismo árbol lo pinta el navegador (vista previa) y Satori en el servidor (PNG del pase). Lo que ves en el editor es lo que llega a la cartera. |
-| Motivo con semilla guardada | El número de sello (`pattern_seed`) genera el guilloché de forma determinista; editar el nombre no cambia el dibujo, «Otro sello» sí. |
+| Motivo con semilla guardada | La semilla (`pattern_seed`) genera el motivo de forma determinista; editar el nombre no cambia el dibujo, «Otra variación» sí. El número nunca se enseña: se elige a ojo. |
+| Motivos retirados en lectura, no en validación | Los valores antiguos (`sello`, `senal`, `ondas`) se traducen al leer (`toPatternKind`) y el `CHECK` los sigue aceptando durante el despliegue; los clientes nuevos solo pueden enviar motivos actuales. |
+| QR sin `altText` en Apple | Wallet imprime ese texto bajo el código y agranda la placa blanca; el enlace ya está en el reverso del pase. |
 | *Hero* de Google con `?v=` | Google cachea las imágenes por URL; la versión (hash de las entradas del arte) cambia solo cuando cambia el dibujo. |
 | JWT con clase + objeto para Google | No hace falta llamar a la API para crear el pase; la API solo se usa para actualizar. |
 | vCard 3.0 | La versión con mejor compatibilidad en iOS y Android. |

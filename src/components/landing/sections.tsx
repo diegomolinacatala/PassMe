@@ -1,5 +1,5 @@
 import { ArrowUpRight, Check, EyeOff, RefreshCw, ShieldCheck, Trash2 } from "lucide-react";
-import { Guilloche } from "@/components/brand/guilloche";
+import { BrandMotif } from "@/components/brand/brand-motif";
 import { LinkIcon } from "@/components/card/link-icon";
 import { WalletPass } from "@/components/card/wallet-pass";
 import { LinkButton } from "@/components/ui/button";
@@ -43,7 +43,7 @@ const STEPS = [
   {
     n: "01",
     title: "Diseña tu tarjeta",
-    body: "Nombre, cargo, foto y los contactos que quieras. Eliges tintas y motivo; nosotros nos aseguramos de que se lea bien.",
+    body: "Nombre, cargo, foto y los contactos que quieras. Eliges motivo, tintas y letra; nosotros nos aseguramos de que se lea bien.",
   },
   {
     n: "02",
@@ -179,8 +179,13 @@ export function PrivacySection() {
 }
 
 export function AlwaysUpdated({ card }: { card: PublicCard }) {
-  const before: PublicCard = { ...card, ...themeDesign("arena", "senal", 48_213), headline: "Product Designer", company: "Estudio Norte" };
-  const after: PublicCard = { ...card, ...themeDesign("cafe", "sello", 48_213), headline: "Head of Design", company: "Norte & Co." };
+  const before: PublicCard = { ...card, ...themeDesign("arena", "orbitas", 48_213), headline: "Product Designer", company: "Estudio Norte" };
+  const after: PublicCard = {
+    ...card,
+    ...themeDesign("cafe", "relieve", 48_213, "editorial"),
+    headline: "Head of Design",
+    company: "Norte & Co.",
+  };
 
   return (
     <section aria-labelledby="actualizada-title" className="overflow-x-clip">
@@ -220,8 +225,9 @@ export function FinalCta({ ctaHref }: { ctaHref: string }) {
   return (
     <section aria-labelledby="cta-title" className="px-5 pb-24 sm:px-8">
       <div className="relative isolate mx-auto max-w-[1240px] overflow-hidden rounded-[36px] bg-glow px-6 py-20 text-center text-ink sm:px-12 sm:py-28">
-        <Guilloche
+        <BrandMotif
           color={BRAND.signal}
+          pattern="rayos"
           size={1100}
           height={760}
           seed={2026}

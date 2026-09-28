@@ -59,12 +59,15 @@ export function WalletPass({ card, style = "apple", className }: WalletPassProps
     </div>
   );
 
+  // Apple shows the bare code (no altText); Google prints the short URL under it.
   const qr = (
     <div className="mx-auto w-fit rounded-xl bg-white p-2.5 shadow-[0_1px_2px_rgb(0_0_0/0.15)]">
       <QrCode value={profileUrl(slug, "qr")} label="Código QR de la tarjeta" className="size-[112px] text-ink" quietZone={1} />
-      <p className="mt-1.5 max-w-[112px] truncate text-center font-mono text-[9px] leading-none text-black/60">
-        {prettyProfileUrl(slug)}
-      </p>
+      {style === "google" ? (
+        <p className="mt-1.5 max-w-[112px] truncate text-center font-mono text-[9px] leading-none text-black/60">
+          {prettyProfileUrl(slug)}
+        </p>
+      ) : null}
     </div>
   );
 

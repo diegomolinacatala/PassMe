@@ -17,7 +17,7 @@ cartera, junto a tus tarjetas y billetes.
 ## Qué hace
 
 - **Pases de cartera**: `.pkpass` firmado para Apple Wallet y pase genérico de Google Wallet, con tu foto, nombre, cargo, empresa y un QR.
-- **Un pase que no se parece a ningún otro**: cada tarjeta lleva un sello de guilloché generado a partir de su número, como los de pasaportes y billetes. Eliges tema, tintas y motivo; el arte se renderiza en el servidor y la vista previa del editor es idéntica al pase real.
+- **Un pase que no se parece a ningún otro**: eliges tema, motivo generativo (órbitas, relieve, trama, tu monograma…), su variación y la letra de tu nombre; el editor te enseña tu propia tarjeta en cada opción. El arte se renderiza en el servidor y la vista previa es idéntica al pase real.
 - **Página al escanear** (`/u/tu-nombre`): tarjeta con tus contactos, botón **Guardar contacto** (vCard con foto) y compartir.
 - **Privacidad por diseño**: cada contacto se puede ocultar; lo oculto **no sale del servidor** (lo filtra la base de datos). Métricas sin IPs ni cookies.
 - **Siempre actualizada**: al editar tu tarjeta, los pases de Apple se actualizan solos (web service + push APNs) y el de Google se sincroniza por API.

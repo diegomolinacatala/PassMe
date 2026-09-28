@@ -1,11 +1,11 @@
 import type { CSSProperties, ReactElement } from "react";
 import type { ResolvedDesign } from "@/lib/card/design";
-import { patternLayers, type PatternBox, type PatternFocus } from "@/lib/card/pattern";
+import { patternLayers, type PatternBox, type PatternFocus, type PatternLayer } from "@/lib/card/pattern";
 
 /**
- * The generative pattern as an SVG, in the card's detail color. Pure (no
+ * The generative motif as an SVG, in the card's detail color. Pure (no
  * hooks, no element ids) so Satori can render it on the server; browsers use
- * <DeferredPatternSvg> to keep the heavy path data out of the HTML.
+ * <DeferredPatternSvg> to keep the path data out of the HTML.
  */
 
 export interface PatternSvgProps {
@@ -17,11 +17,13 @@ export interface PatternSvgProps {
   width: number | string;
   height: number | string;
   style?: CSSProperties;
+  /** Precomputed layers (the browser memoizes them); drawn from the design when omitted. */
+  layers?: ReadonlyArray<PatternLayer>;
 }
 
 /** The generative pattern alone, in the card's detail color. */
-export function PatternSvg({ design, box, focus, fade, width, height, style }: PatternSvgProps): ReactElement | null {
-  const layers = patternLayers(design.pattern, design.seed, box, focus);
+export function PatternSvg({ design, box, focus, fade, width, height, style, layers: given }: PatternSvgProps): ReactElement | null {
+  const layers = given ?? patternLayers(design.pattern, design.seed, box, focus);
   if (layers.length === 0) return null;
 
   // A CSS mask instead of an SVG gradient: no element ids, so any number of
@@ -47,6 +49,8 @@ export function PatternSvg({ design, box, focus, fade, width, height, style }: P
           stroke={layer.mode === "stroke" ? design.detail : "none"}
           strokeWidth={layer.width}
           strokeLinejoin="round"
+          strokeLinecap={layer.cap}
+          strokeDasharray={layer.dash}
           opacity={layer.opacity}
         />
       ))}

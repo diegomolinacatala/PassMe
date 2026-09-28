@@ -5,7 +5,7 @@ import { BRAND, markSvg } from "@/lib/brand";
 import { resolveDesign } from "@/lib/card/design";
 import { getPublicCard } from "@/lib/data/cards";
 import { prettyProfileUrl } from "@/lib/env";
-import { loadOgFonts, OG_MONO, OG_SIZE, SERIF } from "@/lib/og";
+import { loadOgFonts, OG_MONO, OG_SANS, OG_SIZE, SERIF } from "@/lib/og";
 import { avatarForVCard, fetchAvatar } from "@/lib/pass/images";
 
 export const alt = "Tarjeta de contacto en PassMe";
@@ -75,7 +75,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
             initials={initials(card.fullName)}
             avatarSrc={avatarSrc}
             unit={(points) => points * ART_SCALE}
-            fonts={{ serif: SERIF, mono: OG_MONO }}
+            fonts={{ serif: SERIF, sans: OG_SANS }}
             pixelSize={{ width: ART_WIDTH, height: ART_HEIGHT }}
           />
         </div>

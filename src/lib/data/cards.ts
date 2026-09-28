@@ -4,8 +4,8 @@ import { createClient } from "@supabase/supabase-js";
 import { cache } from "react";
 import { isValidAvatarPath } from "@/lib/card/avatar";
 import { DEFAULT_ACCENT, isHexColor } from "@/lib/card/colors";
-import { DEFAULT_DETAIL, isPatternSeed, randomPatternSeed } from "@/lib/card/design";
-import { DEFAULT_PATTERN, isPatternKind } from "@/lib/card/pattern";
+import { DEFAULT_DETAIL, DEFAULT_TYPEFACE, isPatternSeed, isTypeface, randomPatternSeed } from "@/lib/card/design";
+import { DEFAULT_PATTERN, toPatternKind } from "@/lib/card/pattern";
 import { DEMO_CARD, DEMO_SLUG } from "@/lib/card/demo";
 import type { ValidCardInput } from "@/lib/card/schema";
 import { sanitizeStoredLinks } from "@/lib/card/schema";
@@ -17,22 +17,59 @@ import type { Database, Json, ProfileRow } from "@/lib/supabase/database.types";
 import type { TypedSupabaseClient } from "@/lib/supabase/server";
 
 const UNIQUE_VIOLATION = "23505";
+const CHECK_VIOLATION = "23514";
 const MAX_SLUG_ATTEMPTS = 6;
 /** PostgREST (schema cache) and Postgres codes for "that column doesn't exist". */
 const MISSING_COLUMN_CODES = new Set(["PGRST204", "42703"]);
 
+type DesignWrite = Pick<Database["public"]["Tables"]["profiles"]["Update"], "detail_color" | "pattern" | "pattern_seed" | "typeface">;
+type DbError = { code?: string; message?: string } | null;
+
 /**
- * True when the database predates the card-design migration
- * (supabase/migrations/20260928120000_card_design.sql). Writes then fall back
- * to the columns that exist, so sign-ups and saves keep working until it's applied.
+ * Design fields the database can't store yet because a migration is pending:
+ *   20260928120000_card_design.sql  → detail_color, pattern, pattern_seed
+ *   20260928180000_pass_redesign.sql → typeface and the new motifs
  */
-function isMissingDesignColumn(error: { code?: string; message?: string } | null): boolean {
-  if (!error?.code || !MISSING_COLUMN_CODES.has(error.code)) return false;
-  return /detail_color|pattern/.test(error.message ?? "");
+function unsupportedDesignFields(error: DbError): ReadonlyArray<keyof DesignWrite> {
+  if (!error?.code) return [];
+  const message = error.message ?? "";
+  if (MISSING_COLUMN_CODES.has(error.code)) {
+    if (/detail_color|pattern/.test(message)) return ["detail_color", "pattern", "pattern_seed", "typeface"];
+    if (/typeface/.test(message)) return ["typeface"];
+  }
+  if (error.code === CHECK_VIOLATION && /profiles_pattern_kind/.test(message)) return ["pattern"];
+  return [];
 }
 
-function warnMissingDesignMigration(operation: string): void {
-  log.warn("card design columns missing: apply supabase/migrations/20260928120000_card_design.sql", { operation });
+function withoutFields(design: DesignWrite, keys: ReadonlyArray<keyof DesignWrite>): DesignWrite {
+  const rest = { ...design };
+  for (const key of keys) delete rest[key];
+  return rest;
+}
+
+/**
+ * Runs a write, and while the database rejects design fields it doesn't know
+ * yet, retries without them — so sign-ups and saves keep working until the
+ * migrations are applied. Everything else about the write is unchanged.
+ * `dropped` lists what could not be stored, so callers can tell the owner.
+ */
+async function withDesignFallback<R extends { error: DbError }>(
+  operation: string,
+  design: DesignWrite,
+  write: (design: DesignWrite) => PromiseLike<R>,
+): Promise<{ result: R; dropped: ReadonlyArray<keyof DesignWrite> }> {
+  let fields = design;
+  let result = await write(fields);
+  const dropped: Array<keyof DesignWrite> = [];
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const unsupported = unsupportedDesignFields(result.error).filter((key) => key in fields);
+    if (unsupported.length === 0) break;
+    log.warn("card design migration pending: writing without some design fields", { operation, fields: unsupported.join(",") });
+    dropped.push(...unsupported);
+    fields = withoutFields(fields, unsupported);
+    result = await write(fields);
+  }
+  return { result, dropped };
 }
 
 export function toPublicCard(card: OwnerCard | PublicCard): PublicCard {
@@ -48,6 +85,7 @@ export function toPublicCard(card: OwnerCard | PublicCard): PublicCard {
     detailColor: card.detailColor,
     pattern: card.pattern,
     patternSeed: card.patternSeed,
+    typeface: card.typeface,
     avatarUrl: card.avatarUrl,
     links: card.links.filter((l) => l.visible),
   };
@@ -58,15 +96,20 @@ interface DesignColumns {
   detail_color?: string | null;
   pattern?: string | null;
   pattern_seed?: number | null;
+  typeface?: string | null;
 }
 
-/** Validates stored design values (defensive: rows could predate a rule change). */
-function designFromDb(row: DesignColumns): Pick<PublicCard, "accentColor" | "detailColor" | "pattern" | "patternSeed"> {
+/**
+ * Validates stored design values (defensive: rows could predate a rule change
+ * or a migration). Motifs from before the redesign map to their successors.
+ */
+function designFromDb(row: DesignColumns): Pick<PublicCard, "accentColor" | "detailColor" | "pattern" | "patternSeed" | "typeface"> {
   return {
     accentColor: row.accent_color && isHexColor(row.accent_color) ? row.accent_color.toUpperCase() : DEFAULT_ACCENT,
     detailColor: row.detail_color && isHexColor(row.detail_color) ? row.detail_color.toUpperCase() : null,
-    pattern: isPatternKind(row.pattern) ? row.pattern : DEFAULT_PATTERN,
+    pattern: toPatternKind(row.pattern) ?? DEFAULT_PATTERN,
     patternSeed: isPatternSeed(row.pattern_seed) ? row.pattern_seed : 0,
+    typeface: isTypeface(row.typeface) ? row.typeface : DEFAULT_TYPEFACE,
   };
 }
 
@@ -163,22 +206,25 @@ export async function getOrCreateOwnerCard(
   const existing = await findOwnProfile(supabase, user.id);
   if (existing) return rowToOwnerCard(existing);
 
-  const design = { detail_color: DEFAULT_DETAIL, pattern: DEFAULT_PATTERN, pattern_seed: randomPatternSeed() };
+  const design: DesignWrite = {
+    detail_color: DEFAULT_DETAIL,
+    pattern: DEFAULT_PATTERN,
+    pattern_seed: randomPatternSeed(),
+    typeface: DEFAULT_TYPEFACE,
+  };
 
   for (let attempt = 0; attempt < MAX_SLUG_ATTEMPTS; attempt += 1) {
     const slug = slugCandidate(user.email ?? "", randomBytes(3).toString("hex"));
-    const insert = (withDesign: boolean) =>
+    // New cards simply start with the column defaults if some design fields can't be stored yet.
+    const {
+      result: { data, error },
+    } = await withDesignFallback("create", design, (fields) =>
       supabase
         .from("profiles")
-        .insert({ id: user.id, slug, accent_color: DEFAULT_ACCENT, ...(withDesign ? design : {}) })
+        .insert({ id: user.id, slug, accent_color: DEFAULT_ACCENT, ...fields })
         .select("*")
-        .single();
-
-    let { data, error } = await insert(true);
-    if (isMissingDesignColumn(error)) {
-      warnMissingDesignMigration("create");
-      ({ data, error } = await insert(false));
-    }
+        .single(),
+    );
 
     if (!error && data) return rowToOwnerCard(data);
     if (error?.code !== UNIQUE_VIOLATION) throw new Error(`Could not create profile: ${error?.message}`);
@@ -191,7 +237,15 @@ export async function getOrCreateOwnerCard(
 }
 
 export type SaveCardResult =
-  | { ok: true; card: OwnerCard; previousAvatarPath: string | null; slugChanged: boolean; previousSlug: string }
+  | {
+      ok: true;
+      card: OwnerCard;
+      previousAvatarPath: string | null;
+      slugChanged: boolean;
+      previousSlug: string;
+      /** The database couldn't store part of the design yet (a migration is pending). */
+      designPending: boolean;
+    }
   | { ok: false; errors: Record<string, string> };
 
 export async function saveOwnerCard(
@@ -219,20 +273,23 @@ export async function saveOwnerCard(
     links: input.links as unknown as Json,
     is_published: input.isPublished,
   };
-  const design = { detail_color: input.detailColor, pattern: input.pattern, pattern_seed: input.patternSeed };
-  const update = (withDesign: boolean) =>
+  const design: DesignWrite = {
+    detail_color: input.detailColor,
+    pattern: input.pattern,
+    pattern_seed: input.patternSeed,
+    typeface: input.typeface,
+  };
+  const {
+    result: { data, error },
+    dropped,
+  } = await withDesignFallback("save", design, (fields) =>
     supabase
       .from("profiles")
-      .update(withDesign ? { ...content, ...design } : content)
+      .update({ ...content, ...fields })
       .eq("id", userId)
       .select("*")
-      .single();
-
-  let { data, error } = await update(true);
-  if (isMissingDesignColumn(error)) {
-    warnMissingDesignMigration("save");
-    ({ data, error } = await update(false));
-  }
+      .single(),
+  );
 
   if (error || !data) {
     if (error?.code === UNIQUE_VIOLATION) return { ok: false, errors: { slug: "Ese enlace ya está cogido." } };
@@ -246,6 +303,7 @@ export async function saveOwnerCard(
     previousAvatarPath: current.avatar_path !== data.avatar_path ? current.avatar_path : null,
     slugChanged: current.slug !== data.slug,
     previousSlug: current.slug,
+    designPending: dropped.length > 0,
   };
 }
 

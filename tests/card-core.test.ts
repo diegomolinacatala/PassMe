@@ -62,8 +62,9 @@ const validInput = {
   bio: "Línea 1\r\n\r\n\r\n\r\nLínea 2",
   accentColor: "#FF4A1C",
   detailColor: null,
-  pattern: "sello",
+  pattern: "orbitas",
   patternSeed: 42,
+  typeface: "clasica",
   avatarPath: null,
   isPublished: true,
   links: [
@@ -111,13 +112,17 @@ describe("parseCardInput", () => {
     );
   });
 
-  it("rejects unknown patterns and out-of-range seal numbers", () => {
-    const result = parseCardInput({ ...validInput, pattern: "tartan", patternSeed: 1_000_000 });
+  it("rejects unknown motifs, retired motifs, typefaces and out-of-range variations", () => {
+    const result = parseCardInput({ ...validInput, pattern: "tartan", patternSeed: 1_000_000, typeface: "comic" });
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(Object.keys(result.errors)).toEqual(expect.arrayContaining(["pattern", "patternSeed"]));
+    expect(Object.keys(result.errors)).toEqual(expect.arrayContaining(["pattern", "patternSeed", "typeface"]));
     expect(parseCardInput({ ...validInput, patternSeed: 1.5 }).ok).toBe(false);
-    expect(parseCardInput({ ...validInput, detailColor: "#FFE3D1", pattern: "liso", patternSeed: 999_999 }).ok).toBe(true);
+    // Clients only ever send current motifs; retired ones are mapped on read.
+    expect(parseCardInput({ ...validInput, pattern: "sello" }).ok).toBe(false);
+    expect(
+      parseCardInput({ ...validInput, detailColor: "#FFE3D1", pattern: "monograma", patternSeed: 999_999, typeface: "editorial" }).ok,
+    ).toBe(true);
   });
 
   it("rejects unknown link kinds and too many links", () => {

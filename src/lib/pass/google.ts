@@ -9,8 +9,8 @@ import { log } from "@/lib/log";
 import { artVersion } from "./art";
 
 /**
- * Google Wallet "Generic pass" for a contact card. The card's artwork (pattern
- * + seal, no text) is the hero image, served by /u/[slug]/hero.
+ * Google Wallet "Generic pass" for a contact card. The card's artwork (motif
+ * around the PassMe mark, no name) is the hero image, served by /u/[slug]/hero.
  *
  * Adding: we sign a "Save to Google Wallet" JWT that embeds both the class and
  * the object, so Google creates them on first save (no API call needed).
@@ -99,7 +99,7 @@ export function buildGenericObject(config: GoogleWalletConfig, { card, profileId
     },
     heroImage: {
       sourceUri: { uri: heroUri },
-      contentDescription: localized(`Sello de la tarjeta de ${card.fullName}`),
+      contentDescription: localized(`Diseño de la tarjeta de ${card.fullName}`),
     },
     barcode: {
       type: "QR_CODE",

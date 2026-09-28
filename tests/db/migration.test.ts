@@ -1,6 +1,6 @@
 import type { PGlite } from "@electric-sql/pglite";
 import { beforeAll, describe, expect, it } from "vitest";
-import { asRole, createTestDatabase } from "./supabase-stub";
+import { applyMigrations, asRole, createTestDatabase } from "./supabase-stub";
 
 const ALICE = "11111111-1111-4111-8111-111111111111";
 const BOB = "22222222-2222-4222-8222-222222222222";
@@ -48,12 +48,12 @@ describe("profiles constraints", () => {
     }
   });
 
-  it("gives new cards the brand design and a seal number", async () => {
-    const { rows } = await db.query<{ accent_color: string; detail_color: string | null; pattern: string; pattern_seed: number }>(
-      `select accent_color, detail_color, pattern, pattern_seed from public.profiles where id = $1`,
+  it("gives new cards the brand design and their own variation", async () => {
+    const { rows } = await db.query<{ accent_color: string; detail_color: string | null; pattern: string; pattern_seed: number; typeface: string }>(
+      `select accent_color, detail_color, pattern, pattern_seed, typeface from public.profiles where id = $1`,
       [BOB],
     );
-    expect(rows[0]).toMatchObject({ accent_color: "#EF7A4A", detail_color: null, pattern: "sello" });
+    expect(rows[0]).toMatchObject({ accent_color: "#EF7A4A", detail_color: null, pattern: "orbitas", typeface: "clasica" });
     expect(rows[0]!.pattern_seed).toBeGreaterThanOrEqual(0);
     expect(rows[0]!.pattern_seed).toBeLessThanOrEqual(999999);
   });
@@ -68,8 +68,11 @@ describe("profiles constraints", () => {
     await expect(db.query(`update public.profiles set pattern_seed = 1000000 where id = $1`, [ALICE])).rejects.toThrow(
       /profiles_pattern_seed_range/,
     );
+    await expect(db.query(`update public.profiles set typeface = 'comic' where id = $1`, [ALICE])).rejects.toThrow(
+      /profiles_typeface/,
+    );
     const ok = await db.query(
-      `update public.profiles set detail_color = '#FFE3D1', pattern = 'ondas', pattern_seed = 48213 where id = $1`,
+      `update public.profiles set detail_color = '#FFE3D1', pattern = 'relieve', pattern_seed = 48213, typeface = 'editorial' where id = $1`,
       [ALICE],
     );
     expect(ok.affectedRows).toBe(1);
@@ -163,6 +166,7 @@ describe("get_public_card", () => {
     expect(card).toHaveProperty("pattern");
     expect(card).toHaveProperty("pattern_seed");
     expect(card).toHaveProperty("detail_color");
+    expect(card).toHaveProperty("typeface");
   });
 
   it("returns null for drafts, unpublished and unknown slugs", async () => {
@@ -272,6 +276,31 @@ describe("privileges", () => {
       /permission denied/,
     );
   });
+});
+
+describe("pass redesign migration", () => {
+  it("moves retired motifs to their successors and keeps accepting them during the rollout", async () => {
+    const REDESIGN = "20260928180000_pass_redesign.sql";
+    const old = await createTestDatabase({ before: REDESIGN });
+    const users = [ALICE, BOB, "33333333-3333-4333-8333-333333333333", "44444444-4444-4444-8444-444444444444"];
+    const patterns = ["sello", "senal", "ondas", "liso"];
+    for (const [i, id] of users.entries()) {
+      await old.query(`insert into auth.users (id) values ($1)`, [id]);
+      await old.query(`insert into public.profiles (id, slug, pattern) values ($1, $2, $3)`, [id, `user-${i}`, patterns[i]]);
+    }
+
+    await applyMigrations(old, (file) => file >= REDESIGN);
+
+    const { rows } = await old.query<{ slug: string; pattern: string; typeface: string }>(
+      `select slug, pattern, typeface from public.profiles order by slug`,
+    );
+    expect(rows.map((r) => r.pattern)).toEqual(["orbitas", "orbitas", "cinta", "liso"]);
+    expect(new Set(rows.map((r) => r.typeface))).toEqual(new Set(["clasica"]));
+    // The previous app version still writes "sello" until it's redeployed.
+    const legacy = await old.query(`update public.profiles set pattern = 'sello' where id = $1`, [ALICE]);
+    expect(legacy.affectedRows).toBe(1);
+    await old.close();
+  }, 60_000);
 });
 
 describe("cascade deletes", () => {

@@ -81,7 +81,7 @@ export interface CardPalette {
   foreground: Rgb;
   /** Field labels: the detail color when it reads well, otherwise a softened foreground. */
   label: Rgb;
-  /** Color of the guilloché pattern, the seal and other printed details. */
+  /** Color of the motif, the photo frame and other printed details. */
   detail: Rgb;
   isDark: boolean;
 }
