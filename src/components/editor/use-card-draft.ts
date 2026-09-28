@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useReducer } from "react";
+import type { DesignFields } from "@/lib/card/design";
 import type { LinkKind } from "@/lib/card/links";
 import { MAX_LINKS, parseCardInput, type FieldErrors } from "@/lib/card/schema";
 import type { CardLink, OwnerCard, PublicCard } from "@/lib/card/types";
@@ -14,6 +15,9 @@ export interface CardDraft {
   pronouns: string;
   bio: string;
   accentColor: string;
+  detailColor: string | null;
+  pattern: DesignFields["pattern"];
+  patternSeed: number;
   avatarPath: string | null;
   avatarUrl: string | null;
   isPublished: boolean;
@@ -32,6 +36,9 @@ export function draftFromCard(card: OwnerCard): CardDraft {
     pronouns: card.pronouns,
     bio: card.bio,
     accentColor: card.accentColor,
+    detailColor: card.detailColor,
+    pattern: card.pattern,
+    patternSeed: card.patternSeed,
     avatarPath: card.avatarPath,
     avatarUrl: card.avatarUrl,
     isPublished: card.isPublished,
@@ -50,6 +57,9 @@ export function draftToInput(draft: CardDraft) {
     pronouns: draft.pronouns,
     bio: draft.bio,
     accentColor: draft.accentColor,
+    detailColor: draft.detailColor,
+    pattern: draft.pattern,
+    patternSeed: draft.patternSeed,
     avatarPath: draft.avatarPath,
     isPublished: draft.isPublished,
     links: draft.links,
@@ -66,6 +76,9 @@ export function draftToPublicCard(draft: CardDraft): PublicCard {
     pronouns: draft.pronouns.trim(),
     bio: draft.bio.trim(),
     accentColor: draft.accentColor,
+    detailColor: draft.detailColor,
+    pattern: draft.pattern,
+    patternSeed: draft.patternSeed,
     avatarUrl: draft.avatarUrl,
     links: draft.links.filter((l) => l.visible && l.value.trim()),
   };
@@ -81,7 +94,7 @@ function newLinkId(): string {
 
 type Action =
   | { type: "field"; field: TextField; value: string }
-  | { type: "accent"; value: string }
+  | { type: "design"; patch: Partial<DesignFields> }
   | { type: "published"; value: boolean }
   | { type: "avatar"; path: string | null; url: string | null }
   | { type: "addLink"; kind: LinkKind; id: string }
@@ -100,8 +113,8 @@ function reducer(state: State, action: Action): State {
   switch (action.type) {
     case "field":
       return { ...state, draft: { ...draft, [action.field]: action.value } };
-    case "accent":
-      return { ...state, draft: { ...draft, accentColor: action.value } };
+    case "design":
+      return { ...state, draft: { ...draft, ...action.patch } };
     case "published":
       return { ...state, draft: { ...draft, isPublished: action.value } };
     case "avatar":
@@ -145,7 +158,7 @@ export function useCardDraft(initial: CardDraft) {
   const actions = useMemo(
     () => ({
       setField: (field: TextField, value: string) => dispatch({ type: "field", field, value }),
-      setAccent: (value: string) => dispatch({ type: "accent", value }),
+      setDesign: (patch: Partial<DesignFields>) => dispatch({ type: "design", patch }),
       setPublished: (value: boolean) => dispatch({ type: "published", value }),
       setAvatar: (path: string | null, url: string | null) => dispatch({ type: "avatar", path, url }),
       addLink: (kind: LinkKind) => {
