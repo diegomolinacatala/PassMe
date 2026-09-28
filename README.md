@@ -17,6 +17,7 @@ cartera, junto a tus tarjetas y billetes.
 ## Qué hace
 
 - **Pases de cartera**: `.pkpass` firmado para Apple Wallet y pase genérico de Google Wallet, con tu foto, nombre, cargo, empresa y un QR.
+- **Un pase que no se parece a ningún otro**: cada tarjeta lleva un sello de guilloché generado a partir de su número, como los de pasaportes y billetes. Eliges tema, tintas y motivo; el arte se renderiza en el servidor y la vista previa del editor es idéntica al pase real.
 - **Página al escanear** (`/u/tu-nombre`): tarjeta con tus contactos, botón **Guardar contacto** (vCard con foto) y compartir.
 - **Privacidad por diseño**: cada contacto se puede ocultar; lo oculto **no sale del servidor** (lo filtra la base de datos). Métricas sin IPs ni cookies.
 - **Siempre actualizada**: al editar tu tarjeta, los pases de Apple se actualizan solos (web service + push APNs) y el de Google se sincroniza por API.
@@ -71,12 +72,12 @@ src/
   app/                 rutas (landing, /u/[slug], /dashboard, /login, /wallet, api/*)
   components/          brand · card (pase, tarjeta, QR) · editor · landing · ui
   lib/
-    card/              dominio: tipos de enlace, validación, vCard, colores, slugs
+    card/              dominio: tipos de enlace, validación, vCard, colores, diseño y motivos, slugs
     data/              acceso a datos (Supabase)
-    pass/              Apple (.pkpass, APNs, web service) y Google Wallet
+    pass/              Apple (.pkpass, APNs, web service), Google Wallet y arte del pase (Satori)
     supabase/          clientes server/browser/admin y tipos
   proxy.ts             CSP con nonce, refresco de sesión y protección de /dashboard
-supabase/              migración SQL y plantilla de email
+supabase/              migraciones SQL y plantilla de email
 scripts/               doctor, certificados Apple, assets de marca
 tests/ · e2e/          Vitest · Playwright
 ```

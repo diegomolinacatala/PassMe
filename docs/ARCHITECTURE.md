@@ -25,9 +25,9 @@ sequenceDiagram
 
 | Capa | Dónde | Responsabilidad |
 | --- | --- | --- |
-| Dominio | `src/lib/card/*` | Tipos de enlace (validación + href seguro), esquema Zod, vCard 3.0, colores legibles, slugs. Isomórfico: la misma validación en navegador y servidor. |
+| Dominio | `src/lib/card/*` | Tipos de enlace (validación + href seguro), esquema Zod, vCard 3.0, colores legibles, diseño (`design.ts`: temas, tintas, sello) y motivos generativos (`pattern.ts`), slugs. Isomórfico: la misma validación en navegador y servidor. |
 | Datos | `src/lib/data/*` | Lecturas/escrituras en Supabase. Cliente con sesión (RLS) para el dueño, cliente anónimo para lo público y cliente *admin* solo donde es imprescindible. |
-| Pases | `src/lib/pass/*` | `apple.ts` (pass.json + firma), `google.ts` (objeto genérico + JWT + sync REST), `apns.ts` (push HTTP/2), `web-service.ts` (protocolo de Apple), `handoff.ts` (tokens de 30 min), `images.ts` (logo/icono/miniatura con sharp). |
+| Pases | `src/lib/pass/*` | `apple.ts` (pass.json + firma), `google.ts` (objeto genérico + JWT + sync REST), `apns.ts` (push HTTP/2), `web-service.ts` (protocolo de Apple), `handoff.ts` (tokens de 30 min), `images.ts` (logo/icono con sharp), `art.tsx` (banda de Apple y *hero* de Google con Satori). |
 | Rutas | `src/app/**` | Páginas (landing, tarjeta, login, editor, handoff) y API (`/api/pass/*`, `/api/wallet/v1/*`, `/api/events`, `/api/health`). |
 | Borde | `src/proxy.ts` | CSP con nonce por petición, refresco de sesión de Supabase, redirección de `/dashboard` sin sesión. |
 
@@ -46,7 +46,10 @@ erDiagram
         text full_name
         text headline
         text company
-        text accent_color "#RRGGBB"
+        text accent_color "fondo #RRGGBB"
+        text detail_color "tinta de detalle o null (auto)"
+        text pattern "sello|ondas|senal|liso"
+        int pattern_seed "0..999999 = Nº de sello"
         text avatar_path "uid/archivo.jpg"
         jsonb links "[{id, kind, value, label?, visible}]"
         bool is_published
@@ -100,13 +103,30 @@ sequenceDiagram
 
 El número de serie del pase es el `id` del perfil; el `lastUpdated` es el `updated_at` en milisegundos.
 
+## Arte del pase
+
+```mermaid
+flowchart LR
+    D["design.ts<br/>tema · tintas · motivo · Nº sello"] --> P["pattern.ts<br/>rutas SVG deterministas"]
+    P --> A["PassArt (JSX, estilos en línea)"]
+    A -->|navegador| E["Vista previa del editor,<br/>landing, página pública"]
+    A -->|Satori + sharp| S["strip.png @1x/2x/3x<br/>(Apple store card)"]
+    A -->|Satori| H["/u/[slug]/hero?v=…<br/>(Google hero 1032×336)"]
+    A -->|Satori| O["opengraph-image"]
+```
+
+Las imágenes se memorizan por versión del arte (colores, motivo, semilla, nombre y foto). La guía visual completa está en [`BRAND.md`](BRAND.md).
+
 ## Decisiones
 
 | Decisión | Motivo |
 | --- | --- |
 | Next.js en Vercel + Supabase | Lo pedido; cero servidores que mantener, plan gratuito suficiente para el MVP. |
 | Perfiles creados en la app (no trigger en `auth.users`) | Un fallo al generar el slug nunca puede bloquear un registro. |
-| Pase "generic" de Apple | Es el estilo pensado para tarjetas de socio/contacto: nombre grande, miniatura y QR. |
+| Pase *store card* de Apple | Es el único estilo con banda de imagen a todo el ancho (375×144 pt): ahí va el arte de la tarjeta (guilloché, foto y nombre en nuestra tipografía). Los campos de texto reales (cargo, ubicación) siguen debajo para VoiceOver y el Apple Watch. |
+| Un solo componente de arte (`components/card/pass-art.tsx`) | Estilos en línea y flexbox: el mismo árbol lo pinta el navegador (vista previa) y Satori en el servidor (PNG del pase). Lo que ves en el editor es lo que llega a la cartera. |
+| Motivo con semilla guardada | El número de sello (`pattern_seed`) genera el guilloché de forma determinista; editar el nombre no cambia el dibujo, «Otro sello» sí. |
+| *Hero* de Google con `?v=` | Google cachea las imágenes por URL; la versión (hash de las entradas del arte) cambia solo cuando cambia el dibujo. |
 | JWT con clase + objeto para Google | No hace falta llamar a la API para crear el pase; la API solo se usa para actualizar. |
 | vCard 3.0 | La versión con mejor compatibilidad en iOS y Android. |
 | Modo demo sin variables | Se puede enseñar y desarrollar sin credenciales; los tests E2E corren sin secretos. |
