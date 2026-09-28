@@ -1,0 +1,53 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { Mark } from "@/components/brand/logo";
+import { ProfileCard } from "@/components/card/profile-card";
+import { ViewTracker } from "@/components/card/profile-actions";
+import { getPublicCard } from "@/lib/data/cards";
+import { parseVisitSource } from "@/lib/request";
+
+export async function generateMetadata({ params }: PageProps<"/u/[slug]">): Promise<Metadata> {
+  const { slug } = await params;
+  const card = await getPublicCard(slug);
+  if (!card) return { title: "Tarjeta no encontrada", robots: { index: false } };
+
+  const description = [card.headline, card.company, card.location].filter(Boolean).join(" · ") || "Tarjeta de contacto";
+  return {
+    title: card.fullName,
+    description,
+    alternates: { canonical: `/u/${card.slug}` },
+    openGraph: { title: `${card.fullName} · PassMe`, description, type: "profile" },
+    // Personal cards shouldn't be indexed by search engines by default.
+    robots: { index: false, follow: false },
+  };
+}
+
+export default async function PublicCardPage({ params, searchParams }: PageProps<"/u/[slug]">) {
+  const [{ slug }, query] = await Promise.all([params, searchParams]);
+  const card = await getPublicCard(slug);
+  if (!card) notFound();
+
+  const source = parseVisitSource(typeof query.src === "string" ? query.src : null);
+
+  return (
+    <main className="min-h-dvh px-4 pt-6 pb-14 sm:pt-12">
+      <div className="mx-auto w-full max-w-[440px] animate-rise">
+        <ProfileCard card={card} />
+
+        <footer className="mt-8 flex flex-col items-center gap-2 text-center">
+          <Link
+            href="/"
+            className="group inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm text-muted transition-colors hover:text-ink"
+          >
+            <Mark className="size-5 text-ink transition-transform duration-500 group-hover:-rotate-6" />
+            <span>
+              Hecho con <span className="font-display text-base text-ink italic">PassMe</span> · crea la tuya
+            </span>
+          </Link>
+        </footer>
+      </div>
+      <ViewTracker slug={card.slug} source={source} />
+    </main>
+  );
+}
