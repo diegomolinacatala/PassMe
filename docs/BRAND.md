@@ -2,9 +2,9 @@
 
 > **Pásame tu contacto.** PassMe convierte tu tarjeta de visita en un pase de
 > Apple Wallet y Google Wallet. La marca es **papelería cálida**: papel beige,
-> tinta café y un naranja suave. El pase toma prestado el oficio de la
-> **impresión de seguridad** (guilloché, microtexto, números de sello) para
-> que cada tarjeta sea única.
+> tinta café y un naranja suave. El pase se dibuja para cada persona: un
+> **motivo generativo** de líneas finas, su variación y la letra del nombre
+> hacen que no haya dos iguales.
 
 ## 1. Idea
 
@@ -12,7 +12,7 @@
 | --- | --- |
 | **Nombre** | *PassMe* se lee «pásame»: lo que dices cuando alguien te pide el contacto. |
 | **Promesa** | Tu tarjeta de visita, en la cartera del móvil. Siempre al día, tú decides qué se ve. |
-| **Recurso gráfico** | El **sello**: un rosetón de guilloché generado para cada tarjeta a partir de su número (`Sello Nº 048213`). Nadie más tiene el mismo. |
+| **Recurso gráfico** | El **motivo**: órbitas, curvas de nivel, rayos… dibujados alrededor de tu foto a partir de una semilla que no se ve. «Otra variación» dibuja otro; nadie más tiene el tuyo. |
 | **Personalidad** | Sencilla y cercana, con el cuidado de la buena papelería. Editorial, nunca corporativa. |
 
 ## 2. Paleta
@@ -39,8 +39,8 @@ Derivados en `src/app/globals.css` (`--color-*`): `paper-deep #E9E3D6` (arena), 
 | Rol | Familia | Uso |
 | --- | --- | --- |
 | Display | **Instrument Serif** (regular + *itálica*) | Titulares y el nombre en el pase. La cursiva en naranja marca la frase clave: «Tu tarjeta, *a tu manera.*» |
-| Texto / UI | **Geist** | Todo lo funcional. |
-| Marcas | **Geist Mono**, mayúsculas espaciadas | *Eyebrows*, números de sección (`01`), números de sello, microtexto. |
+| Texto / UI | **Geist** | Todo lo funcional, y la letra «Moderna» del pase. |
+| Marcas | **Geist Mono**, mayúsculas espaciadas | *Eyebrows*, números de sección (`01`), etiquetas. |
 
 Las tres son OFL; las copias `.woff` de `assets/fonts` alimentan las imágenes generadas en el servidor (Satori).
 
@@ -62,28 +62,46 @@ El pase es el producto. Anatomía en Apple Wallet (estilo *store card*):
 ┌──────────────────────────────────────────┐
 │ ◧ Estudio Norte                           │  logo (tinta de etiquetas) + empresa
 ├──────────────────────────────────────────┤
-│ SELLO Nº 048213            ╭─────────╮    │
-│                           ( guilloché )   │  banda de arte 375×144 pt,
-│ Alex Rivera               (  ( foto )  )  │  generada en el servidor con Satori
-│                            ╰─────────╯    │
-│ PASSME · ALEX RIVERA · PASSME · …         │  microtexto
+│                        ·  ╭────────╮   ·  │
+│ Alex Rivera           (  ( ( foto ) )  )  │  banda de arte 375×144 pt,
+│                           ╰────────╯      │  generada en el servidor con Satori
 ├──────────────────────────────────────────┤
 │ CARGO               UBICACIÓN             │  campos reales (VoiceOver, Watch)
 │ Product Designer    Valencia, ES          │
-│                  ▣ QR                     │
+│                  ▣ QR                     │  sin texto debajo
 └──────────────────────────────────────────┘
 ```
 
-En Google Wallet el arte va en la imagen *hero* (1032×336 px) **sin texto**, como piden sus directrices: guilloché y sello con la marca.
+En Google Wallet el arte va en la imagen *hero* (1032×336 px) **sin el nombre**, como piden sus directrices: el motivo alrededor de la marca (con Monograma, la inicial).
 
-**Lo que el usuario edita** (todo, siempre):
+**Lo que el usuario edita** (todo, siempre; cada opción se previsualiza con su propia tarjeta):
 
 | Ajuste | Opciones | Dónde vive |
 | --- | --- | --- |
 | **Tema** | 10 combinaciones suaves: Naranja, Melocotón, Papel, Arena, Caramelo, Terracota, Café, Tinta, Salvia, Mostaza | `CARD_THEMES` en `src/lib/card/design.ts` |
+| **Motivo** | Órbitas, Relieve, Halo, Trama, Cinta, Rayos, Monograma, Liso | `pattern` · `src/lib/card/pattern.ts` |
+| **Variación** | «Otra variación» vuelve a dibujar el motivo; «Anterior» lo deshace. La semilla nunca se muestra | `pattern_seed` |
+| **Letra** | Clásica, Cursiva, Editorial (nombre recto y apellidos en cursiva), Moderna (Geist) | `typeface` · `src/lib/card/design.ts` |
 | **Tintas** | Fondo y detalle libres (selector de color), detalle «Auto» | `accent_color`, `detail_color` |
-| **Motivo** | Sello (rosetón), Ondas (billete), Señal (anillos *contactless*), Liso | `pattern` · `src/lib/card/pattern.ts` |
-| **Sello** | Número de 6 cifras que genera el motivo; «Otro sello» lo cambia | `pattern_seed` |
+
+**Los motivos**
+
+| Motivo | Qué dibuja |
+| --- | --- |
+| **Órbitas** | Anillos finos que se abren alrededor de la foto, uno punteado y dos o tres lunas. El motivo por defecto. |
+| **Relieve** | Curvas de nivel de un monte cuya cima es la foto; una de cada cinco, más marcada, como en un mapa. |
+| **Halo** | Tres discos tintados, descentrados como un eclipse: tono sobre tono. |
+| **Trama** | Puntos de semitono, grandes junto a la foto, que se desvanecen hacia el nombre. |
+| **Cinta** | Una cinta de hilos que pasa bajo el nombre, se retuerce y sube por detrás de la foto. |
+| **Rayos** | Un sol de líneas finas, largas y cortas, que sale de la foto. |
+| **Monograma** | La inicial en cursiva, enorme y cortada por los bordes, como un sello de papelería. |
+| **Liso** | Solo color y el aro de la foto. |
+
+**Reglas del motivo**
+
+- Siempre en la tinta de detalle, con trazos finos (0,4–1 pt) y aire alrededor de la foto; el aro fino de la foto es común a todos.
+- Nunca compite con el nombre: los de líneas y puntos se desvanecen hacia la izquierda; los de tinta plana (Halo, Monograma) son tono sobre tono.
+- Sin texto decorativo: ni números de serie ni microtexto. Todo lo que se lee en el pase es información.
 
 **Garantías automáticas**: el texto se pone blanco o Café según el fondo (≥ 4,5:1; en los tonos medios en que el Café no llega, negro); las etiquetas usan la tinta de detalle solo si llega a 4,5:1; si el detalle elegido apenas se ve (< 1,6:1) se sustituye por uno tonal automático.
 
@@ -91,12 +109,11 @@ En Google Wallet el arte va en la imagen *hero* (1032×336 px) **sin texto**, co
 
 - Tuteo, frases cortas, verbos al principio. «Guárdala en tu cartera.»
 - Juega con el nombre sin abusar: *Pásame tu contacto*, *Pásate*.
-- Concreto antes que abstracto: «2 min», «0 apps», «Nº 048213».
+- Concreto antes que abstracto: «2 min», «0 apps», «8 motivos».
 - La privacidad se explica con hechos («lo oculto no sale del servidor»), no con promesas.
 
 ## 7. Detalles de oficio
 
-- **Guilloché** como textura: detrás de objetos protagonistas, con viñeta, nunca detrás de texto largo.
-- **Microtexto** (`.microtext`): línea de mayúsculas diminutas en pies y bordes, como en un billete.
+- **Motivo de marca** (`BrandMotif`) como textura: detrás de objetos protagonistas, con viñeta, nunca detrás de texto largo.
 - **Marcas de corte** (`.crop-marks`) alrededor de los objetos de escaparate.
 - **Números de sección** en mono (`01`, `02`…) y *eyebrows* en mayúsculas espaciadas.
