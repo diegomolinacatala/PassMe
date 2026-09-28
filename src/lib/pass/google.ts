@@ -1,14 +1,16 @@
 import "server-only";
 import { importPKCS8, SignJWT } from "jose";
-import { cardPalette, toHex } from "@/lib/card/colors";
+import { resolveDesign } from "@/lib/card/design";
 import { linkHref, linkTitle } from "@/lib/card/links";
 import type { PublicCard } from "@/lib/card/types";
 import type { GoogleWalletConfig } from "@/lib/config.server";
 import { getSiteUrl, prettyProfileUrl, profileUrl } from "@/lib/env";
 import { log } from "@/lib/log";
+import { artVersion } from "./art";
 
 /**
- * Google Wallet "Generic pass" for a contact card.
+ * Google Wallet "Generic pass" for a contact card. The card's artwork (pattern
+ * + seal, no text) is the hero image, served by /u/[slug]/hero.
  *
  * Adding: we sign a "Save to Google Wallet" JWT that embeds both the class and
  * the object, so Google creates them on first save (no API call needed).
@@ -61,12 +63,16 @@ export interface GooglePassInput {
 }
 
 export function buildGenericObject(config: GoogleWalletConfig, { card, profileId }: GooglePassInput) {
-  const palette = cardPalette(card.accentColor);
+  const design = resolveDesign(card);
   const logoUri = card.avatarUrl ?? `${getSiteUrl()}/brand/wallet-logo.png`;
+  const heroUri = `${profileUrl(card.slug)}/hero?v=${artVersion(card, "hero")}`;
 
+  // Ids match the class template rows (company | location), which is unchanged
+  // since v1 so existing issuer classes keep working without a new suffix.
   const textModulesData = [
     card.company ? { id: "company", header: "Empresa", body: card.company } : null,
     card.location ? { id: "location", header: "Ubicación", body: card.location } : null,
+    card.pronouns ? { id: "pronouns", header: "Pronombres", body: card.pronouns } : null,
     card.bio ? { id: "bio", header: "Sobre mí", body: card.bio } : null,
   ].filter((m): m is { id: string; header: string; body: string } => m !== null);
 
@@ -86,10 +92,14 @@ export function buildGenericObject(config: GoogleWalletConfig, { card, profileId
     cardTitle: localized(card.company || "PassMe"),
     header: localized(card.fullName),
     ...(card.headline ? { subheader: localized(card.headline) } : {}),
-    hexBackgroundColor: toHex(palette.background),
+    hexBackgroundColor: design.background,
     logo: {
       sourceUri: { uri: logoUri },
       contentDescription: localized(card.avatarUrl ? `Foto de ${card.fullName}` : "PassMe"),
+    },
+    heroImage: {
+      sourceUri: { uri: heroUri },
+      contentDescription: localized(`Sello de la tarjeta de ${card.fullName}`),
     },
     barcode: {
       type: "QR_CODE",

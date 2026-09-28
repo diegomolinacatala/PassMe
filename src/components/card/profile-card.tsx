@@ -2,11 +2,14 @@ import { ArrowUpRight, MapPin, UserRoundPlus } from "lucide-react";
 import { Mark } from "@/components/brand/logo";
 import { buttonClasses } from "@/components/ui/button";
 import { cardCssVars } from "@/lib/card/colors";
+import { resolveDesign, sealNumber } from "@/lib/card/design";
 import { linkDisplay, linkHref, linkTitle } from "@/lib/card/links";
 import type { PublicCard } from "@/lib/card/types";
 import { cn } from "@/lib/cn";
 import { Avatar } from "./avatar";
 import { LinkIcon } from "./link-icon";
+import { DeferredPatternSvg } from "./deferred-pattern-svg";
+import { microtext } from "./pass-art";
 import { ShareButton, TrackedLink } from "./profile-actions";
 
 interface ProfileCardProps {
@@ -16,42 +19,67 @@ interface ProfileCardProps {
   className?: string;
 }
 
+/** Header artwork box: anchored bottom-right so the seal always wraps the avatar. */
+const ART_BOX = { width: 600, height: 210 };
+const AVATAR_SIZE = 88;
+/** Avatar center, measured from the header's bottom-right corner (px-6 / pb-9 + half the avatar). */
+const ART_FOCUS = { x: ART_BOX.width - 24 - AVATAR_SIZE / 2, y: ART_BOX.height - 36 - AVATAR_SIZE / 2, r: AVATAR_SIZE / 2 };
+
 /**
  * The public contact card (what people see after scanning the QR).
- * Styled like a physical pass: accent-colored stub, perforation, paper body.
+ * Styled like the pass: the card's color and guilloché seal on the stub,
+ * a perforation, and a paper body with the contacts.
  */
 export function ProfileCard({ card, preview = false, className }: ProfileCardProps) {
   const name = card.fullName || "Tu nombre";
   const meta = [card.headline, card.company].filter(Boolean).join(" · ");
   const vcardHref = `/u/${encodeURIComponent(card.slug)}/vcard`;
+  const design = resolveDesign(card);
 
   return (
     <article
       className={cn("relative overflow-hidden rounded-[28px] bg-card shadow-object", className)}
-      style={cardCssVars(card.accentColor)}
+      style={cardCssVars(design.background, design.detail)}
       aria-label={`Tarjeta de contacto de ${name}`}
     >
       {/* Stub */}
-      <header className="relative bg-[var(--card-bg)] px-6 pt-5 pb-9 text-[var(--card-fg)]">
-        <div className="flex items-center justify-between">
-          <span className="inline-flex items-center gap-1.5 font-mono text-[10px] tracking-[0.16em] uppercase">
+      <header className="relative isolate overflow-hidden bg-[var(--card-bg)] px-6 pt-5 pb-9 text-[var(--card-fg)]">
+        <DeferredPatternSvg
+          design={design}
+          box={ART_BOX}
+          focus={ART_FOCUS}
+          fade={{ from: ART_BOX.width - 330, to: ART_BOX.width - 150 }}
+          width={ART_BOX.width}
+          height={ART_BOX.height}
+          style={{ position: "absolute", right: 0, bottom: 0, zIndex: -1, maxWidth: "none" }}
+        />
+        <div className="flex items-center justify-between gap-3">
+          <span className="inline-flex items-center gap-1.5 font-mono text-[10px] tracking-[0.16em] text-[var(--card-label)] uppercase">
             <Mark className="size-4" cutout="var(--card-bg)" />
-            Tarjeta de contacto
+            Contacto · Sello {sealNumber(design.seed)}
           </span>
           {card.pronouns ? (
-            <span className="rounded-full border border-current/25 px-2 py-0.5 font-mono text-[10px] tracking-wide">
+            <span className="rounded-full border border-current/25 bg-[var(--card-bg)] px-2 py-0.5 font-mono text-[10px] tracking-wide">
               {card.pronouns}
             </span>
           ) : null}
         </div>
 
-        <div className="mt-8 flex items-end justify-between gap-4">
+        <div className="mt-10 flex items-end justify-between gap-4">
           <div className="min-w-0">
-            <h1 className="font-display text-[2.6rem] leading-[0.95] tracking-tight break-words">{name}</h1>
-            {meta ? <p className="mt-2 text-[0.95rem] leading-snug opacity-85">{meta}</p> : null}
+            <h1 className="font-display text-[2.7rem] leading-[0.95] tracking-tight break-words">{name}</h1>
+            {meta ? <p className="mt-2 text-[0.95rem] leading-snug opacity-90">{meta}</p> : null}
           </div>
-          <Avatar name={name} url={card.avatarUrl} size={84} className="ring-4 ring-[var(--card-fg)]/15" />
+          <Avatar
+            name={name}
+            url={card.avatarUrl}
+            size={AVATAR_SIZE}
+            className="ring-1 ring-[var(--card-detail)] ring-offset-4 ring-offset-[var(--card-bg)]"
+          />
         </div>
+        <p className="microtext absolute inset-x-6 bottom-3 text-[var(--card-detail)] opacity-80" aria-hidden="true">
+          {microtext(name)}
+        </p>
       </header>
 
       {/* Perforation */}
@@ -95,7 +123,7 @@ export function ProfileCard({ card, preview = false, className }: ProfileCardPro
             {card.links.map((link) => {
               const content = (
                 <>
-                  <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[var(--card-bg)] text-[var(--card-fg)] transition-transform duration-300 ease-[var(--ease-spring)] group-hover:-rotate-6">
+                  <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[var(--card-bg)] text-[var(--card-label)] transition-transform duration-300 ease-[var(--ease-spring)] group-hover:-rotate-6">
                     <LinkIcon kind={link.kind} size={19} />
                   </span>
                   <span className="min-w-0 flex-1">

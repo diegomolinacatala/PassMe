@@ -43,6 +43,9 @@ function profile(overrides: Partial<ProfileRow> = {}): ProfileRow {
     pronouns: "",
     bio: "",
     accent_color: "#2340F5",
+    detail_color: null,
+    pattern: "sello",
+    pattern_seed: 42,
     avatar_path: null,
     links: [{ id: "l-email-1", kind: "email", value: "alex@example.com", visible: true }],
     is_published: true,
@@ -157,7 +160,8 @@ describe("pass generation service", () => {
     const pass = await service.buildDemoApplePass();
     const json = JSON.parse(await (await JSZip.loadAsync(pass.buffer)).file("pass.json")!.async("string"));
     expect(json.webServiceURL).toBeUndefined();
-    expect(json.generic.primaryFields[0].value).toBe("Alex Rivera");
+    expect(json.description).toBe("Tarjeta de contacto de Alex Rivera");
+    expect(json.storeCard.secondaryFields[0].value).toBe("Product Designer");
   }, 30_000);
 });
 

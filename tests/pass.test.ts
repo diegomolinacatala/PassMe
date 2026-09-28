@@ -4,6 +4,7 @@ import JSZip from "jszip";
 import forge from "node-forge";
 import sharp from "sharp";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { cardPalette, toRgbString } from "@/lib/card/colors";
 import { DEMO_CARD } from "@/lib/card/demo";
 import type { AppleWalletConfig, GoogleWalletConfig } from "@/lib/config.server";
 import { toPublicCard } from "@/lib/data/cards";
@@ -38,7 +39,7 @@ afterEach(() => {
 const card = toPublicCard(DEMO_CARD);
 
 describe("buildApplePassJson", () => {
-  it("builds a generic pass with a QR pointing at the public card", () => {
+  it("builds a store card with a QR pointing at the public card", () => {
     const json = buildApplePassJson({ card, serialNumber: DEMO_CARD.id, authenticationToken: "a".repeat(64) }, appleConfig);
 
     expect(json).toMatchObject({
@@ -47,7 +48,11 @@ describe("buildApplePassJson", () => {
       teamIdentifier: "TEAMID1234",
       serialNumber: DEMO_CARD.id,
       logoText: "Estudio Norte",
-      backgroundColor: "rgb(255, 74, 28)",
+      description: "Tarjeta de contacto de Alex Rivera",
+      backgroundColor: "rgb(239, 122, 74)",
+      // Café ink on the Naranja theme; labels are a softened ink (the pastel detail is too light).
+      foregroundColor: "rgb(34, 27, 23)",
+      labelColor: toRgbString(cardPalette("#EF7A4A", "#FFE3D1").label),
       webServiceURL: `${SITE}/api/wallet`,
       authenticationToken: "a".repeat(64),
     });
@@ -57,7 +62,13 @@ describe("buildApplePassJson", () => {
       messageEncoding: "iso-8859-1",
       altText: "passme.test/u/demo",
     });
-    expect(json.generic.primaryFields[0]).toEqual({ key: "name", label: "PRODUCT DESIGNER", value: "Alex Rivera" });
+    expect(json).not.toHaveProperty("generic");
+    // The name lives in the strip artwork; fields below it carry role and place.
+    expect(json.storeCard.primaryFields).toEqual([]);
+    expect(json.storeCard.secondaryFields).toEqual([
+      { key: "headline", label: "CARGO", value: "Product Designer" },
+      { key: "location", label: "UBICACIÓN", value: "Valencia, ES" },
+    ]);
   });
 
   it("only includes visible links on the back and escapes HTML", () => {
@@ -71,11 +82,11 @@ describe("buildApplePassJson", () => {
       },
       appleConfig,
     );
-    const back = JSON.stringify(json.generic.backFields);
+    const back = JSON.stringify(json.storeCard.backFields);
     expect(back).not.toContain("600 000 000");
     expect(back).toContain("alex@example.com");
     // Labels are plain text in Wallet; only attributedValue is parsed as (tiny) HTML.
-    const attributed = json.generic.backFields.map((f) => ("attributedValue" in f ? f.attributedValue : "")).join();
+    const attributed = json.storeCard.backFields.map((f) => ("attributedValue" in f ? f.attributedValue : "")).join();
     expect(attributed).not.toContain("<b>");
     expect(attributed).toContain("&lt;b&gt;");
   });
@@ -89,7 +100,7 @@ describe("buildApplePassJson", () => {
 
   it("keeps field keys unique", () => {
     const json = buildApplePassJson({ card, serialNumber: "x" }, appleConfig);
-    const keys = Object.values(json.generic).flat().map((f) => f.key);
+    const keys = Object.values(json.storeCard).flat().map((f) => f.key);
     expect(new Set(keys).size).toBe(keys.length);
   });
 });
@@ -116,10 +127,12 @@ describe("createApplePass", () => {
         "icon@3x.png",
         "logo.png",
         "logo@2x.png",
-        "thumbnail.png",
-        "thumbnail@3x.png",
+        "strip.png",
+        "strip@2x.png",
+        "strip@3x.png",
       ]),
     );
+    expect(files).not.toContain("thumbnail.png");
 
     // Manifest hashes match every file.
     const manifest = JSON.parse(await zip.file("manifest.json")!.async("string")) as Record<string, string>;
@@ -136,12 +149,11 @@ describe("createApplePass", () => {
     );
     expect(subjects).toEqual(expect.arrayContaining(["Test WWDR CA", "Pass Type ID: pass.app.passme.test"]));
 
-    // Thumbnail is a circle: transparent corners.
-    const thumb = await sharp(await zip.file("thumbnail@3x.png")!.async("nodebuffer")).raw().ensureAlpha().toBuffer({
-      resolveWithObject: true,
-    });
-    expect(thumb.info.width).toBe(270);
-    expect(thumb.data[3]).toBe(0);
+    // Strip artwork at Apple's store-card size (375×144 pt) for every scale.
+    for (const [name, scale] of [["strip.png", 1], ["strip@2x.png", 2], ["strip@3x.png", 3]] as const) {
+      const meta = await sharp(await zip.file(name)!.async("nodebuffer")).metadata();
+      expect([meta.width, meta.height], name).toEqual([375 * scale, 144 * scale]);
+    }
 
     const passJson = JSON.parse(await zip.file("pass.json")!.async("string"));
     expect(passJson.serialNumber).toBe(DEMO_CARD.id);
@@ -150,7 +162,7 @@ describe("createApplePass", () => {
   it("works without an avatar", async () => {
     const buffer = await createApplePass({ card: { ...card, avatarUrl: null }, serialNumber: "demo-serial" }, appleConfig);
     const zip = await JSZip.loadAsync(buffer);
-    expect(zip.file("thumbnail.png")).toBeNull();
+    expect(zip.file("strip@3x.png")).not.toBeNull();
     expect(zip.file("icon.png")).not.toBeNull();
   }, 60_000);
 });
@@ -169,7 +181,10 @@ describe("Google Wallet", () => {
     expect(object.id).toBe(googleObjectId(googleConfig, DEMO_CARD.id));
     expect(object.classId).toBe("3388000000012345678.passme_card_v1");
     expect(object.header.defaultValue.value).toBe("Alex Rivera");
-    expect(object.hexBackgroundColor).toBe("#FF4A1C");
+    expect(object.hexBackgroundColor).toBe("#EF7A4A");
+    // Text modules keep the ids the v1 class template rows point at.
+    expect(object.textModulesData.map((m) => m.id)).toEqual(expect.arrayContaining(["company", "location"]));
+    expect(object.heroImage.sourceUri.uri).toMatch(new RegExp(`^${SITE}/u/demo/hero\\?v=[0-9a-z]+$`));
     expect(object.barcode).toEqual({ type: "QR_CODE", value: `${SITE}/u/demo?src=qr`, alternateText: "passme.test/u/demo" });
     expect(object.logo.sourceUri.uri).toBe(`${SITE}/brand/wallet-logo.png`);
     const uris = object.linksModuleData.uris.map((u) => u.uri);

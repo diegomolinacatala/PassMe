@@ -1,9 +1,10 @@
 import { Mark } from "@/components/brand/logo";
-import { cardPalette, toHex } from "@/lib/card/colors";
+import { resolveDesign } from "@/lib/card/design";
 import type { PublicCard } from "@/lib/card/types";
 import { cn } from "@/lib/cn";
 import { prettyProfileUrl, profileUrl } from "@/lib/env";
-import { Avatar } from "./avatar";
+import { Avatar, initials } from "./avatar";
+import { containerUnit, CSS_FONTS, PassArt } from "./pass-art";
 import { QrCode } from "./qr-code";
 
 export type PassStyle = "apple" | "google";
@@ -14,118 +15,114 @@ interface WalletPassProps {
   className?: string;
 }
 
+interface Field {
+  label: string;
+  value: string;
+}
+
+/** Same fields, same order as lib/pass/apple.ts (store card) and lib/pass/google.ts (class row). */
+function frontFields(card: PublicCard, style: PassStyle): Field[] {
+  const fields: Field[] = [];
+  if (style === "apple") {
+    if (card.headline) fields.push({ label: "Cargo", value: card.headline });
+    if (card.location) fields.push({ label: "Ubicación", value: card.location });
+    if (card.pronouns) fields.push({ label: "Pronombres", value: card.pronouns });
+  } else {
+    if (card.company) fields.push({ label: "Empresa", value: card.company });
+    if (card.location) fields.push({ label: "Ubicación", value: card.location });
+  }
+  return fields;
+}
+
 /**
- * Visual preview of the wallet pass. Mirrors the field layout produced by
- * lib/pass/apple.ts and lib/pass/google.ts so the editor shows what the
- * phone will show.
+ * Visual preview of the wallet pass. Mirrors the layout produced by
+ * lib/pass/apple.ts and lib/pass/google.ts, and renders the very same
+ * <PassArt> the server turns into the strip / hero images.
  */
 export function WalletPass({ card, style = "apple", className }: WalletPassProps) {
-  const palette = cardPalette(card.accentColor);
-  const bg = toHex(palette.background);
-  const fg = toHex(palette.foreground);
-  const label = toHex(palette.label);
+  const design = resolveDesign(card);
   const name = card.fullName || "Tu nombre";
+  const slug = card.slug || "tu-nombre";
+  const fields = frontFields(card, style);
+  const art = (variant: "strip" | "hero") => (
+    <div style={{ containerType: "inline-size" }}>
+      <PassArt
+        design={design}
+        variant={variant}
+        name={name}
+        initials={initials(name)}
+        avatarSrc={card.avatarUrl}
+        unit={containerUnit}
+        fonts={CSS_FONTS}
+        deferPattern
+      />
+    </div>
+  );
 
   const qr = (
     <div className="mx-auto w-fit rounded-xl bg-white p-2.5 shadow-[0_1px_2px_rgb(0_0_0/0.15)]">
-      <QrCode value={profileUrl(card.slug || "tu-nombre", "qr")} label="Código QR de la tarjeta" className="size-[112px] text-black" quietZone={1} />
+      <QrCode value={profileUrl(slug, "qr")} label="Código QR de la tarjeta" className="size-[112px] text-ink" quietZone={1} />
       <p className="mt-1.5 max-w-[112px] truncate text-center font-mono text-[9px] leading-none text-black/60">
-        {prettyProfileUrl(card.slug || "tu-nombre")}
+        {prettyProfileUrl(slug)}
       </p>
     </div>
   );
+
+  const fieldRow =
+    fields.length > 0 ? (
+      <dl className={cn("grid gap-3", fields.length === 1 ? "grid-cols-1" : fields.length === 2 ? "grid-cols-2" : "grid-cols-3")}>
+        {fields.map((field) => (
+          <div key={field.label} className="min-w-0">
+            <dt className="text-[10px] font-semibold tracking-[0.08em] uppercase" style={{ color: design.label }}>
+              {field.label}
+            </dt>
+            <dd className="truncate text-[14px] leading-snug">{field.value}</dd>
+          </div>
+        ))}
+      </dl>
+    ) : null;
 
   if (style === "google") {
     return (
       <div
         className={cn("w-full max-w-[340px] overflow-hidden rounded-[24px] shadow-object", className)}
-        style={{ backgroundColor: bg, color: fg }}
+        style={{ backgroundColor: design.background, color: design.foreground }}
         aria-label={`Vista previa del pase de Google Wallet de ${name}`}
       >
         <div className="flex items-center gap-2.5 px-5 pt-5">
-          <div className="grid size-9 place-items-center overflow-hidden rounded-full bg-white/90">
-            {card.avatarUrl ? (
-              <Avatar name={name} url={card.avatarUrl} size={36} />
-            ) : (
-              <Mark className="size-6 text-ink" cutout="#fff" />
-            )}
+          <div className="grid size-9 place-items-center overflow-hidden rounded-full bg-signal">
+            {card.avatarUrl ? <Avatar name={name} url={card.avatarUrl} size={36} /> : <Mark className="size-6 text-paper" cutout="var(--color-signal)" />}
           </div>
           <span className="truncate text-sm font-medium">{card.company || "PassMe"}</span>
         </div>
-        <div className="mt-4 border-t px-5 pt-4" style={{ borderColor: `${fg}26` }}>
+        <div className="mt-4 border-t px-5 pt-4" style={{ borderColor: `${design.foreground}26` }}>
           {card.headline ? (
-            <p className="text-xs" style={{ color: label }}>
+            <p className="text-xs" style={{ color: design.label }}>
               {card.headline}
             </p>
           ) : null}
           <p className="mt-0.5 text-[1.6rem] leading-tight font-medium tracking-tight">{name}</p>
-          {card.company || card.location ? (
-            <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
-              <div>
-                <p style={{ color: label }}>Empresa</p>
-                <p className="mt-0.5 truncate font-medium">{card.company || "—"}</p>
-              </div>
-              <div className="text-right">
-                <p style={{ color: label }}>Ubicación</p>
-                <p className="mt-0.5 truncate font-medium">{card.location || "—"}</p>
-              </div>
-            </div>
-          ) : null}
+          {fieldRow ? <div className="mt-4">{fieldRow}</div> : null}
         </div>
         <div className="px-5 pt-6 pb-6">{qr}</div>
+        {art("hero")}
       </div>
     );
   }
 
   return (
     <div
-      className={cn("w-full max-w-[340px] rounded-[18px] px-4 pt-3.5 pb-5 shadow-object", className)}
-      style={{ backgroundColor: bg, color: fg }}
+      className={cn("w-full max-w-[340px] overflow-hidden rounded-[16px] shadow-object", className)}
+      style={{ backgroundColor: design.background, color: design.foreground }}
       aria-label={`Vista previa del pase de Apple Wallet de ${name}`}
     >
-      <div className="flex items-center gap-2">
-        <Mark className="size-7" cutout={bg} />
+      <div className="flex items-center gap-2 px-3.5 pt-3 pb-2.5">
+        <Mark className="size-7" cutout={design.background} style={{ color: design.label }} />
         <span className="truncate text-[15px] font-medium tracking-tight">{card.company || "PassMe"}</span>
       </div>
-
-      <div className="mt-5 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate text-[10px] font-semibold tracking-[0.08em] uppercase" style={{ color: label }}>
-            {card.headline || "Contacto"}
-          </p>
-          <p className="mt-1 text-[1.7rem] leading-[1.05] font-light tracking-tight break-words">{name}</p>
-        </div>
-        <Avatar name={name} url={card.avatarUrl} size={72} className="mt-0.5" />
-      </div>
-
-      <div className="mt-5 grid grid-cols-2 gap-3">
-        {card.company ? (
-          <div className="min-w-0">
-            <p className="text-[10px] font-semibold tracking-[0.08em] uppercase" style={{ color: label }}>
-              Empresa
-            </p>
-            <p className="truncate text-[15px]">{card.company}</p>
-          </div>
-        ) : null}
-        {card.location ? (
-          <div className="min-w-0">
-            <p className="text-[10px] font-semibold tracking-[0.08em] uppercase" style={{ color: label }}>
-              Ubicación
-            </p>
-            <p className="truncate text-[15px]">{card.location}</p>
-          </div>
-        ) : null}
-      </div>
-      {card.pronouns ? (
-        <div className="mt-3">
-          <p className="text-[10px] font-semibold tracking-[0.08em] uppercase" style={{ color: label }}>
-            Pronombres
-          </p>
-          <p className="text-[15px]">{card.pronouns}</p>
-        </div>
-      ) : null}
-
-      <div className="mt-7">{qr}</div>
+      {art("strip")}
+      {fieldRow ? <div className="px-3.5 pt-3">{fieldRow}</div> : null}
+      <div className="px-3.5 pt-5 pb-5">{qr}</div>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { Mark } from "@/components/brand/logo";
 import { ProfileCard } from "@/components/card/profile-card";
 import { ViewTracker } from "@/components/card/profile-actions";
+import { resolveDesign } from "@/lib/card/design";
 import { getPublicCard } from "@/lib/data/cards";
 import { parseVisitSource } from "@/lib/request";
 
@@ -29,9 +30,14 @@ export default async function PublicCardPage({ params, searchParams }: PageProps
   if (!card) notFound();
 
   const source = parseVisitSource(typeof query.src === "string" ? query.src : null);
+  const { background } = resolveDesign(card);
 
   return (
-    <main className="min-h-dvh px-4 pt-6 pb-14 sm:pt-12">
+    <main
+      className="min-h-dvh px-4 pt-6 pb-14 sm:pt-12"
+      // A faint halo of the card's own color, as if the pass lit up the paper.
+      style={{ backgroundImage: `radial-gradient(60rem 28rem at 50% -6rem, ${background}33, transparent 70%)` }}
+    >
       <div className="mx-auto w-full max-w-[440px] animate-rise">
         <ProfileCard card={card} />
 

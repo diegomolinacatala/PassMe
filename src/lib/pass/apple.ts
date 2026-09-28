@@ -1,18 +1,23 @@
 import "server-only";
 import { PKPass } from "passkit-generator";
-import { cardPalette, toHex, toRgbString } from "@/lib/card/colors";
+import { cardPalette, toRgbString } from "@/lib/card/colors";
+import { resolveDesign } from "@/lib/card/design";
 import { isWebLink, linkDisplay, linkHref, linkTitle } from "@/lib/card/links";
 import type { PublicCard } from "@/lib/card/types";
 import type { AppleWalletConfig } from "@/lib/config.server";
 import { getSiteUrl, prettyProfileUrl, profileUrl } from "@/lib/env";
-import { brandIconImages, logoImages, thumbnailImages } from "./images";
+import { stripImages } from "./art";
+import { brandIconImages, logoImages } from "./images";
 
 /**
- * Apple Wallet "generic" pass for a contact card.
+ * Apple Wallet "store card" pass for a contact card.
  *
- * Front: logo + company, name (primary) with headline as label, circular
- * avatar thumbnail, company/location, and a QR that opens the public card.
- * Back: every visible link (tappable) plus the card URL.
+ * Store cards are the only pass style with a full-width strip image, which is
+ * where the card's artwork lives (see lib/pass/art.tsx): generative pattern,
+ * avatar seal and the name set in our display serif.
+ *
+ * Front: logo + company, artwork strip, role/location/pronouns, and a QR that
+ * opens the public card. Back: every visible link (tappable) plus the card URL.
  */
 
 export interface ApplePassInput {
@@ -71,11 +76,13 @@ function backFields(card: PublicCard): PassField[] {
 /** Pure pass.json builder (no signing) — unit tested. */
 export function buildApplePassJson(input: ApplePassInput, config: Pick<AppleWalletConfig, "passTypeId" | "teamId" | "webServiceEnabled">) {
   const { card } = input;
-  const palette = cardPalette(card.accentColor);
+  const design = resolveDesign(card);
+  const palette = cardPalette(design.background, design.detail);
   const qrUrl = profileUrl(card.slug, "qr");
 
+  // Store cards show up to four secondary + auxiliary fields in one row under the strip.
   const secondaryFields: PassField[] = [];
-  if (card.company) secondaryFields.push({ key: "company", label: "EMPRESA", value: card.company });
+  if (card.headline) secondaryFields.push({ key: "headline", label: "CARGO", value: card.headline });
   if (card.location) secondaryFields.push({ key: "location", label: "UBICACIÓN", value: card.location });
 
   const auxiliaryFields: PassField[] = card.pronouns
@@ -99,8 +106,9 @@ export function buildApplePassJson(input: ApplePassInput, config: Pick<AppleWall
     foregroundColor: toRgbString(palette.foreground),
     labelColor: toRgbString(palette.label),
     sharingProhibited: false,
-    generic: {
-      primaryFields: [{ key: "name", label: (card.headline || "Contacto").toUpperCase(), value: card.fullName }],
+    storeCard: {
+      // The name is set in the strip artwork; VoiceOver reads it from `description`.
+      primaryFields: [],
       secondaryFields,
       auxiliaryFields,
       backFields: backFields(card),
@@ -119,13 +127,14 @@ export function buildApplePassJson(input: ApplePassInput, config: Pick<AppleWall
 
 /** Builds and signs the .pkpass archive. */
 export async function createApplePass(input: ApplePassInput, config: AppleWalletConfig): Promise<Buffer> {
-  const palette = cardPalette(input.card.accentColor);
+  const design = resolveDesign(input.card);
   const passJson = buildApplePassJson(input, config);
 
-  const [icons, logos, thumbnails] = await Promise.all([
+  const [icons, logos, strips] = await Promise.all([
     brandIconImages(),
-    logoImages(toHex(palette.foreground), toHex(palette.background)),
-    input.avatar ? thumbnailImages(input.avatar) : Promise.resolve({}),
+    // The mark takes the label color: the card's detail ink whenever it reads well.
+    logoImages(design.label, design.background),
+    stripImages(input.card, input.avatar ?? null),
   ]);
 
   const pass = new PKPass(
@@ -133,7 +142,7 @@ export async function createApplePass(input: ApplePassInput, config: AppleWallet
       "pass.json": Buffer.from(JSON.stringify(passJson)),
       ...icons,
       ...logos,
-      ...thumbnails,
+      ...strips,
     },
     {
       wwdr: config.wwdr,
