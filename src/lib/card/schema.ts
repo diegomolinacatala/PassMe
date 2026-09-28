@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { HEX_COLOR_RE } from "./colors";
+import { PATTERN_SEED_MAX } from "./design";
+import { PATTERN_KINDS } from "./pattern";
 import { LINK_KINDS, normalizeLinkValue } from "./links";
 import { checkSlug, SLUG_ERRORS } from "./slug";
 import type { CardLink } from "./types";
@@ -60,6 +62,9 @@ export const cardInputSchema = z
     pronouns: line(LIMITS.pronouns),
     bio: paragraph(LIMITS.bio),
     accentColor: z.string().regex(HEX_COLOR_RE, "Color no válido."),
+    detailColor: z.string().regex(HEX_COLOR_RE, "Color no válido.").nullable(),
+    pattern: z.enum(PATTERN_KINDS, { error: "Motivo no válido." }),
+    patternSeed: z.number().int().min(0).max(PATTERN_SEED_MAX, "Sello no válido."),
     avatarPath: z.string().max(200).nullable(),
     isPublished: z.boolean(),
     links: z.array(linkSchema).max(MAX_LINKS, `Máximo ${MAX_LINKS} enlaces.`),

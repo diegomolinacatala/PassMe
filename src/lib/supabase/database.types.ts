@@ -23,6 +23,9 @@ export type Database = {
           pronouns: string;
           bio: string;
           accent_color: string;
+          detail_color: string | null;
+          pattern: string;
+          pattern_seed: number;
           avatar_path: string | null;
           links: Json;
           is_published: boolean;
@@ -39,6 +42,9 @@ export type Database = {
           pronouns?: string;
           bio?: string;
           accent_color?: string;
+          detail_color?: string | null;
+          pattern?: string;
+          pattern_seed?: number;
           avatar_path?: string | null;
           links?: Json;
           is_published?: boolean;
@@ -55,6 +61,9 @@ export type Database = {
           pronouns?: string;
           bio?: string;
           accent_color?: string;
+          detail_color?: string | null;
+          pattern?: string;
+          pattern_seed?: number;
           avatar_path?: string | null;
           links?: Json;
           is_published?: boolean;

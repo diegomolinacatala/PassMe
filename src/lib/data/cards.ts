@@ -4,6 +4,8 @@ import { createClient } from "@supabase/supabase-js";
 import { cache } from "react";
 import { isValidAvatarPath } from "@/lib/card/avatar";
 import { DEFAULT_ACCENT, isHexColor } from "@/lib/card/colors";
+import { DEFAULT_DETAIL, isPatternSeed, randomPatternSeed } from "@/lib/card/design";
+import { DEFAULT_PATTERN, isPatternKind } from "@/lib/card/pattern";
 import { DEMO_CARD, DEMO_SLUG } from "@/lib/card/demo";
 import type { ValidCardInput } from "@/lib/card/schema";
 import { sanitizeStoredLinks } from "@/lib/card/schema";
@@ -16,6 +18,22 @@ import type { TypedSupabaseClient } from "@/lib/supabase/server";
 
 const UNIQUE_VIOLATION = "23505";
 const MAX_SLUG_ATTEMPTS = 6;
+/** PostgREST (schema cache) and Postgres codes for "that column doesn't exist". */
+const MISSING_COLUMN_CODES = new Set(["PGRST204", "42703"]);
+
+/**
+ * True when the database predates the card-design migration
+ * (supabase/migrations/20260928120000_card_design.sql). Writes then fall back
+ * to the columns that exist, so sign-ups and saves keep working until it's applied.
+ */
+function isMissingDesignColumn(error: { code?: string; message?: string } | null): boolean {
+  if (!error?.code || !MISSING_COLUMN_CODES.has(error.code)) return false;
+  return /detail_color|pattern/.test(error.message ?? "");
+}
+
+function warnMissingDesignMigration(operation: string): void {
+  log.warn("card design columns missing: apply supabase/migrations/20260928120000_card_design.sql", { operation });
+}
 
 export function toPublicCard(card: OwnerCard | PublicCard): PublicCard {
   return {
@@ -27,8 +45,28 @@ export function toPublicCard(card: OwnerCard | PublicCard): PublicCard {
     pronouns: card.pronouns,
     bio: card.bio,
     accentColor: card.accentColor,
+    detailColor: card.detailColor,
+    pattern: card.pattern,
+    patternSeed: card.patternSeed,
     avatarUrl: card.avatarUrl,
     links: card.links.filter((l) => l.visible),
+  };
+}
+
+interface DesignColumns {
+  accent_color?: string | null;
+  detail_color?: string | null;
+  pattern?: string | null;
+  pattern_seed?: number | null;
+}
+
+/** Validates stored design values (defensive: rows could predate a rule change). */
+function designFromDb(row: DesignColumns): Pick<PublicCard, "accentColor" | "detailColor" | "pattern" | "patternSeed"> {
+  return {
+    accentColor: row.accent_color && isHexColor(row.accent_color) ? row.accent_color.toUpperCase() : DEFAULT_ACCENT,
+    detailColor: row.detail_color && isHexColor(row.detail_color) ? row.detail_color.toUpperCase() : null,
+    pattern: isPatternKind(row.pattern) ? row.pattern : DEFAULT_PATTERN,
+    patternSeed: isPatternSeed(row.pattern_seed) ? row.pattern_seed : 0,
   };
 }
 
@@ -42,7 +80,7 @@ export function rowToOwnerCard(row: ProfileRow): OwnerCard {
     location: row.location,
     pronouns: row.pronouns,
     bio: row.bio,
-    accentColor: isHexColor(row.accent_color) ? row.accent_color.toUpperCase() : DEFAULT_ACCENT,
+    ...designFromDb(row),
     avatarPath: row.avatar_path,
     avatarUrl: avatarPublicUrl(row.avatar_path),
     links: sanitizeStoredLinks(row.links),
@@ -51,7 +89,7 @@ export function rowToOwnerCard(row: ProfileRow): OwnerCard {
   };
 }
 
-interface PublicCardJson {
+interface PublicCardJson extends DesignColumns {
   slug?: string;
   full_name?: string;
   headline?: string;
@@ -59,7 +97,6 @@ interface PublicCardJson {
   location?: string;
   pronouns?: string;
   bio?: string;
-  accent_color?: string;
   avatar_path?: string | null;
   links?: Json;
 }
@@ -74,7 +111,7 @@ function jsonToPublicCard(json: PublicCardJson): PublicCard | null {
     location: json.location ?? "",
     pronouns: json.pronouns ?? "",
     bio: json.bio ?? "",
-    accentColor: json.accent_color && isHexColor(json.accent_color) ? json.accent_color.toUpperCase() : DEFAULT_ACCENT,
+    ...designFromDb(json),
     avatarUrl: avatarPublicUrl(json.avatar_path),
     // The RPC already strips hidden links; re-validate anyway (defense in depth).
     links: sanitizeStoredLinks(json.links).filter((l) => l.visible),
@@ -126,13 +163,22 @@ export async function getOrCreateOwnerCard(
   const existing = await findOwnProfile(supabase, user.id);
   if (existing) return rowToOwnerCard(existing);
 
+  const design = { detail_color: DEFAULT_DETAIL, pattern: DEFAULT_PATTERN, pattern_seed: randomPatternSeed() };
+
   for (let attempt = 0; attempt < MAX_SLUG_ATTEMPTS; attempt += 1) {
     const slug = slugCandidate(user.email ?? "", randomBytes(3).toString("hex"));
-    const { data, error } = await supabase
-      .from("profiles")
-      .insert({ id: user.id, slug, accent_color: DEFAULT_ACCENT })
-      .select("*")
-      .single();
+    const insert = (withDesign: boolean) =>
+      supabase
+        .from("profiles")
+        .insert({ id: user.id, slug, accent_color: DEFAULT_ACCENT, ...(withDesign ? design : {}) })
+        .select("*")
+        .single();
+
+    let { data, error } = await insert(true);
+    if (isMissingDesignColumn(error)) {
+      warnMissingDesignMigration("create");
+      ({ data, error } = await insert(false));
+    }
 
     if (!error && data) return rowToOwnerCard(data);
     if (error?.code !== UNIQUE_VIOLATION) throw new Error(`Could not create profile: ${error?.message}`);
@@ -160,27 +206,36 @@ export async function saveOwnerCard(
   const current = await findOwnProfile(supabase, userId);
   if (!current) return { ok: false, errors: { _form: "No encontramos tu tarjeta. Recarga la página." } };
 
-  const { data, error } = await supabase
-    .from("profiles")
-    .update({
-      slug: input.slug,
-      full_name: input.fullName,
-      headline: input.headline,
-      company: input.company,
-      location: input.location,
-      pronouns: input.pronouns,
-      bio: input.bio,
-      accent_color: input.accentColor,
-      avatar_path: input.avatarPath,
-      links: input.links as unknown as Json,
-      is_published: input.isPublished,
-    })
-    .eq("id", userId)
-    .select("*")
-    .single();
+  const content = {
+    slug: input.slug,
+    full_name: input.fullName,
+    headline: input.headline,
+    company: input.company,
+    location: input.location,
+    pronouns: input.pronouns,
+    bio: input.bio,
+    accent_color: input.accentColor,
+    avatar_path: input.avatarPath,
+    links: input.links as unknown as Json,
+    is_published: input.isPublished,
+  };
+  const design = { detail_color: input.detailColor, pattern: input.pattern, pattern_seed: input.patternSeed };
+  const update = (withDesign: boolean) =>
+    supabase
+      .from("profiles")
+      .update(withDesign ? { ...content, ...design } : content)
+      .eq("id", userId)
+      .select("*")
+      .single();
 
-  if (error) {
-    if (error.code === UNIQUE_VIOLATION) return { ok: false, errors: { slug: "Ese enlace ya está cogido." } };
+  let { data, error } = await update(true);
+  if (isMissingDesignColumn(error)) {
+    warnMissingDesignMigration("save");
+    ({ data, error } = await update(false));
+  }
+
+  if (error || !data) {
+    if (error?.code === UNIQUE_VIOLATION) return { ok: false, errors: { slug: "Ese enlace ya está cogido." } };
     log.error("saveOwnerCard failed", { userId }, error);
     return { ok: false, errors: { _form: "No hemos podido guardar. Inténtalo de nuevo." } };
   }

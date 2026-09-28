@@ -1,4 +1,5 @@
 import type { LinkKind } from "./links";
+import type { PatternKind } from "./pattern";
 
 /** A single contact entry the owner adds to their card. */
 export interface CardLink {
@@ -22,7 +23,13 @@ export interface CardData {
   location: string;
   pronouns: string;
   bio: string;
+  /** Pass background. */
   accentColor: string;
+  /** Pattern/seal/label color; null = derived from the background. */
+  detailColor: string | null;
+  pattern: PatternKind;
+  /** Seeds the generative pattern and doubles as the card's "seal number". */
+  patternSeed: number;
   avatarUrl: string | null;
   links: CardLink[];
 }

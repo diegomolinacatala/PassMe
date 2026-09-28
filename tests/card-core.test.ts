@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { cardPalette, contrastRatio, parseHex, toHex, toRgbString, ACCENT_SWATCHES } from "@/lib/card/colors";
+import { cardPalette, contrastRatio, parseHex, toHex, toRgbString } from "@/lib/card/colors";
+import { CARD_THEMES } from "@/lib/card/design";
 import { checkSlug, slugCandidate, slugify } from "@/lib/card/slug";
 import { parseCardInput, sanitizeStoredLinks } from "@/lib/card/schema";
 import { buildVCard, escapeText, foldLine, splitName, vcardFilename } from "@/lib/card/vcard";
@@ -14,15 +15,16 @@ describe("colors", () => {
   });
 
   it("picks white text on dark backgrounds and ink on light ones", () => {
-    expect(cardPalette("#141414").isDark).toBe(true);
+    expect(cardPalette("#221B17").isDark).toBe(true);
     expect(cardPalette("#E9DFCB").isDark).toBe(false);
-    expect(cardPalette("not-a-color").isDark).toBe(true);
+    // Invalid input falls back to the (light) Naranja default with dark text.
+    expect(cardPalette("not-a-color").isDark).toBe(false);
   });
 
-  it("keeps every swatch readable (WCAG AA large text)", () => {
-    for (const swatch of ACCENT_SWATCHES) {
-      const p = cardPalette(swatch.hex);
-      expect(contrastRatio(p.background, p.foreground), swatch.name).toBeGreaterThanOrEqual(3);
+  it("keeps every theme readable (WCAG AA body text)", () => {
+    for (const theme of CARD_THEMES) {
+      const p = cardPalette(theme.background, theme.detail);
+      expect(contrastRatio(p.background, p.foreground), theme.name).toBeGreaterThanOrEqual(4.5);
     }
   });
 });
@@ -59,6 +61,9 @@ const validInput = {
   pronouns: "",
   bio: "Línea 1\r\n\r\n\r\n\r\nLínea 2",
   accentColor: "#FF4A1C",
+  detailColor: null,
+  pattern: "sello",
+  patternSeed: 42,
   avatarPath: null,
   isPublished: true,
   links: [
@@ -85,6 +90,7 @@ describe("parseCardInput", () => {
       slug: "admin",
       fullName: "   ",
       accentColor: "red",
+      detailColor: "#GGGGGG",
       links: [
         { id: "link-1", kind: "website", value: "javascript:alert(1)", visible: true },
         { id: "link-1", kind: "custom", value: "https://example.com", visible: true },
@@ -93,8 +99,25 @@ describe("parseCardInput", () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(Object.keys(result.errors)).toEqual(
-      expect.arrayContaining(["slug", "fullName", "accentColor", "links.0.value", "links.1.id", "links.1.label"]),
+      expect.arrayContaining([
+        "slug",
+        "fullName",
+        "accentColor",
+        "detailColor",
+        "links.0.value",
+        "links.1.id",
+        "links.1.label",
+      ]),
     );
+  });
+
+  it("rejects unknown patterns and out-of-range seal numbers", () => {
+    const result = parseCardInput({ ...validInput, pattern: "tartan", patternSeed: 1_000_000 });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(Object.keys(result.errors)).toEqual(expect.arrayContaining(["pattern", "patternSeed"]));
+    expect(parseCardInput({ ...validInput, patternSeed: 1.5 }).ok).toBe(false);
+    expect(parseCardInput({ ...validInput, detailColor: "#FFE3D1", pattern: "liso", patternSeed: 999_999 }).ok).toBe(true);
   });
 
   it("rejects unknown link kinds and too many links", () => {
@@ -191,9 +214,11 @@ describe("vcard", () => {
 
 describe("card palette labels", () => {
   it("keeps small labels at WCAG AA contrast on every swatch and on extremes", () => {
-    for (const hex of [...ACCENT_SWATCHES.map((s) => s.hex), "#FFFFFF", "#000000", "#808080", "#FF0000", "#00FF00"]) {
-      const p = cardPalette(hex);
-      expect(contrastRatio(p.label, p.background), hex).toBeGreaterThanOrEqual(4.5);
+    for (const hex of [...CARD_THEMES.map((t) => t.background), "#FFFFFF", "#000000", "#808080", "#FF0000", "#00FF00"]) {
+      for (const detail of [null, "#FFE3D1", "#E4572A", hex]) {
+        const p = cardPalette(hex, detail);
+        expect(contrastRatio(p.label, p.background), `${hex} / ${detail}`).toBeGreaterThanOrEqual(4.5);
+      }
     }
   });
 });
