@@ -49,14 +49,20 @@ const SUPABASE_STUB_SQL = `
   grant all on storage.objects to anon, authenticated, service_role;
 `;
 
-export async function createTestDatabase(): Promise<PGlite> {
+const MIGRATIONS_DIR = join(process.cwd(), "supabase", "migrations");
+
+/** Applies migration files in the order Supabase does, optionally only some of them. */
+export async function applyMigrations(db: PGlite, include: (file: string) => boolean = () => true): Promise<void> {
+  for (const file of readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith(".sql")).sort()) {
+    if (include(file)) await db.exec(readFileSync(join(MIGRATIONS_DIR, file), "utf8"));
+  }
+}
+
+/** A database with every migration applied — or only those before `before` (a file name). */
+export async function createTestDatabase({ before }: { before?: string } = {}): Promise<PGlite> {
   const db = new PGlite();
   await db.exec(SUPABASE_STUB_SQL);
-
-  const dir = join(process.cwd(), "supabase", "migrations");
-  for (const file of readdirSync(dir).filter((f) => f.endsWith(".sql")).sort()) {
-    await db.exec(readFileSync(join(dir, file), "utf8"));
-  }
+  await applyMigrations(db, (file) => !before || file < before);
   return db;
 }
 

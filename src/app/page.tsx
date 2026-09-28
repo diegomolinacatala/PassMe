@@ -1,7 +1,7 @@
 import { ArrowUpRight } from "lucide-react";
-import { Guilloche } from "@/components/brand/guilloche";
+import { BrandMotif } from "@/components/brand/brand-motif";
 import { PhoneShowcase } from "@/components/landing/phone-showcase";
-import { SealSection } from "@/components/landing/seal-section";
+import { DesignSection } from "@/components/landing/design-section";
 import { AlwaysUpdated, ContactMarquee, FinalCta, HowItWorks, PrivacySection } from "@/components/landing/sections";
 import { SiteFooter } from "@/components/landing/site-footer";
 import { SiteHeader } from "@/components/landing/site-header";
@@ -63,7 +63,7 @@ export default function HomePage() {
             </div>
 
             <div className="relative animate-rise [animation-delay:150ms] lg:col-span-5">
-              <Guilloche
+              <BrandMotif
                 size={820}
                 seed={48213}
                 className="pointer-events-none absolute top-1/2 left-1/2 -z-10 -translate-x-1/2 -translate-y-1/2 opacity-45"
@@ -75,7 +75,7 @@ export default function HomePage() {
 
         <ContactMarquee />
         <HowItWorks />
-        <SealSection />
+        <DesignSection />
         <PrivacySection />
         <AlwaysUpdated card={demo} />
         <FinalCta ctaHref={ctaHref} />

@@ -11,14 +11,14 @@ export interface CardTheme {
   name: string;
   /** Pass background (stored as `accentColor`). */
   background: string;
-  /** Pattern, seal and label color (stored as `detailColor`). */
+  /** Motif, photo frame and label color (stored as `detailColor`). */
   detail: string;
 }
 
 /**
  * Curated themes: warm, soft, paper-and-clay tones (oranges, beiges, browns)
  * plus two muted pastels. Every pair keeps text at WCAG AA (≥ 4.5:1) and the
- * guilloché visible (≥ 2:1) without shouting.
+ * motif visible (≥ 2:1) without shouting.
  */
 export const CARD_THEMES: ReadonlyArray<CardTheme> = [
   { id: "naranja", name: "Naranja", background: "#EF7A4A", detail: "#FFE3D1" },
@@ -40,14 +40,32 @@ export function themeDesign(
   id: string,
   pattern: PatternKind = DEFAULT_PATTERN,
   patternSeed = 0,
-): Pick<DesignFields, "accentColor" | "detailColor" | "pattern" | "patternSeed"> {
+  typeface: Typeface = DEFAULT_TYPEFACE,
+): DesignFields {
   const theme = CARD_THEMES.find((t) => t.id === id) ?? DEFAULT_THEME;
-  return { accentColor: theme.background, detailColor: theme.detail, pattern, patternSeed };
+  return { accentColor: theme.background, detailColor: theme.detail, pattern, patternSeed, typeface };
 }
 
 export const DEFAULT_DETAIL = DEFAULT_THEME.detail;
 
-/** Seal numbers are six digits: "Nº 048213". */
+/** Typefaces for the name on the pass. */
+export const TYPEFACES = ["clasica", "cursiva", "editorial", "moderna"] as const;
+export type Typeface = (typeof TYPEFACES)[number];
+
+export const DEFAULT_TYPEFACE: Typeface = "clasica";
+
+export const TYPEFACE_LABELS: Record<Typeface, { name: string; description: string }> = {
+  clasica: { name: "Clásica", description: "Serif de revista: la de toda la vida." },
+  cursiva: { name: "Cursiva", description: "La misma serif, inclinada. Más personal." },
+  editorial: { name: "Editorial", description: "Tu nombre recto y los apellidos en cursiva." },
+  moderna: { name: "Moderna", description: "Sin serifa, limpia y directa." },
+};
+
+export function isTypeface(value: unknown): value is Typeface {
+  return typeof value === "string" && (TYPEFACES as readonly string[]).includes(value);
+}
+
+/** Variations are numbered 0–999 999; the number itself is never shown. */
 export const PATTERN_SEED_MAX = 999_999;
 
 export function isPatternSeed(value: unknown): value is number {
@@ -61,10 +79,6 @@ export function randomPatternSeed(): number {
   return Math.floor(Math.random() * (PATTERN_SEED_MAX + 1));
 }
 
-export function sealNumber(seed: number): string {
-  return `Nº ${String(seed).padStart(6, "0")}`;
-}
-
 export function themeFor(background: string, detail: string | null): CardTheme | undefined {
   const bg = background.toUpperCase();
   return CARD_THEMES.find((t) => t.background === bg && (detail === null || t.detail === detail.toUpperCase()));
@@ -76,6 +90,7 @@ export interface DesignFields {
   detailColor: string | null;
   pattern: PatternKind;
   patternSeed: number;
+  typeface: Typeface;
 }
 
 /** Everything a renderer needs, as hex strings. */
@@ -89,6 +104,7 @@ export interface ResolvedDesign {
   isDark: boolean;
   pattern: PatternKind;
   seed: number;
+  typeface: Typeface;
 }
 
 export function resolveDesign(fields: DesignFields): ResolvedDesign {
@@ -104,6 +120,7 @@ export function resolveDesign(fields: DesignFields): ResolvedDesign {
     isDark: palette.isDark,
     pattern: fields.pattern,
     seed: fields.patternSeed,
+    typeface: fields.typeface,
   };
 }
 
@@ -117,4 +134,5 @@ export const DEFAULT_DESIGN: DesignFields = {
   detailColor: DEFAULT_DETAIL,
   pattern: DEFAULT_PATTERN,
   patternSeed: 0,
+  typeface: DEFAULT_TYPEFACE,
 };

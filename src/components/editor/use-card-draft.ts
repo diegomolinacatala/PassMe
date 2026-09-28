@@ -18,6 +18,7 @@ export interface CardDraft {
   detailColor: string | null;
   pattern: DesignFields["pattern"];
   patternSeed: number;
+  typeface: DesignFields["typeface"];
   avatarPath: string | null;
   avatarUrl: string | null;
   isPublished: boolean;
@@ -39,6 +40,7 @@ export function draftFromCard(card: OwnerCard): CardDraft {
     detailColor: card.detailColor,
     pattern: card.pattern,
     patternSeed: card.patternSeed,
+    typeface: card.typeface,
     avatarPath: card.avatarPath,
     avatarUrl: card.avatarUrl,
     isPublished: card.isPublished,
@@ -60,6 +62,7 @@ export function draftToInput(draft: CardDraft) {
     detailColor: draft.detailColor,
     pattern: draft.pattern,
     patternSeed: draft.patternSeed,
+    typeface: draft.typeface,
     avatarPath: draft.avatarPath,
     isPublished: draft.isPublished,
     links: draft.links,
@@ -79,6 +82,7 @@ export function draftToPublicCard(draft: CardDraft): PublicCard {
     detailColor: draft.detailColor,
     pattern: draft.pattern,
     patternSeed: draft.patternSeed,
+    typeface: draft.typeface,
     avatarUrl: draft.avatarUrl,
     links: draft.links.filter((l) => l.visible && l.value.trim()),
   };

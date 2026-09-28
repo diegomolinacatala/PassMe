@@ -7,7 +7,7 @@ import type { PublicCard } from "@/lib/card/types";
  * and the side button that you double-press to bring the wallet up.
  */
 export function PhoneShowcase({ card }: { card: PublicCard }) {
-  const backCard: PublicCard = { ...card, ...themeDesign("cafe", "ondas", 311_724) };
+  const backCard: PublicCard = { ...card, ...themeDesign("cafe", "relieve", 311_724) };
 
   return (
     <div className="relative mx-auto w-[300px] sm:w-[330px]" aria-label="Ejemplo de tarjeta PassMe en la cartera del móvil">
@@ -49,7 +49,7 @@ export function PhoneShowcase({ card }: { card: PublicCard }) {
               <WalletPass card={card} style="apple" className="max-w-none" />
               {/* Scanner line sweeping the QR */}
               <span
-                className="pointer-events-none absolute bottom-[3.2rem] left-1/2 h-[2px] w-[132px] -translate-x-1/2 animate-scan bg-signal shadow-[0_0_12px_2px_rgb(228_87_42/0.55)] [--scan-distance:-108px]"
+                className="pointer-events-none absolute bottom-[2.25rem] left-1/2 h-[2px] w-[132px] -translate-x-1/2 animate-scan bg-signal shadow-[0_0_12px_2px_rgb(228_87_42/0.55)] [--scan-distance:-104px]"
                 aria-hidden="true"
               />
             </div>

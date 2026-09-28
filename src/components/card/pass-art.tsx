@@ -1,11 +1,11 @@
 import type { CSSProperties } from "react";
-import { sealNumber, type ResolvedDesign } from "@/lib/card/design";
-import type { PatternBox, PatternFocus } from "@/lib/card/pattern";
+import type { ResolvedDesign, Typeface } from "@/lib/card/design";
+import { fadesUnderText, type PatternBox, type PatternFocus } from "@/lib/card/pattern";
 import { DeferredPatternSvg } from "./deferred-pattern-svg";
 import { PatternSvg } from "./pattern-svg";
 
 /**
- * The pass artwork: guilloché pattern, avatar seal, name and microtext.
+ * The pass artwork: generative motif, avatar and name.
  *
  * Written with inline styles and flexbox only, so the exact same tree renders
  * in the browser (editor preview, landing) and in Satori on the server, which
@@ -23,9 +23,16 @@ export const HERO_BOX: PatternBox = { width: 375, height: 122 };
 const STRIP_FOCUS: PatternFocus = { x: 301, y: 72, r: 38 };
 const HERO_FOCUS: PatternFocus = { x: 187.5, y: 61, r: 21 };
 
+/** Gap between the avatar and its hairline frame. */
+const FRAME_GAP = 4.5;
+/** Monogram font size, as a share of the strip height (the letter bleeds off both edges). */
+const MONOGRAM_SIZE = 1.75;
+export const MONOGRAM_OPACITY = 0.36;
+const NAME_LEFT = 20;
+
 export interface ArtFonts {
   serif: string;
-  mono: string;
+  sans: string;
 }
 
 export type Unit = (points: number) => number | string;
@@ -35,7 +42,7 @@ export const containerUnit: Unit = (points) => `${((points / 375) * 100).toFixed
 
 export const CSS_FONTS: ArtFonts = {
   serif: "var(--font-instrument-serif), Georgia, serif",
-  mono: "var(--font-geist-mono), ui-monospace, monospace",
+  sans: "var(--font-geist), ui-sans-serif, system-ui, sans-serif",
 };
 
 interface PassArtProps {
@@ -62,9 +69,35 @@ export function nameFontSize(name: string): number {
   return 25;
 }
 
-export function microtext(name: string): string {
-  const chunk = `PASSME · ${name.trim().toUpperCase() || "TARJETA DE CONTACTO"} · `;
-  return chunk.repeat(Math.ceil(260 / chunk.length));
+/**
+ * The monogram's letter and its box for an avatar of radius `r`, in the
+ * strip's proportions: a letter this big bleeds off both edges on purpose.
+ */
+export function monogram(name: string, r: number): { letter: string; size: number; shiftX: number } {
+  return {
+    letter: name.trim().charAt(0).toUpperCase(),
+    size: (MONOGRAM_SIZE * STRIP_BOX.height * r) / STRIP_FOCUS.r,
+    shiftX: -0.25 * r,
+  };
+}
+
+/** "Editorial" sets the first name upright and the rest, in italics, on a second line. */
+export function editorialLines(name: string): [string, string] {
+  const [first = "", ...rest] = name.trim().split(/\s+/);
+  return [first, rest.join(" ")];
+}
+
+/** Letterforms of each typeface. Geist runs wider than Instrument Serif, hence the smaller size. */
+function typeStyle(typeface: Typeface, fonts: ArtFonts): { style: CSSProperties; scale: number; tracking: number } {
+  switch (typeface) {
+    case "moderna":
+      return { style: { fontFamily: fonts.sans, fontWeight: 500 }, scale: 0.82, tracking: -0.6 };
+    case "cursiva":
+      return { style: { fontFamily: fonts.serif, fontStyle: "italic" }, scale: 1, tracking: -0.3 };
+    case "clasica":
+    case "editorial":
+      return { style: { fontFamily: fonts.serif }, scale: 1, tracking: -0.4 };
+  }
 }
 
 /** The PassMe mark as a single-color SVG (see lib/brand.ts). */
@@ -79,6 +112,53 @@ function MarkSvg({ color, cutout, size }: { color: string; cutout: string; size:
   );
 }
 
+/** Truncates to `lines` lines in both renderers (they spell line clamping differently). */
+function clamp(lines: number, isSatori: boolean): CSSProperties {
+  return isSatori
+    ? { display: "block", lineClamp: lines, wordBreak: "break-word", overflow: "hidden" }
+    : { display: "-webkit-box", WebkitLineClamp: lines, WebkitBoxOrient: "vertical", overflowWrap: "anywhere", overflow: "hidden" };
+}
+
+interface NameProps {
+  name: string;
+  design: ResolvedDesign;
+  fonts: ArtFonts;
+  unit: Unit;
+  isSatori: boolean;
+}
+
+/** The name, set in the owner's typeface. */
+function Name({ name, design, fonts, unit: u, isSatori }: NameProps) {
+  const type = typeStyle(design.typeface, fonts);
+  const [first, rest] = editorialLines(name);
+  const line = (text: string, size: number, lines: number, extra?: CSSProperties) => (
+    <div
+      style={{
+        ...type.style,
+        ...extra,
+        fontSize: u(size * type.scale),
+        lineHeight: 0.98,
+        letterSpacing: u(type.tracking),
+        color: design.foreground,
+        ...clamp(lines, isSatori),
+      }}
+    >
+      {text}
+    </div>
+  );
+
+  if (design.typeface === "editorial" && rest) {
+    const size = nameFontSize(first.length > rest.length ? first : rest);
+    return (
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        {line(first, size, 1)}
+        {line(rest, size, 2, { fontStyle: "italic", letterSpacing: u(-0.3) })}
+      </div>
+    );
+  }
+  return line(name, nameFontSize(name), 2);
+}
+
 export function PassArt({ design, variant, name = "", initials = "", avatarSrc, unit: u, fonts, pixelSize, deferPattern }: PassArtProps) {
   const box = variant === "strip" ? STRIP_BOX : HERO_BOX;
   const focus = variant === "strip" ? STRIP_FOCUS : HERO_FOCUS;
@@ -88,8 +168,11 @@ export function PassArt({ design, variant, name = "", initials = "", avatarSrc, 
     return typeof value === "number" ? `${value}px` : value;
   };
   const diameter = focus.r * 2;
-  const fade = variant === "strip" ? { from: box.width * 0.36, to: box.width * 0.72 } : undefined;
+  const frame = diameter + FRAME_GAP * 2;
+  const fade = variant === "strip" && fadesUnderText(design.pattern) ? { from: box.width * 0.36, to: box.width * 0.72 } : undefined;
   const Pattern = deferPattern ? DeferredPatternSvg : PatternSvg;
+  const type = typeStyle(design.typeface, fonts);
+  const letter = design.pattern === "monograma" ? monogram(name, focus.r) : null;
 
   const root: CSSProperties = {
     position: "relative",
@@ -116,6 +199,30 @@ export function PassArt({ design, variant, name = "", initials = "", avatarSrc, 
 
   return (
     <div style={root}>
+      {letter?.letter ? (
+        <div
+          style={{
+            position: "absolute",
+            left: u(focus.x + letter.shiftX - letter.size),
+            top: u(focus.y - letter.size),
+            width: u(letter.size * 2),
+            height: u(letter.size * 2),
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            ...type.style,
+            // Serif monograms are always italic: an upright capital reads as plain text.
+            ...(design.typeface === "moderna" ? {} : { fontStyle: "italic" }),
+            fontSize: u(letter.size * (design.typeface === "moderna" ? 0.8 : 1)),
+            lineHeight: 1,
+            color: design.detail,
+            opacity: MONOGRAM_OPACITY,
+          }}
+        >
+          {letter.letter}
+        </div>
+      ) : null}
+
       <Pattern
         design={design}
         box={box}
@@ -126,20 +233,19 @@ export function PassArt({ design, variant, name = "", initials = "", avatarSrc, 
         style={{ position: "absolute", left: 0, top: 0 }}
       />
 
-      {design.pattern === "liso" || design.pattern === "senal" ? (
-        <div
-          style={{
-            position: "absolute",
-            left: u(focus.x - focus.r - 4.5),
-            top: u(focus.y - focus.r - 4.5),
-            width: u(diameter + 9),
-            height: u(diameter + 9),
-            borderRadius: u(diameter + 9),
-            border: `${length(variant === "strip" ? 1 : 0.8)} solid ${design.detail}`,
-            display: "flex",
-          }}
-        />
-      ) : null}
+      {/* Hairline frame around the avatar. */}
+      <div
+        style={{
+          position: "absolute",
+          left: u(focus.x - frame / 2),
+          top: u(focus.y - frame / 2),
+          width: u(frame),
+          height: u(frame),
+          borderRadius: u(frame),
+          border: `${length(variant === "strip" ? 0.9 : 0.8)} solid ${design.detail}`,
+          display: "flex",
+        }}
+      />
 
       {variant === "hero" ? (
         <div style={{ ...seal, backgroundColor: design.background }}>
@@ -154,9 +260,10 @@ export function PassArt({ design, variant, name = "", initials = "", avatarSrc, 
         <div
           style={{
             ...seal,
+            ...type.style,
+            fontStyle: "normal",
             backgroundColor: design.seal,
-            fontFamily: fonts.serif,
-            fontSize: u(30),
+            fontSize: u(30 * type.scale),
             lineHeight: 1,
             color: design.foreground,
           }}
@@ -165,74 +272,22 @@ export function PassArt({ design, variant, name = "", initials = "", avatarSrc, 
         </div>
       )}
 
-      {variant === "strip"
-        ? [
-          <div
-            key="seal-number"
-            style={{
-              position: "absolute",
-              left: u(20),
-              top: u(17),
-              display: "flex",
-              fontFamily: fonts.mono,
-              fontSize: u(6.6),
-              letterSpacing: u(1.3),
-              color: design.label,
-              textTransform: "uppercase",
-            }}
-          >
-            {`Sello ${sealNumber(design.seed)}`}
-          </div>,
-          <div
-            key="name"
-            style={{
-              position: "absolute",
-              left: u(19),
-              top: u(30),
-              bottom: u(24),
-              width: u(focus.x - focus.r - 19 - 14),
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "center",
-            }}
-          >
-            <div
-              style={{
-                fontFamily: fonts.serif,
-                fontSize: u(nameFontSize(name)),
-                lineHeight: 0.98,
-                letterSpacing: u(-0.4),
-                color: design.foreground,
-                overflow: "hidden",
-                ...(isSatori
-                  ? { display: "block", lineClamp: 2, wordBreak: "break-word" }
-                  : { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflowWrap: "anywhere" }),
-              }}
-            >
-              {name || "Tu nombre"}
-            </div>
-          </div>,
-          <div
-            key="microtext"
-            style={{
-              position: "absolute",
-              left: u(20),
-              right: u(20),
-              bottom: u(9),
-              display: "flex",
-              overflow: "hidden",
-              whiteSpace: "nowrap",
-              fontFamily: fonts.mono,
-              fontSize: u(4.4),
-              letterSpacing: u(0.9),
-              color: design.detail,
-              opacity: 0.8,
-            }}
-          >
-            {microtext(name)}
-          </div>,
-        ]
-        : null}
+      {variant === "strip" ? (
+        <div
+          style={{
+            position: "absolute",
+            left: u(NAME_LEFT),
+            top: u(14),
+            bottom: u(14),
+            width: u(focus.x - frame / 2 - NAME_LEFT - 14),
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+          }}
+        >
+          <Name name={name || "Tu nombre"} design={design} fonts={fonts} unit={u} isSatori={isSatori} />
+        </div>
+      ) : null}
     </div>
   );
 }

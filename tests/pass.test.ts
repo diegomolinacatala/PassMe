@@ -56,11 +56,11 @@ describe("buildApplePassJson", () => {
       webServiceURL: `${SITE}/api/wallet`,
       authenticationToken: "a".repeat(64),
     });
+    // No altText: Wallet would print it under the code and stretch the white plate.
     expect(json.barcodes[0]).toEqual({
       format: "PKBarcodeFormatQR",
       message: `${SITE}/u/demo?src=qr`,
       messageEncoding: "iso-8859-1",
-      altText: "passme.test/u/demo",
     });
     expect(json).not.toHaveProperty("generic");
     // The name lives in the strip artwork; fields below it carry role and place.

@@ -13,8 +13,8 @@ import { brandIconImages, logoImages } from "./images";
  * Apple Wallet "store card" pass for a contact card.
  *
  * Store cards are the only pass style with a full-width strip image, which is
- * where the card's artwork lives (see lib/pass/art.tsx): generative pattern,
- * avatar seal and the name set in our display serif.
+ * where the card's artwork lives (see lib/pass/art.tsx): generative motif,
+ * framed avatar and the name in the owner's typeface.
  *
  * Front: logo + company, artwork strip, role/location/pronouns, and a QR that
  * opens the public card. Back: every visible link (tappable) plus the card URL.
@@ -113,12 +113,13 @@ export function buildApplePassJson(input: ApplePassInput, config: Pick<AppleWall
       auxiliaryFields,
       backFields: backFields(card),
     },
+    // No altText: Wallet would print the URL under the code and stretch the white
+    // plate around it. The link is on the back of the pass anyway.
     barcodes: [
       {
         format: "PKBarcodeFormatQR",
         message: qrUrl,
         messageEncoding: "iso-8859-1",
-        altText: prettyProfileUrl(card.slug),
       },
     ],
     ...webService,

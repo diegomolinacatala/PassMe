@@ -2,14 +2,15 @@ import { ArrowUpRight, MapPin, UserRoundPlus } from "lucide-react";
 import { Mark } from "@/components/brand/logo";
 import { buttonClasses } from "@/components/ui/button";
 import { cardCssVars } from "@/lib/card/colors";
-import { resolveDesign, sealNumber } from "@/lib/card/design";
+import { resolveDesign, type Typeface } from "@/lib/card/design";
 import { linkDisplay, linkHref, linkTitle } from "@/lib/card/links";
+import { fadesUnderText } from "@/lib/card/pattern";
 import type { PublicCard } from "@/lib/card/types";
 import { cn } from "@/lib/cn";
 import { Avatar } from "./avatar";
 import { LinkIcon } from "./link-icon";
 import { DeferredPatternSvg } from "./deferred-pattern-svg";
-import { microtext } from "./pass-art";
+import { editorialLines, monogram, MONOGRAM_OPACITY } from "./pass-art";
 import { ShareButton, TrackedLink } from "./profile-actions";
 
 interface ProfileCardProps {
@@ -23,18 +24,50 @@ interface ProfileCardProps {
 const ART_BOX = { width: 600, height: 210 };
 const AVATAR_SIZE = 88;
 /** Avatar center, measured from the header's bottom-right corner (px-6 / pb-9 + half the avatar). */
-const ART_FOCUS = { x: ART_BOX.width - 24 - AVATAR_SIZE / 2, y: ART_BOX.height - 36 - AVATAR_SIZE / 2, r: AVATAR_SIZE / 2 };
+const AVATAR_INSET = { right: 24 + AVATAR_SIZE / 2, bottom: 36 + AVATAR_SIZE / 2 };
+const ART_FOCUS = { x: ART_BOX.width - AVATAR_INSET.right, y: ART_BOX.height - AVATAR_INSET.bottom, r: AVATAR_SIZE / 2 };
+
+/** The name in the owner's typeface (the pass sets it the same way). */
+const NAME_CLASSES: Record<Typeface, string> = {
+  clasica: "font-display text-[2.7rem] leading-[0.95] tracking-tight",
+  cursiva: "font-display text-[2.7rem] leading-[0.95] tracking-tight italic",
+  editorial: "font-display text-[2.7rem] leading-[0.95] tracking-tight",
+  moderna: "font-sans text-[2.05rem] leading-[1.02] font-medium tracking-[-0.035em]",
+};
+
+/** The pass's monogram, centered on the avatar like on the strip. */
+function Monogram({ name, italic }: { name: string; italic: boolean }) {
+  const { letter, size, shiftX } = monogram(name, AVATAR_SIZE / 2);
+  return (
+    <span
+      className={cn("pointer-events-none absolute -z-10 flex items-center justify-center leading-none", italic ? "font-display italic" : "font-sans font-medium")}
+      style={{
+        right: AVATAR_INSET.right - shiftX - size,
+        bottom: AVATAR_INSET.bottom - size,
+        width: size * 2,
+        height: size * 2,
+        fontSize: italic ? size : size * 0.8,
+        color: "var(--card-detail)",
+        opacity: MONOGRAM_OPACITY,
+      }}
+      aria-hidden="true"
+    >
+      {letter}
+    </span>
+  );
+}
 
 /**
  * The public contact card (what people see after scanning the QR).
- * Styled like the pass: the card's color and guilloché seal on the stub,
- * a perforation, and a paper body with the contacts.
+ * Styled like the pass: the card's color and motif on the stub, a
+ * perforation, and a paper body with the contacts.
  */
 export function ProfileCard({ card, preview = false, className }: ProfileCardProps) {
   const name = card.fullName || "Tu nombre";
   const meta = [card.headline, card.company].filter(Boolean).join(" · ");
   const vcardHref = `/u/${encodeURIComponent(card.slug)}/vcard`;
   const design = resolveDesign(card);
+  const [first, rest] = editorialLines(name);
 
   return (
     <article
@@ -44,11 +77,12 @@ export function ProfileCard({ card, preview = false, className }: ProfileCardPro
     >
       {/* Stub */}
       <header className="relative isolate overflow-hidden bg-[var(--card-bg)] px-6 pt-5 pb-9 text-[var(--card-fg)]">
+        {design.pattern === "monograma" ? <Monogram name={name} italic={design.typeface !== "moderna"} /> : null}
         <DeferredPatternSvg
           design={design}
           box={ART_BOX}
           focus={ART_FOCUS}
-          fade={{ from: ART_BOX.width - 330, to: ART_BOX.width - 150 }}
+          fade={fadesUnderText(design.pattern) ? { from: ART_BOX.width - 330, to: ART_BOX.width - 150 } : undefined}
           width={ART_BOX.width}
           height={ART_BOX.height}
           style={{ position: "absolute", right: 0, bottom: 0, zIndex: -1, maxWidth: "none" }}
@@ -56,7 +90,7 @@ export function ProfileCard({ card, preview = false, className }: ProfileCardPro
         <div className="flex items-center justify-between gap-3">
           <span className="inline-flex items-center gap-1.5 font-mono text-[10px] tracking-[0.16em] text-[var(--card-label)] uppercase">
             <Mark className="size-4" cutout="var(--card-bg)" />
-            Contacto · Sello {sealNumber(design.seed)}
+            Tarjeta de contacto
           </span>
           {card.pronouns ? (
             <span className="rounded-full border border-current/25 bg-[var(--card-bg)] px-2 py-0.5 font-mono text-[10px] tracking-wide">
@@ -67,7 +101,16 @@ export function ProfileCard({ card, preview = false, className }: ProfileCardPro
 
         <div className="mt-10 flex items-end justify-between gap-4">
           <div className="min-w-0">
-            <h1 className="font-display text-[2.7rem] leading-[0.95] tracking-tight break-words">{name}</h1>
+            <h1 className={cn("break-words", NAME_CLASSES[design.typeface])}>
+              {design.typeface === "editorial" && rest ? (
+                <>
+                  <span className="block">{first}</span>
+                  <em className="block">{rest}</em>
+                </>
+              ) : (
+                name
+              )}
+            </h1>
             {meta ? <p className="mt-2 text-[0.95rem] leading-snug opacity-90">{meta}</p> : null}
           </div>
           <Avatar
@@ -77,9 +120,6 @@ export function ProfileCard({ card, preview = false, className }: ProfileCardPro
             className="ring-1 ring-[var(--card-detail)] ring-offset-4 ring-offset-[var(--card-bg)]"
           />
         </div>
-        <p className="microtext absolute inset-x-6 bottom-3 text-[var(--card-detail)] opacity-80" aria-hidden="true">
-          {microtext(name)}
-        </p>
       </header>
 
       {/* Perforation */}

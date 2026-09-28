@@ -40,18 +40,28 @@ test.describe("editor (demo mode)", () => {
     await expect(panel.getByText("alex@example.com")).toHaveCount(0);
   });
 
-  test("changes the card theme, pattern and seal", async ({ page }) => {
+  test("changes the card theme, motif, variation and typeface", async ({ page }) => {
     await page.getByRole("radio", { name: "Café" }).click();
     await expect(page.getByRole("radio", { name: "Café" })).toHaveAttribute("aria-checked", "true");
     const pass = page.getByLabel(/Vista previa del pase de Apple Wallet/).locator("visible=true");
     await expect(pass).toHaveCSS("background-color", "rgb(62, 44, 35)");
 
-    await page.getByRole("radio", { name: "Ondas" }).click();
-    await expect(page.getByRole("radio", { name: "Ondas" })).toHaveAttribute("aria-checked", "true");
+    await page.getByRole("radio", { name: "Relieve" }).click();
+    await expect(page.getByRole("radio", { name: "Relieve" })).toHaveAttribute("aria-checked", "true");
 
-    await expect(pass.getByText("Sello Nº 048213")).toBeVisible();
-    await page.getByRole("button", { name: "Otro sello" }).click();
-    await expect(pass.getByText("Sello Nº 048213")).toHaveCount(0);
+    // Variations re-roll the motif and can be undone; no number is ever shown.
+    const previous = page.getByRole("button", { name: "Volver a la variación anterior" });
+    await expect(previous).toBeDisabled();
+    await page.getByRole("button", { name: "Otra variación" }).click();
+    await expect(previous).toBeEnabled();
+    await expect(pass.getByText(/Nº/)).toHaveCount(0);
+
+    // Letter-only motifs have no variations.
+    await page.getByRole("radio", { name: "Monograma" }).click();
+    await expect(page.getByRole("button", { name: "Otra variación" })).toBeDisabled();
+
+    await page.getByRole("radio", { name: "Editorial" }).click();
+    await expect(page.getByRole("radio", { name: "Editorial" })).toHaveAttribute("aria-checked", "true");
     await expect(page.getByRole("status")).toContainText("Cambios sin guardar");
   });
 

@@ -1,3 +1,4 @@
+import type { Typeface } from "./design";
 import type { LinkKind } from "./links";
 import type { PatternKind } from "./pattern";
 
@@ -25,11 +26,13 @@ export interface CardData {
   bio: string;
   /** Pass background. */
   accentColor: string;
-  /** Pattern/seal/label color; null = derived from the background. */
+  /** Motif/frame/label color; null = derived from the background. */
   detailColor: string | null;
   pattern: PatternKind;
-  /** Seeds the generative pattern and doubles as the card's "seal number". */
+  /** Seeds the generative motif: the card's own variation. */
   patternSeed: number;
+  /** Typeface of the name on the pass. */
+  typeface: Typeface;
   avatarUrl: string | null;
   links: CardLink[];
 }
