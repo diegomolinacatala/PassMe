@@ -1,4 +1,5 @@
 import { WalletPass } from "@/components/card/wallet-pass";
+import { themeDesign } from "@/lib/card/design";
 import type { PublicCard } from "@/lib/card/types";
 
 /**
@@ -6,7 +7,7 @@ import type { PublicCard } from "@/lib/card/types";
  * and the side button that you double-press to bring the wallet up.
  */
 export function PhoneShowcase({ card }: { card: PublicCard }) {
-  const backCard: PublicCard = { ...card, accentColor: "#141414" };
+  const backCard: PublicCard = { ...card, ...themeDesign("cafe", "ondas", 311_724) };
 
   return (
     <div className="relative mx-auto w-[300px] sm:w-[330px]" aria-label="Ejemplo de tarjeta PassMe en la cartera del móvil">
@@ -26,13 +27,13 @@ export function PhoneShowcase({ card }: { card: PublicCard }) {
           <span className="absolute top-36 -right-[5px] h-20 w-[5px] rounded-r-md bg-ink" aria-hidden="true" />
           <span className="absolute top-[9.5rem] -right-[4.75rem] hidden items-center gap-2 lg:flex" aria-hidden="true">
             <span className="relative flex size-3">
-              <span className="absolute inset-0 animate-ping rounded-full bg-signal/70" />
+              <span className="absolute inset-0 animate-ping rounded-full bg-signal/60" />
               <span className="relative size-3 rounded-full bg-signal" />
             </span>
             <span className="font-mono text-[11px] tracking-[0.14em] text-ink uppercase">×2</span>
           </span>
 
-          <div className="relative overflow-hidden rounded-[42px] bg-[#e7e3dc] px-3.5 pt-3 pb-8">
+          <div className="relative overflow-hidden rounded-[42px] bg-paper-deep px-3.5 pt-3 pb-8">
             {/* Status bar + dynamic island */}
             <div className="flex items-center justify-between px-3 pt-1 text-[12px] font-semibold text-ink">
               <span>9:41</span>
@@ -48,7 +49,7 @@ export function PhoneShowcase({ card }: { card: PublicCard }) {
               <WalletPass card={card} style="apple" className="max-w-none" />
               {/* Scanner line sweeping the QR */}
               <span
-                className="pointer-events-none absolute bottom-[3.2rem] left-1/2 h-[2px] w-[132px] -translate-x-1/2 animate-scan bg-signal shadow-[0_0_12px_2px_rgb(255_74_28/0.55)] [--scan-distance:-108px]"
+                className="pointer-events-none absolute bottom-[3.2rem] left-1/2 h-[2px] w-[132px] -translate-x-1/2 animate-scan bg-signal shadow-[0_0_12px_2px_rgb(228_87_42/0.55)] [--scan-distance:-108px]"
                 aria-hidden="true"
               />
             </div>

@@ -80,6 +80,13 @@ test.describe("public card", () => {
     expect(await response.text()).toContain("<svg");
   });
 
+  test("serves the Google Wallet hero artwork", async ({ request }) => {
+    const response = await request.get("/u/demo/hero");
+    expect(response.status()).toBe(200);
+    expect(response.headers()["content-type"]).toBe("image/png");
+    expect((await request.get("/u/esta-tarjeta-no-existe/hero")).status()).toBe(404);
+  });
+
   test("returns 404 for unknown cards", async ({ page }) => {
     const response = await page.goto("/u/esta-tarjeta-no-existe");
     expect(response?.status()).toBe(404);

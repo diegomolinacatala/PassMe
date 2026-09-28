@@ -40,11 +40,19 @@ test.describe("editor (demo mode)", () => {
     await expect(panel.getByText("alex@example.com")).toHaveCount(0);
   });
 
-  test("changes the card color", async ({ page }) => {
-    await page.getByRole("radio", { name: "Cobalto" }).click();
-    await expect(page.getByRole("radio", { name: "Cobalto" })).toHaveAttribute("aria-checked", "true");
+  test("changes the card theme, pattern and seal", async ({ page }) => {
+    await page.getByRole("radio", { name: "Café" }).click();
+    await expect(page.getByRole("radio", { name: "Café" })).toHaveAttribute("aria-checked", "true");
     const pass = page.getByLabel(/Vista previa del pase de Apple Wallet/).locator("visible=true");
-    await expect(pass).toHaveCSS("background-color", "rgb(35, 64, 245)");
+    await expect(pass).toHaveCSS("background-color", "rgb(62, 44, 35)");
+
+    await page.getByRole("radio", { name: "Ondas" }).click();
+    await expect(page.getByRole("radio", { name: "Ondas" })).toHaveAttribute("aria-checked", "true");
+
+    await expect(pass.getByText("Sello Nº 048213")).toBeVisible();
+    await page.getByRole("button", { name: "Otro sello" }).click();
+    await expect(pass.getByText("Sello Nº 048213")).toHaveCount(0);
+    await expect(page.getByRole("status")).toContainText("Cambios sin guardar");
   });
 
   test("tracks unsaved changes and 'saves' in demo mode", async ({ page }) => {

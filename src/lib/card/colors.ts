@@ -1,6 +1,7 @@
 /**
  * Color helpers shared by the web preview, the public page and both wallets.
  * Apple Wallet wants `rgb(r, g, b)` strings; Google Wallet wants `#rrggbb`.
+ * Curated themes live in ./design.ts.
  */
 
 export interface Rgb {
@@ -11,24 +12,15 @@ export interface Rgb {
 
 export const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 
-export const DEFAULT_ACCENT = "#141414";
+/** Theme "Naranja" — the background every new card starts with. */
+export const DEFAULT_ACCENT = "#EF7A4A";
 
-/** Curated card colors. Hand-picked so both black and white text stay legible. */
-export const ACCENT_SWATCHES: ReadonlyArray<{ name: string; hex: string }> = [
-  { name: "Tinta", hex: "#141414" },
-  { name: "Bermellón", hex: "#FF4A1C" },
-  { name: "Cobalto", hex: "#2340F5" },
-  { name: "Bosque", hex: "#1F4D3A" },
-  { name: "Ciruela", hex: "#5B2A86" },
-  { name: "Arena", hex: "#E9DFCB" },
-  { name: "Salvia", hex: "#B7C9A8" },
-  { name: "Cielo", hex: "#A9CBF2" },
-  { name: "Rosa", hex: "#F4B6C2" },
-  { name: "Limón", hex: "#E8F260" },
-];
-
-const INK: Rgb = { r: 17, g: 17, b: 17 };
+/** Brand "Café": the dark text color used on light cards. */
+const INK: Rgb = { r: 34, g: 27, b: 23 };
 const WHITE: Rgb = { r: 255, g: 255, b: 255 };
+const BLACK: Rgb = { r: 0, g: 0, b: 0 };
+/** WCAG AA for body text. */
+const TEXT_MIN_CONTRAST = 4.5;
 
 export function isHexColor(value: string): boolean {
   return HEX_COLOR_RE.test(value);
@@ -73,15 +65,24 @@ export function mix(a: Rgb, b: Rgb, amountOfB: number): Rgb {
 }
 
 /** Picks ink or white — whichever reads better on the given background. */
+/**
+ * Picks white or Café ink — whichever reads better on the given background.
+ * On the few mid-tones where warm ink can't reach AA, falls back to pure black
+ * (white or black always clears 4.5:1).
+ */
 export function readableOn(background: Rgb): Rgb {
-  return contrastRatio(background, WHITE) >= contrastRatio(background, INK) ? WHITE : INK;
+  const best = contrastRatio(background, WHITE) >= contrastRatio(background, INK) ? WHITE : INK;
+  if (best === WHITE || contrastRatio(background, INK) >= TEXT_MIN_CONTRAST) return best;
+  return contrastRatio(background, BLACK) >= contrastRatio(background, WHITE) ? BLACK : WHITE;
 }
 
 export interface CardPalette {
   background: Rgb;
   foreground: Rgb;
-  /** Softer tone for field labels. */
+  /** Field labels: the detail color when it reads well, otherwise a softened foreground. */
   label: Rgb;
+  /** Color of the guilloché pattern, the seal and other printed details. */
+  detail: Rgb;
   isDark: boolean;
 }
 
@@ -97,24 +98,45 @@ function softLabel(foreground: Rgb, background: Rgb): Rgb {
   return foreground;
 }
 
-export function cardPalette(accentHex: string): CardPalette {
+/** Details must stand out from the background at least this much (WCAG non-text contrast). */
+const DETAIL_MIN_CONTRAST = 1.6;
+
+/**
+ * Tonal detail color derived from the background: a lighter, cleaner version
+ * on dark cards and a deeper one on light cards. Used when the owner picks
+ * "automático".
+ */
+export function autoDetail(background: Rgb): Rgb {
+  const isDark = readableOn(background) === WHITE;
+  for (let t = 0.5; t <= 0.95; t += 0.05) {
+    const candidate = isDark ? mix(background, WHITE, t) : mix(background, INK, t);
+    if (contrastRatio(candidate, background) >= 3) return candidate;
+  }
+  return readableOn(background);
+}
+
+export function cardPalette(accentHex: string, detailHex?: string | null): CardPalette {
   const background = parseHex(accentHex) ?? parseHex(DEFAULT_ACCENT)!;
   const foreground = readableOn(background);
   const isDark = foreground === WHITE;
+  const chosen = detailHex ? parseHex(detailHex) : null;
+  const detail = chosen && contrastRatio(chosen, background) >= DETAIL_MIN_CONTRAST ? chosen : autoDetail(background);
   return {
     background,
     foreground,
-    label: softLabel(foreground, background),
+    label: contrastRatio(detail, background) >= LABEL_MIN_CONTRAST ? detail : softLabel(foreground, background),
+    detail,
     isDark,
   };
 }
 
 /** CSS custom properties consumed by card components. */
-export function cardCssVars(accentHex: string): Record<string, string> {
-  const p = cardPalette(accentHex);
+export function cardCssVars(accentHex: string, detailHex?: string | null): Record<string, string> {
+  const p = cardPalette(accentHex, detailHex);
   return {
     "--card-bg": toHex(p.background),
     "--card-fg": toHex(p.foreground),
     "--card-label": toHex(p.label),
+    "--card-detail": toHex(p.detail),
   };
 }

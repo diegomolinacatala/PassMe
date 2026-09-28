@@ -15,7 +15,7 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/u/[slug]/qr
     type: "svg",
     errorCorrectionLevel: "M",
     margin: 2,
-    color: { dark: "#141414", light: "#ffffff" },
+    color: { dark: "#221b17", light: "#ffffff" },
   });
 
   return new Response(svg, {

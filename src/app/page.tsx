@@ -1,5 +1,7 @@
 import { ArrowUpRight } from "lucide-react";
+import { Guilloche } from "@/components/brand/guilloche";
 import { PhoneShowcase } from "@/components/landing/phone-showcase";
+import { SealSection } from "@/components/landing/seal-section";
 import { AlwaysUpdated, ContactMarquee, FinalCta, HowItWorks, PrivacySection } from "@/components/landing/sections";
 import { SiteFooter } from "@/components/landing/site-footer";
 import { SiteHeader } from "@/components/landing/site-header";
@@ -16,12 +18,12 @@ export default function HomePage() {
     <>
       <SiteHeader ctaHref={ctaHref} />
       <main>
-        <section aria-labelledby="hero-title" className="relative overflow-hidden">
+        <section aria-labelledby="hero-title" className="relative isolate overflow-hidden">
           <div className="mx-auto grid max-w-[1240px] grid-cols-1 items-center gap-16 px-5 pt-8 pb-24 sm:px-8 lg:grid-cols-12 lg:gap-8 lg:pt-14 lg:pb-32">
             <div className="animate-rise lg:col-span-7">
               <p className="eyebrow flex items-center gap-2">
                 <span className="inline-block size-1.5 rounded-full bg-signal" aria-hidden="true" />
-                Tarjeta de visita · Apple Wallet &amp; Google Wallet
+                Pásame tu contacto · Apple Wallet &amp; Google Wallet
               </p>
               <h1
                 id="hero-title"
@@ -60,7 +62,12 @@ export default function HomePage() {
               </dl>
             </div>
 
-            <div className="animate-rise [animation-delay:150ms] lg:col-span-5">
+            <div className="relative animate-rise [animation-delay:150ms] lg:col-span-5">
+              <Guilloche
+                size={820}
+                seed={48213}
+                className="pointer-events-none absolute top-1/2 left-1/2 -z-10 -translate-x-1/2 -translate-y-1/2 opacity-45"
+              />
               <PhoneShowcase card={demo} />
             </div>
           </div>
@@ -68,6 +75,7 @@ export default function HomePage() {
 
         <ContactMarquee />
         <HowItWorks />
+        <SealSection />
         <PrivacySection />
         <AlwaysUpdated card={demo} />
         <FinalCta ctaHref={ctaHref} />

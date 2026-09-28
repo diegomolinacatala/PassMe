@@ -44,7 +44,7 @@ export function PreviewPanel({ card }: { card: PublicCard }) {
         id={`${id}-panel`}
         role="tabpanel"
         aria-labelledby={`${id}-tab-${tab}`}
-        className="relative mt-5 flex min-h-[460px] justify-center rounded-[28px] bg-[#e6e1d7] px-4 py-8 shadow-[inset_0_2px_12px_rgb(20_20_20/0.08)]"
+        className="relative mt-5 flex min-h-[460px] justify-center rounded-[28px] bg-paper-deep px-4 py-8 shadow-[inset_0_2px_12px_rgb(34_27_23/0.08)]"
       >
         {tab === "web" ? (
           <div className="w-full max-w-[360px] origin-top scale-[0.94]">

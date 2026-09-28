@@ -48,6 +48,33 @@ describe("profiles constraints", () => {
     }
   });
 
+  it("gives new cards the brand design and a seal number", async () => {
+    const { rows } = await db.query<{ accent_color: string; detail_color: string | null; pattern: string; pattern_seed: number }>(
+      `select accent_color, detail_color, pattern, pattern_seed from public.profiles where id = $1`,
+      [BOB],
+    );
+    expect(rows[0]).toMatchObject({ accent_color: "#EF7A4A", detail_color: null, pattern: "sello" });
+    expect(rows[0]!.pattern_seed).toBeGreaterThanOrEqual(0);
+    expect(rows[0]!.pattern_seed).toBeLessThanOrEqual(999999);
+  });
+
+  it("validates the design columns", async () => {
+    await expect(db.query(`update public.profiles set detail_color = 'lime' where id = $1`, [ALICE])).rejects.toThrow(
+      /profiles_detail_color_format/,
+    );
+    await expect(db.query(`update public.profiles set pattern = 'tartan' where id = $1`, [ALICE])).rejects.toThrow(
+      /profiles_pattern_kind/,
+    );
+    await expect(db.query(`update public.profiles set pattern_seed = 1000000 where id = $1`, [ALICE])).rejects.toThrow(
+      /profiles_pattern_seed_range/,
+    );
+    const ok = await db.query(
+      `update public.profiles set detail_color = '#FFE3D1', pattern = 'ondas', pattern_seed = 48213 where id = $1`,
+      [ALICE],
+    );
+    expect(ok.affectedRows).toBe(1);
+  });
+
   it("rejects non-array or oversized links", async () => {
     await expect(
       db.query(`update public.profiles set links = '{}'::jsonb where id = $1`, [ALICE]),
@@ -133,6 +160,9 @@ describe("get_public_card", () => {
     expect(card.links.map((l) => l.id)).toEqual(["l-email-1", "l-web-111"]);
     expect(JSON.stringify(card)).not.toContain("600 000 000");
     expect(card).not.toHaveProperty("id");
+    expect(card).toHaveProperty("pattern");
+    expect(card).toHaveProperty("pattern_seed");
+    expect(card).toHaveProperty("detail_color");
   });
 
   it("returns null for drafts, unpublished and unknown slugs", async () => {

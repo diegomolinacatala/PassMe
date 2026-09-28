@@ -10,7 +10,7 @@ import type { CardStats } from "@/lib/data/cards";
 import { cn } from "@/lib/cn";
 import { AccountPanel } from "./account-panel";
 import { AvatarField } from "./avatar-field";
-import { ColorField } from "./color-field";
+import { DesignField } from "./design-field";
 import { Section, Switch, TextField } from "./fields";
 import { LinksEditor } from "./links-editor";
 import { PreviewPanel } from "./preview-panel";
@@ -164,7 +164,7 @@ export function CardEditor({ initialCard, stats, wallet, siteUrl, email, demo }:
       ) : null}
 
       <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_400px] xl:gap-12">
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           {/* On phones the live preview sits on top; on desktop it lives in the sticky aside. */}
           <div className="lg:hidden">
             <PreviewPanel card={preview} />
@@ -218,8 +218,20 @@ export function CardEditor({ initialCard, stats, wallet, siteUrl, email, demo }:
             />
           </Section>
 
-          <Section number="03" title="Estilo" description="El color de fondo del pase y de tu página. El texto se ajusta solo para que se lea.">
-            <ColorField value={draft.accentColor} onChange={editor.setAccent} />
+          <Section
+            number="03"
+            title="Estilo"
+            description="Colores, motivo y sello de tu pase. Se aplican también a tu página. El texto se ajusta solo para que se lea."
+          >
+            <DesignField
+              value={{
+                accentColor: draft.accentColor,
+                detailColor: draft.detailColor,
+                pattern: draft.pattern,
+                patternSeed: draft.patternSeed,
+              }}
+              onChange={editor.setDesign}
+            />
           </Section>
 
           <Section

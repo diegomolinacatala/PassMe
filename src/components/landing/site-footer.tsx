@@ -22,6 +22,9 @@ export function SiteFooter() {
         </nav>
         <p className="font-mono text-[11px] tracking-[0.14em] text-muted uppercase">© {new Date().getFullYear()} PassMe</p>
       </div>
+      <p className="microtext border-t hairline px-5 py-3 text-center text-muted sm:px-8" aria-hidden="true">
+        {"PASSME · PÁSAME TU CONTACTO · ".repeat(12)}
+      </p>
     </footer>
   );
 }

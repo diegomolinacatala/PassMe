@@ -44,9 +44,11 @@ Sin tocar nada, `npm run dev` ya funciona en **modo demo**: landing, tarjeta de 
    - *Publishable key* (`sb_publishable_…`) → `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
    - *Secret key* (`sb_secret_…`, créala si no existe) → `SUPABASE_SECRET_KEY`
    - Si tu proyecto solo muestra las claves antiguas (*Legacy*): `anon` → `NEXT_PUBLIC_SUPABASE_ANON_KEY` y `service_role` → `SUPABASE_SERVICE_ROLE_KEY`. La app acepta ambos nombres.
-3. **Base de datos** → *SQL Editor → New query* → pega **todo** el contenido de
-   [`supabase/migrations/20260927120000_init.sql`](../supabase/migrations/20260927120000_init.sql) → *Run*.
-   Debe terminar con *Success. No rows returned*. Crea tablas, políticas RLS, funciones y el bucket `avatars`.
+3. **Base de datos** → *SQL Editor → New query* → pega **todo** el contenido de cada migración, **en orden**, y pulsa *Run* en cada una:
+   1. [`supabase/migrations/20260927120000_init.sql`](../supabase/migrations/20260927120000_init.sql) — tablas, políticas RLS, funciones y el bucket `avatars`.
+   2. [`supabase/migrations/20260928120000_card_design.sql`](../supabase/migrations/20260928120000_card_design.sql) — diseño del pase (tinta de detalle, motivo y número de sello).
+
+   Cada una debe terminar con *Success. No rows returned*. Si ya aplicaste la primera, ejecuta solo la segunda.
    - Alternativa con CLI: `npx supabase login && npx supabase init && npx supabase link --project-ref <ref> && npx supabase db push`.
 4. **URLs de autenticación** → *Authentication → URL Configuration*:
    - *Site URL*: `http://localhost:3000` por ahora (en el paso 3 pondrás la de producción).
@@ -145,6 +147,7 @@ Necesitas el **Apple Developer Program** (99 $/año). Si te das de alta como emp
 6. `npm run doctor` → *Google Wallet* en ✔ (hace un intercambio de token real con Google).
 7. **Modo prueba**: hasta que Google apruebe tu cuenta de emisor solo pueden guardar pases los usuarios de prueba. En la Wallet Console añade tu cuenta de Google como *test user*. Prueba con `https://TU-URL/api/pass/google?demo=1` desde Android o Chrome.
 8. **Publicar**: cuando todo funcione, *Request publishing access* en la Wallet Console (Google revisa el diseño de la clase).
+9. **Imagen del pase**: el arte de cada tarjeta (guilloché y sello) se sirve desde `/u/<slug>/hero`, así que `NEXT_PUBLIC_SITE_URL` debe ser una URL pública para que Google pueda descargarla. Si algún día cambias las filas de la plantilla de la clase (`buildGenericClass`), sube la versión en `GOOGLE_WALLET_CLASS_SUFFIX` (`passme_card_v2`…): Google no actualiza una clase ya creada desde el JWT.
 
 ---
 
