@@ -1,7 +1,10 @@
 import { ArrowUpRight, Check, EyeOff, RefreshCw, ShieldCheck, Trash2 } from "lucide-react";
+import { Guilloche } from "@/components/brand/guilloche";
 import { LinkIcon } from "@/components/card/link-icon";
 import { WalletPass } from "@/components/card/wallet-pass";
 import { LinkButton } from "@/components/ui/button";
+import { BRAND } from "@/lib/brand";
+import { themeDesign } from "@/lib/card/design";
 import type { LinkKind } from "@/lib/card/links";
 import type { PublicCard } from "@/lib/card/types";
 
@@ -23,12 +26,12 @@ const CONTACT_KINDS = [
 export function ContactMarquee() {
   const items = [...CONTACT_KINDS, ...CONTACT_KINDS];
   return (
-    <div className="relative overflow-hidden border-y hairline bg-paper-deep/60 py-4" aria-hidden="true">
-      <div className="flex w-max animate-marquee gap-8 font-mono text-[12px] tracking-[0.18em] text-ink-soft uppercase">
+    <div className="relative overflow-hidden bg-ink py-4" aria-hidden="true">
+      <div className="flex w-max animate-marquee gap-8 font-mono text-[12px] tracking-[0.18em] text-paper/80 uppercase">
         {items.map((item, i) => (
           <span key={`${item}-${i}`} className="flex items-center gap-8">
             {item}
-            <span className="text-signal">✦</span>
+            <span className="text-glow">✦</span>
           </span>
         ))}
       </div>
@@ -40,7 +43,7 @@ const STEPS = [
   {
     n: "01",
     title: "Diseña tu tarjeta",
-    body: "Nombre, cargo, foto y los contactos que quieras. Eliges el color; nosotros nos aseguramos de que se lea bien.",
+    body: "Nombre, cargo, foto y los contactos que quieras. Eliges tintas y motivo; nosotros nos aseguramos de que se lea bien.",
   },
   {
     n: "02",
@@ -112,9 +115,9 @@ export function PrivacySection() {
     <section id="privacidad" aria-labelledby="privacidad-title" className="scroll-mt-10 bg-ink text-paper">
       <div className="mx-auto grid max-w-[1240px] grid-cols-1 gap-16 px-5 py-24 sm:px-8 sm:py-32 lg:grid-cols-12 lg:gap-10">
         <div className="lg:col-span-6">
-          <p className="eyebrow text-paper/55">Privacidad</p>
+          <p className="eyebrow text-paper/60">Privacidad</p>
           <h2 id="privacidad-title" className="mt-4 font-display text-[length:var(--text-display)] leading-[0.95] tracking-tight">
-            Tú decides <em className="text-signal">qué</em> se ve.
+            Tú decides <em className="text-glow">qué</em> se ve.
           </h2>
           <p className="mt-6 max-w-md text-lg leading-relaxed text-paper/70">
             No todo el mundo quiere repartir su móvil. Enseña el LinkedIn en un evento, el WhatsApp a un cliente — y cambia
@@ -124,7 +127,7 @@ export function PrivacySection() {
           <ul className="mt-12 space-y-8">
             {PRIVACY_POINTS.map(({ icon: Icon, title, body }) => (
               <li key={title} className="flex gap-4">
-                <span className="mt-0.5 grid size-10 shrink-0 place-items-center rounded-full border border-paper/20 text-signal">
+                <span className="mt-0.5 grid size-10 shrink-0 place-items-center rounded-full border border-paper/20 text-glow">
                   <Icon className="size-[18px]" aria-hidden />
                 </span>
                 <div>
@@ -138,7 +141,7 @@ export function PrivacySection() {
 
         <div className="lg:col-span-5 lg:col-start-8">
           <div className="rounded-[28px] border border-paper/12 bg-paper/[0.04] p-3 sm:p-4" aria-label="Ejemplo de contactos visibles y ocultos">
-            <p className="eyebrow px-3 pt-2 pb-4 text-paper/50">Tus contactos</p>
+            <p className="eyebrow px-3 pt-2 pb-4 text-paper/60">Tus contactos</p>
             <ul className="space-y-2">
               {PRIVACY_ROWS.map((row) => (
                 <li
@@ -146,7 +149,7 @@ export function PrivacySection() {
                   className={`flex items-center gap-3 rounded-2xl px-3 py-3 ${row.visible ? "bg-paper text-ink" : "bg-paper/[0.06] text-paper/75"}`}
                 >
                   <span
-                    className={`grid size-9 shrink-0 place-items-center rounded-xl ${row.visible ? "bg-signal text-white" : "bg-paper/10"}`}
+                    className={`grid size-9 shrink-0 place-items-center rounded-xl ${row.visible ? "bg-signal-strong text-white" : "bg-paper/10"}`}
                   >
                     <LinkIcon kind={row.kind} size={17} />
                   </span>
@@ -176,8 +179,8 @@ export function PrivacySection() {
 }
 
 export function AlwaysUpdated({ card }: { card: PublicCard }) {
-  const before: PublicCard = { ...card, headline: "Product Designer", company: "Estudio Norte", accentColor: "#E9DFCB" };
-  const after: PublicCard = { ...card, headline: "Head of Design", company: "Norte & Co.", accentColor: "#2340F5" };
+  const before: PublicCard = { ...card, ...themeDesign("arena", "senal", 48_213), headline: "Product Designer", company: "Estudio Norte" };
+  const after: PublicCard = { ...card, ...themeDesign("cafe", "sello", 48_213), headline: "Head of Design", company: "Norte & Co." };
 
   return (
     <section aria-labelledby="actualizada-title" className="overflow-x-clip">
@@ -188,8 +191,8 @@ export function AlwaysUpdated({ card }: { card: PublicCard }) {
             Cambias de trabajo, <em className="text-signal">no de tarjeta.</em>
           </h2>
           <p className="mt-6 max-w-md text-lg leading-relaxed text-ink-soft">
-            Edita tu cargo, tu foto o tus enlaces y el pase se actualiza solo en todas las carteras donde esté. Nada de
-            reimprimir, nada de volver a enviar.
+            Edita tu cargo, tu foto, tus enlaces o el diseño entero y el pase se actualiza solo en todas las carteras
+            donde esté. Nada de reimprimir, nada de volver a enviar.
           </p>
           <p className="mt-8 inline-flex items-center gap-2 font-mono text-[12px] tracking-[0.12em] text-muted uppercase">
             <RefreshCw className="size-4 text-signal" aria-hidden />
@@ -216,19 +219,22 @@ export function AlwaysUpdated({ card }: { card: PublicCard }) {
 export function FinalCta({ ctaHref }: { ctaHref: string }) {
   return (
     <section aria-labelledby="cta-title" className="px-5 pb-24 sm:px-8">
-      <div className="relative mx-auto max-w-[1240px] overflow-hidden rounded-[36px] bg-signal-strong px-6 py-20 text-center text-white sm:px-12 sm:py-28">
-        <div
-          className="pointer-events-none absolute inset-0 opacity-[0.12] [background-image:radial-gradient(circle_at_1px_1px,#fff_1px,transparent_0)] [background-size:22px_22px]"
-          aria-hidden="true"
+      <div className="relative isolate mx-auto max-w-[1240px] overflow-hidden rounded-[36px] bg-glow px-6 py-20 text-center text-ink sm:px-12 sm:py-28">
+        <Guilloche
+          color={BRAND.signal}
+          size={1100}
+          height={760}
+          seed={2026}
+          className="pointer-events-none absolute top-1/2 left-1/2 -z-10 -translate-x-1/2 -translate-y-1/2 opacity-35"
         />
-        <p className="eyebrow relative text-white">Empieza hoy</p>
+        <p className="eyebrow relative text-ink-soft">Empieza hoy</p>
         <h2 id="cta-title" className="relative mx-auto mt-4 max-w-3xl font-display text-[length:var(--text-display)] leading-[0.95] tracking-tight">
-          Deja de repartir papel. <em>Pásate.</em>
+          Deja de repartir papel. <em className="text-signal-deep">Pásate.</em>
         </h2>
-        <ul className="relative mx-auto mt-8 flex max-w-xl flex-wrap justify-center gap-x-6 gap-y-2 text-white">
+        <ul className="relative mx-auto mt-8 flex max-w-xl flex-wrap justify-center gap-x-6 gap-y-2 text-ink">
           {["Gratis", "Listo en 2 minutos", "iPhone y Android"].map((item) => (
             <li key={item} className="inline-flex items-center gap-1.5">
-              <Check className="size-4" aria-hidden /> {item}
+              <Check className="size-4 text-signal-deep" aria-hidden /> {item}
             </li>
           ))}
         </ul>

@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
+import { Guilloche } from "@/components/brand/guilloche";
 import { Logo } from "@/components/brand/logo";
 import { WalletPass } from "@/components/card/wallet-pass";
+import { BRAND } from "@/lib/brand";
 import { DEMO_CARD } from "@/lib/card/demo";
+import { themeDesign } from "@/lib/card/design";
 import { toPublicCard } from "@/lib/data/cards";
 import { isGoogleAuthEnabled, isSupabaseConfigured } from "@/lib/env";
 import { safeNextPath } from "@/lib/request";
@@ -56,13 +59,18 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
         className="relative hidden overflow-hidden bg-ink lg:flex lg:items-center lg:justify-center"
         aria-hidden="true"
       >
-        <div className="pointer-events-none absolute inset-0 opacity-[0.08] [background-image:radial-gradient(circle_at_1px_1px,#fff_1px,transparent_0)] [background-size:24px_24px]" />
+        <Guilloche
+          color={BRAND.glow}
+          size={900}
+          seed={1618}
+          className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-20"
+        />
         <div className="relative h-[520px] w-[520px]">
           <div className="absolute top-10 left-2 w-[290px] -rotate-[10deg]">
-            <WalletPass card={{ ...demo, accentColor: "#E9DFCB", fullName: "Marta Gil", headline: "Abogada", company: "Gil & Asociados", location: "Madrid" }} />
+            <WalletPass card={{ ...demo, ...themeDesign("papel", "senal", 104_882), fullName: "Marta Gil", headline: "Abogada", company: "Gil & Asociados", location: "Madrid" }} />
           </div>
           <div className="absolute top-24 right-0 w-[290px] rotate-[7deg]">
-            <WalletPass card={{ ...demo, accentColor: "#2340F5", fullName: "Jon Etxeberria", headline: "Sales Lead", company: "Kobalt", location: "Bilbao" }} style="google" />
+            <WalletPass card={{ ...demo, ...themeDesign("terracota", "ondas", 730_115), fullName: "Jon Etxeberria", headline: "Sales Lead", company: "Kobalt", location: "Bilbao" }} style="google" />
           </div>
           <div className="absolute top-44 left-[115px] w-[300px] animate-float [--tilt:-1deg]">
             <WalletPass card={demo} />
