@@ -6,6 +6,15 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 3000
+    },
+    {
+      "name": "passme-demo",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "-e",
+        "require('child_process').spawn(process.execPath, [require.resolve('next/dist/bin/next'), 'dev', '-p', '3000'], { stdio: 'inherit', env: { ...process.env, NEXT_PUBLIC_SUPABASE_URL: '', NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: '' } }).on('exit', (code) => process.exit(code ?? 0))"
+      ],
+      "port": 3000
     }
   ]
 }
