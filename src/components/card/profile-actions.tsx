@@ -18,13 +18,25 @@ function track(payload: { slug: string; kind: TrackKind; source?: string; linkId
   );
 }
 
-/** Counts one view per page load (skipped for the owner's editor preview). */
+/** First view of this card in this browser tab session? (Reloads don't count twice.) */
+function isFirstViewThisSession(slug: string): boolean {
+  const key = `passme:viewed:${slug}`;
+  try {
+    if (sessionStorage.getItem(key)) return false;
+    sessionStorage.setItem(key, "1");
+  } catch {
+    // Storage blocked (private mode, embedded browsers): count the view anyway.
+  }
+  return true;
+}
+
+/** Counts one view per card and session (skipped for the owner's editor preview). */
 export function ViewTracker({ slug, source }: { slug: string; source: string }) {
   const sent = useRef(false);
   useEffect(() => {
     if (sent.current) return;
     sent.current = true;
-    track({ slug, kind: "view", source });
+    if (isFirstViewThisSession(slug)) track({ slug, kind: "view", source });
   }, [slug, source]);
   return null;
 }

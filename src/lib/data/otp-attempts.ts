@@ -1,5 +1,6 @@
 import "server-only";
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
+import { getSigningSecret } from "@/lib/config.server";
 import { log } from "@/lib/log";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 
@@ -8,32 +9,67 @@ import { createAdminSupabase } from "@/lib/supabase/admin";
  *
  * A 6-digit code has 10⁶ combinations and stays valid for a while, so an
  * IP-only limiter is not enough (attackers rotate IPs and Vercel runs many
- * instances). Failures are stored in Supabase (shared across instances) and
- * mirrored in memory as a fallback when the secret key is missing.
+ * instances). Every attempt is stored in Supabase *before* the code is checked
+ * — so parallel guesses can't all slip past a "not locked yet" read — and a
+ * successful login clears them. Mirrored in memory as a fallback when the
+ * secret key is missing.
+ *
+ * This guards our own form. Supabase's /auth/v1/verify endpoint is public too:
+ * docs/SETUP.md › Supabase sets a longer code, a short expiry and its rate
+ * limits so that path is covered as well.
  */
 
-export const OTP_MAX_FAILURES = 5;
+export const OTP_MAX_ATTEMPTS = 5;
 export const OTP_LOCK_WINDOW_MS = 15 * 60_000;
 const CLEANUP_OLDER_THAN_MS = 24 * 60 * 60_000;
 
 const MAX_MEMORY_KEYS = 10_000;
-const memoryFailures = new Map<string, number[]>();
+const memoryAttempts = new Map<string, number[]>();
 
+/**
+ * Keyed hash of the email (HMAC with PASSME_SIGNING_SECRET when configured),
+ * so the table can't be used to check whether an address has tried to log in.
+ */
 export function hashEmail(email: string): string {
-  return createHash("sha256").update(email.trim().toLowerCase()).digest("hex");
+  const normalized = email.trim().toLowerCase();
+  const secret = getSigningSecret();
+  return secret
+    ? createHmac("sha256", secret).update(`otp:${normalized}`).digest("hex")
+    : createHash("sha256").update(normalized).digest("hex");
 }
 
-function recentMemoryFailures(hash: string, now: number): number[] {
-  return (memoryFailures.get(hash) ?? []).filter((t) => now - t < OTP_LOCK_WINDOW_MS);
+function recentMemoryAttempts(hash: string, now: number): number[] {
+  return (memoryAttempts.get(hash) ?? []).filter((t) => now - t < OTP_LOCK_WINDOW_MS);
 }
 
-/** True when this email has too many recent failed codes (fails closed on DB errors). */
-export async function isOtpLocked(email: string, now: number = Date.now()): Promise<boolean> {
+function registerInMemory(hash: string, now: number): boolean {
+  if (memoryAttempts.size > MAX_MEMORY_KEYS) {
+    for (const key of memoryAttempts.keys()) {
+      if (recentMemoryAttempts(key, now).length === 0) memoryAttempts.delete(key);
+    }
+  }
+  const attempts = [...recentMemoryAttempts(hash, now), now];
+  memoryAttempts.set(hash, attempts);
+  return attempts.length <= OTP_MAX_ATTEMPTS;
+}
+
+/**
+ * Records a code attempt and says whether it may be checked. Returns false once
+ * an email has used up its attempts in the window. Fails closed on DB errors.
+ */
+export async function registerOtpAttempt(email: string, now: number = Date.now()): Promise<boolean> {
   const hash = hashEmail(email);
-  if (recentMemoryFailures(hash, now).length >= OTP_MAX_FAILURES) return true;
+  const allowedInMemory = registerInMemory(hash, now);
 
   const admin = createAdminSupabase();
-  if (!admin) return false;
+  if (!admin) return allowedInMemory;
+  if (!allowedInMemory) return false;
+
+  const inserted = await admin.from("auth_otp_attempts").insert({ email_hash: hash });
+  if (inserted.error) {
+    log.warn("otp attempt insert failed", {}, inserted.error);
+    return false;
+  }
 
   const since = new Date(now - OTP_LOCK_WINDOW_MS).toISOString();
   const { count, error } = await admin
@@ -42,38 +78,25 @@ export async function isOtpLocked(email: string, now: number = Date.now()): Prom
     .eq("email_hash", hash)
     .gte("created_at", since);
   if (error) {
-    log.warn("otp lock check failed", {}, error);
-    return true;
+    log.warn("otp attempt count failed", {}, error);
+    return false;
   }
-  return (count ?? 0) >= OTP_MAX_FAILURES;
-}
 
-export async function recordOtpFailure(email: string, now: number = Date.now()): Promise<void> {
-  const hash = hashEmail(email);
-  if (memoryFailures.size > MAX_MEMORY_KEYS) {
-    for (const key of memoryFailures.keys()) {
-      if (recentMemoryFailures(key, now).length === 0) memoryFailures.delete(key);
-    }
-  }
-  memoryFailures.set(hash, [...recentMemoryFailures(hash, now), now]);
-
-  const admin = createAdminSupabase();
-  if (!admin) return;
-  const { error } = await admin.from("auth_otp_attempts").insert({ email_hash: hash });
-  if (error) log.warn("otp failure insert failed", {}, error);
-
-  // Opportunistic cleanup keeps the table tiny without a cron job.
+  // Opportunistic cleanup keeps the table tiny even without the daily cron.
   if (Math.random() < 0.05) {
     const cutoff = new Date(now - CLEANUP_OLDER_THAN_MS).toISOString();
     await admin.from("auth_otp_attempts").delete().lt("created_at", cutoff);
   }
+
+  return (count ?? 0) <= OTP_MAX_ATTEMPTS;
 }
 
+/** After a successful login the email starts from zero again. */
 export async function clearOtpFailures(email: string): Promise<void> {
   const hash = hashEmail(email);
-  memoryFailures.delete(hash);
+  memoryAttempts.delete(hash);
   const admin = createAdminSupabase();
   if (!admin) return;
   const { error } = await admin.from("auth_otp_attempts").delete().eq("email_hash", hash);
-  if (error) log.warn("otp failure cleanup failed", {}, error);
+  if (error) log.warn("otp attempts cleanup failed", {}, error);
 }

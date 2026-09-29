@@ -1,23 +1,30 @@
 import { after, NextResponse, type NextRequest } from "next/server";
 import { recordEventForProfile } from "@/lib/data/events";
+import { createSharedRateLimiter } from "@/lib/data/rate-limits";
 import { log } from "@/lib/log";
-import { buildDemoGoogleSaveUrl, buildGoogleSaveUrlForProfile, PassError, resolvePassOwnerId } from "@/lib/pass/service";
-import { createRateLimiter } from "@/lib/rate-limit";
-import { getClientIp } from "@/lib/request";
+import {
+  assertDemoPassAllowed,
+  buildDemoGoogleSaveUrl,
+  buildGoogleSaveUrlForProfile,
+  PassError,
+  resolvePassOwnerId,
+} from "@/lib/pass/service";
+import { clientRateKey } from "@/lib/request";
 
 export const runtime = "nodejs";
 
-const limiter = createRateLimiter({ limit: 20, windowMs: 60_000 });
+const limiter = createSharedRateLimiter({ name: "pass-google-ip", limit: 20, windowMs: 60_000 });
 
 /** Redirects to Google's "Save to Google Wallet" page with a freshly signed JWT. */
 export async function GET(request: NextRequest) {
-  if (!limiter.check(getClientIp(request.headers)).ok) {
+  if (!(await limiter.check(clientRateKey(request.headers))).ok) {
     return Response.json({ error: "rate_limited" }, { status: 429 });
   }
 
   try {
     const params = request.nextUrl.searchParams;
     const isDemo = params.get("demo") === "1";
+    if (isDemo) await assertDemoPassAllowed();
     const profileId = isDemo ? null : await resolvePassOwnerId(params.get("t"));
     const url = profileId ? await buildGoogleSaveUrlForProfile(profileId) : await buildDemoGoogleSaveUrl();
 

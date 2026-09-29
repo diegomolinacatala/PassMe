@@ -2,6 +2,7 @@ import "server-only";
 import { DEMO_CARD } from "@/lib/card/demo";
 import type { OwnerCard } from "@/lib/card/types";
 import { getAppleWalletConfig, getGoogleWalletConfig } from "@/lib/config.server";
+import { isSupabaseConfigured } from "@/lib/env";
 import { toPublicCard } from "@/lib/data/cards";
 import {
   deleteRegistrationsForPushTokens,
@@ -37,6 +38,18 @@ export async function resolvePassOwnerId(handoffToken: string | null): Promise<s
   const user = supabase ? await getSessionUser(supabase) : null;
   if (!user) throw new PassError(401, "unauthorized", "Inicia sesión para descargar tu pase.");
   return user.id;
+}
+
+/**
+ * The sample pass is signed with the real certificate, so once accounts exist
+ * only signed-in users may download it (handy to test a phone before saving a
+ * card). Before Supabase is connected it stays open for the setup checks.
+ */
+export async function assertDemoPassAllowed(): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  const supabase = await createServerSupabase();
+  const user = supabase ? await getSessionUser(supabase) : null;
+  if (!user) throw new PassError(401, "unauthorized", "Inicia sesión para descargar el pase de ejemplo.");
 }
 
 async function loadOwnerCard(profileId: string): Promise<OwnerCard> {

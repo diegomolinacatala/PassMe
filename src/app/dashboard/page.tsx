@@ -3,9 +3,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Logo } from "@/components/brand/logo";
 import { CardEditor } from "@/components/editor/card-editor";
-import { DEMO_CARD } from "@/lib/card/demo";
+import { DEMO_CARD, DEMO_CONTACT_REQUESTS } from "@/lib/card/demo";
 import { getAppleWalletConfig, getConfigStatus, getGoogleWalletConfig } from "@/lib/config.server";
 import { EMPTY_STATS, getOrCreateOwnerCard, getOwnStats } from "@/lib/data/cards";
+import { listOwnContactRequests } from "@/lib/data/contact-requests";
 import { getSiteUrl } from "@/lib/env";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
 
@@ -39,6 +40,7 @@ export default async function DashboardPage() {
         <CardEditor
           initialCard={DEMO_CARD}
           stats={EMPTY_STATS}
+          contacts={{ available: true, requests: DEMO_CONTACT_REQUESTS }}
           wallet={{ apple: getAppleWalletConfig() !== null, google: getGoogleWalletConfig() !== null, handoff: false }}
           siteUrl={getSiteUrl()}
           email={null}
@@ -51,7 +53,11 @@ export default async function DashboardPage() {
   const user = await getSessionUser(supabase);
   if (!user) redirect("/login?next=/dashboard");
 
-  const [card, stats] = await Promise.all([getOrCreateOwnerCard(supabase, user), getOwnStats(supabase)]);
+  const [card, stats, contacts] = await Promise.all([
+    getOrCreateOwnerCard(supabase, user),
+    getOwnStats(supabase),
+    listOwnContactRequests(supabase),
+  ]);
   const status = getConfigStatus();
 
   return (
@@ -60,6 +66,7 @@ export default async function DashboardPage() {
       <CardEditor
         initialCard={card}
         stats={stats}
+        contacts={contacts}
         wallet={{
           apple: status.appleWallet && status.supabaseSecretKey,
           google: status.googleWallet && status.supabaseSecretKey,

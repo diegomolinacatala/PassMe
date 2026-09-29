@@ -73,6 +73,20 @@ export function slugify(input: string, maxLength = 24): string {
     .replace(/-+$/g, "");
 }
 
+/** Base of the handle new cards get until the owner picks one ("tarjeta-3f9a1c"). */
+export const PLACEHOLDER_SLUG_BASE = "tarjeta";
+const PLACEHOLDER_SLUG_RE = /^tarjeta-[0-9a-f]{6}$/;
+
+export function isPlaceholderSlug(slug: string): boolean {
+  return PLACEHOLDER_SLUG_RE.test(slug);
+}
+
+/** Handle suggested from the owner's name ("José Núñez" → "jose-nunez"), or null if unusable. */
+export function suggestSlug(fullName: string): string | null {
+  const base = slugify(fullName, SLUG_MAX_LENGTH);
+  return checkSlug(base).ok ? base : null;
+}
+
 /** Builds a candidate slug from a seed (name or email local-part) plus a random suffix. */
 export function slugCandidate(seed: string, suffix: string): string {
   const base = slugify(seed.split("@")[0] ?? "") || "tarjeta";

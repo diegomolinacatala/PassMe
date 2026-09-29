@@ -19,6 +19,8 @@ sequenceDiagram
     Contacto->>Web: Escanea → /u/slug?src=qr
     Web->>DB: get_public_card(slug) — solo enlaces visibles
     Web-->>Contacto: Tarjeta + "Guardar contacto" (vCard)
+    Contacto->>Web: "Te dejo mi contacto" (opcional)
+    Web->>DB: submit_contact_request → lo ve solo el dueño
 ```
 
 ## Módulos
@@ -26,9 +28,9 @@ sequenceDiagram
 | Capa | Dónde | Responsabilidad |
 | --- | --- | --- |
 | Dominio | `src/lib/card/*` | Tipos de enlace (validación + href seguro), esquema Zod, vCard 3.0, colores legibles, diseño (`design.ts`: temas, tintas, letra, variación) y motivos generativos (`pattern.ts`), slugs. Isomórfico: la misma validación en navegador y servidor. |
-| Datos | `src/lib/data/*` | Lecturas/escrituras en Supabase. Cliente con sesión (RLS) para el dueño, cliente anónimo para lo público y cliente *admin* solo donde es imprescindible. |
+| Datos | `src/lib/data/*` | Lecturas/escrituras en Supabase. Cliente con sesión (RLS) para el dueño, cliente anónimo para lo público y cliente *admin* solo donde es imprescindible. `rate-limits.ts` (límites compartidos en Postgres), `contact-requests.ts` (contactos recibidos). |
 | Pases | `src/lib/pass/*` | `apple.ts` (pass.json + firma), `google.ts` (objeto genérico + JWT + sync REST), `apns.ts` (push HTTP/2), `web-service.ts` (protocolo de Apple), `handoff.ts` (tokens de 30 min), `images.ts` (logo/icono con sharp), `art.tsx` (banda de Apple y *hero* de Google con Satori). |
-| Rutas | `src/app/**` | Páginas (landing, tarjeta, login, editor, handoff) y API (`/api/pass/*`, `/api/wallet/v1/*`, `/api/events`, `/api/health`). |
+| Rutas | `src/app/**` | Páginas (landing, tarjeta, login, editor, handoff, legales) y API (`/api/pass/*`, `/api/wallet/v1/*`, `/api/events`, `/api/health`, `/api/cron/cleanup`). Exportación de contactos en `/dashboard/contactos`. |
 | Borde | `src/proxy.ts` | CSP con nonce por petición, refresco de sesión de Supabase, redirección de `/dashboard` sin sesión. |
 
 ## Modelo de datos
@@ -38,7 +40,9 @@ erDiagram
     auth_users ||--|| profiles : "1 tarjeta"
     profiles ||--o{ profile_events : "métricas"
     profiles ||--o| wallet_pass_secrets : "token Apple"
-    profiles ||--o{ apple_pass_registrations : "dispositivos"
+    profiles ||--o{ apple_pass_registrations : "dispositivos (máx. 10)"
+    profiles ||--o{ contact_requests : "contactos recibidos"
+    profiles ||--o{ profile_slug_history : "enlaces antiguos"
 
     profiles {
         uuid id PK "= auth.users.id"
@@ -64,7 +68,9 @@ erDiagram
     }
 ```
 
-Además: `auth_otp_attempts` (hashes SHA-256 de emails con códigos fallidos, para bloquear fuerza bruta) y el bucket público `avatars`.
+Además: `auth_otp_attempts` (HMAC de los emails que intentan un código, para bloquear fuerza bruta), `rate_limit_buckets` (contadores de límites por hash, tabla *unlogged*) y el bucket público `avatars`.
+
+**Enlaces antiguos.** Al cambiar el slug, un *trigger* guarda el anterior en `profile_slug_history`: redirige a la tarjeta actual (los QR impresos siguen valiendo) y nadie más puede reclamarlo. Si se borra la cuenta, sus enlaces quedan en cuarentena 90 días. Máximo 10 enlaces antiguos por tarjeta.
 
 **¿Por qué los enlaces son JSONB?** Guardar la tarjeta es una única operación atómica, el orden va implícito y la lectura pública es una fila. La validación estricta vive en la app (`schema.ts`) y la base de datos pone límites de forma (array, ≤ 20).
 
@@ -75,9 +81,11 @@ Además: `auth_otp_attempts` (hashes SHA-256 de emails con códigos fallidos, pa
 - **Enlaces seguros**: cada tipo normaliza la entrada y construye el `href` (solo `https:`, `mailto:`, `tel:`); `javascript:`/`data:` imposibles. Los `attributedValue` del pase de Apple se escapan.
 - **Avatares**: ruta validada en cliente, servidor y `CHECK` de Postgres; políticas de Storage limitadas a la carpeta del usuario; sin listado público.
 - **Pases**: se descargan con sesión o con un token HS256 de 30 min firmado con `PASSME_SIGNING_SECRET` (flujo "enviar a mi móvil"). El web service de Apple exige el token por pase (`ApplePass …`, comparación en tiempo constante).
-- **Login**: OTP con límite por IP y **bloqueo por email persistido** (5 fallos / 15 min). Redirecciones `next` limitadas a rutas relativas.
+- **Login**: límites por IP y por destinatario, **bloqueo por email persistido** (el intento se registra *antes* de comprobar el código, así que no hay carrera) y CAPTCHA opcional (Turnstile). La API de verificación de Supabase también es pública: por eso el código es de 8 dígitos y caduca en 10 min (docs/SETUP.md). Redirecciones `next` limitadas a rutas relativas.
+- **Límites de peticiones** compartidos por todas las instancias (`rate_limit_hit` en Postgres, claves con hash) con respaldo en memoria si la base de datos no responde.
+- **Contactos recibidos**: formulario público con *honeypot*, límites por IP y por tarjeta y CAPTCHA opcional; se inserta con `submit_contact_request` (solo el servidor) y RLS limita la lectura y el borrado al dueño. Exportación CSV con fórmulas neutralizadas.
 - **Cabeceras**: CSP con nonce + `strict-dynamic` (todas las páginas se renderizan por petición para poder llevar nonce), HSTS, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`.
-- **Privacidad**: métricas sin IPs ni cookies; los bots/previsualizadores no cuentan; las tarjetas llevan `noindex`.
+- **Privacidad**: métricas sin IPs ni cookies (una visita por sesión del navegador); los clics solo cuentan si el enlace existe y es visible; los bots/previsualizadores no cuentan; las tarjetas llevan `noindex`. Retención: `cleanup_expired_data()` a diario (Vercel Cron).
 
 ## Actualización de pases
 
@@ -133,14 +141,14 @@ Las imágenes se memorizan por versión del arte (colores, motivo, semilla, letr
 | JWT con clase + objeto para Google | No hace falta llamar a la API para crear el pase; la API solo se usa para actualizar. |
 | vCard 3.0 | La versión con mejor compatibilidad en iOS y Android. |
 | Modo demo sin variables | Se puede enseñar y desarrollar sin credenciales; los tests E2E corren sin secretos. |
-| Rate limit en memoria | Suficiente para el MVP; donde importa de verdad (OTP) hay bloqueo persistido en Supabase. |
+| Rate limit en Postgres | Sin otro proveedor que mantener: una llamada `rate_limit_hit` por petición limitada, compartida entre instancias. Si falla, cae a memoria. |
+| Contactos recibidos opt-in | Privacidad por defecto: el dueño decide si su página muestra el formulario; el visitante da su consentimiento explícito. |
 
 ## Ideas para después del MVP
 
 - **Varias tarjetas por persona** (trabajo / personal) con contactos distintos.
 - **Plan empresas**: una compañía da de alta a su equipo con su marca, colores y logo en el pase. Es el camino natural de monetización.
-- **Intercambio de contacto**: formulario opcional en la tarjeta para que la otra persona te deje el suyo (leads).
+- **Modo evento**: fecha y lugar relevantes en el pase para que aparezca en la pantalla de bloqueo durante una feria.
 - **NFC** en Apple Wallet (requiere solicitar el entitlement a Apple).
-- **Historial de slugs** con redirecciones para que cambiar el enlace no rompa los QR antiguos.
-- **Rate limiting distribuido** (Upstash) y **Sentry** para errores.
+- **Sentry** (o similar) para errores en producción.
 - **Inglés** y demás idiomas (los textos están centralizados por componente).

@@ -19,10 +19,12 @@ cartera, junto a tus tarjetas y billetes.
 - **Pases de cartera**: `.pkpass` firmado para Apple Wallet y pase genérico de Google Wallet, con tu foto, nombre, cargo, empresa y un QR.
 - **Un pase que no se parece a ningún otro**: eliges tema, motivo generativo (órbitas, relieve, trama, tu monograma…), su variación y la letra de tu nombre; el editor te enseña tu propia tarjeta en cada opción. El arte se renderiza en el servidor y la vista previa es idéntica al pase real.
 - **Página al escanear** (`/u/tu-nombre`): tarjeta con tus contactos, botón **Guardar contacto** (vCard con foto) y compartir.
+- **Te dejo mi contacto** (opcional): quien escanea tu QR puede dejarte su nombre, email o teléfono. Lo ves en el editor, lo exportas a CSV o a Contactos, y te avisamos por email.
+- **Enlaces que no se rompen**: si cambias tu enlace, el antiguo sigue llevando a tu tarjeta y nadie puede quedárselo.
 - **Privacidad por diseño**: cada contacto se puede ocultar; lo oculto **no sale del servidor** (lo filtra la base de datos). Métricas sin IPs ni cookies.
 - **Siempre actualizada**: al editar tu tarjeta, los pases de Apple se actualizan solos (web service + push APNs) y el de Google se sincroniza por API.
 - **Del ordenador al móvil**: el editor genera un QR temporal para añadir el pase en tu teléfono sin iniciar sesión allí.
-- **Login sin contraseñas**: enlace mágico o código de 6 dígitos (y Google opcional).
+- **Login sin contraseñas**: enlace mágico o código de un solo uso (y Google opcional), con bloqueo anti fuerza bruta y CAPTCHA opcional.
 - **Métricas**: visitas, escaneos del QR, contactos guardados, pases añadidos y clics por enlace.
 - **Modo demo**: sin configurar nada, todo funciona en local con una tarjeta de ejemplo.
 
@@ -51,7 +53,8 @@ npm run doctor
 | `npm run dev` | Servidor de desarrollo (Turbopack) |
 | `npm run build` / `npm start` | Build y servidor de producción |
 | `npm test` | Tests unitarios + tests de la base de datos (migración real sobre PGlite) |
-| `npm run e2e` | Playwright contra el build de producción (escritorio + móvil) |
+| `npm run e2e:demo` | Build en modo demo + Playwright (escritorio + móvil), aunque tengas `.env.local` |
+| `npm run e2e` | Playwright contra el build ya hecho (lo que usa el CI) |
 | `npm run lint` / `npm run typecheck` | ESLint / TypeScript |
 | `npm run doctor` | Verifica variables y credenciales contra los servicios reales |
 | `npm run brand` | Regenera favicon, icono iOS y logo de Google Wallet |

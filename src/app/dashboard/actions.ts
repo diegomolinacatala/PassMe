@@ -8,6 +8,8 @@ import { checkSlug, SLUG_ERRORS } from "@/lib/card/slug";
 import { parseCardInput, type FieldErrors } from "@/lib/card/schema";
 import type { OwnerCard } from "@/lib/card/types";
 import { isSlugAvailable, saveOwnerCard } from "@/lib/data/cards";
+import { deleteContactRequest } from "@/lib/data/contact-requests";
+import { createSharedRateLimiter } from "@/lib/data/rate-limits";
 import { log } from "@/lib/log";
 import { HANDOFF_TTL_SECONDS, signHandoffToken } from "@/lib/pass/handoff";
 import { notifyWalletsOfUpdate } from "@/lib/pass/service";
@@ -18,6 +20,9 @@ import { createServerSupabase, getSessionUser, type TypedSupabaseClient } from "
  * Every action re-checks the session: Server Functions are reachable by POST
  * regardless of what proxy.ts matches, so auth must never rely on it alone.
  */
+
+// Each save can fan out to APNs and the Google Wallet API: keep it human-paced.
+const saveLimiter = createSharedRateLimiter({ name: "save-user", limit: 30, windowMs: 10 * 60_000 });
 
 async function requireUser() {
   const supabase = await createServerSupabase();
@@ -33,6 +38,9 @@ export type SaveCardResult =
 export async function saveCardAction(input: unknown): Promise<SaveCardResult> {
   const session = await requireUser();
   if (!session) return { ok: false, errors: { _form: "Tu sesión ha caducado. Vuelve a entrar." } };
+  if (!(await saveLimiter.check(session.user.id)).ok) {
+    return { ok: false, errors: { _form: "Demasiados guardados seguidos. Espera unos minutos." } };
+  }
 
   const parsed = parseCardInput(input);
   if (!parsed.ok) return { ok: false, errors: parsed.errors };
@@ -45,21 +53,29 @@ export async function saveCardAction(input: unknown): Promise<SaveCardResult> {
 
   const userId = session.user.id;
   const currentAvatar = result.card.avatarPath;
+  const changed = result.changed;
   after(async () => {
-    await Promise.allSettled([notifyWalletsOfUpdate(userId), cleanupAvatars(session.supabase, userId, currentAvatar)]);
+    await Promise.allSettled([
+      changed ? notifyWalletsOfUpdate(userId) : Promise.resolve(),
+      cleanupAvatars(session.supabase, userId, currentAvatar),
+    ]);
   });
 
   return { ok: true, card: result.card, designPending: result.designPending };
 }
 
-/** Removes replaced or abandoned uploads from the user's avatar folder. */
+/** Removes replaced or abandoned uploads from the user's avatar folder (flat by policy). */
 async function cleanupAvatars(supabase: TypedSupabaseClient, userId: string, keep: string | null): Promise<void> {
-  const { data, error } = await supabase.storage.from(AVATAR_BUCKET).list(userId, { limit: 100 });
+  const { data, error } = await supabase.storage.from(AVATAR_BUCKET).list(userId, { limit: 1000 });
   if (error) {
     log.warn("avatar list failed", { userId }, error);
     return;
   }
-  const stale = data.map((file) => `${userId}/${file.name}`).filter((path) => path !== keep);
+  // Folders (id === null) can't be created under the current policy; skip them defensively.
+  const stale = data
+    .filter((file) => file.id !== null)
+    .map((file) => `${userId}/${file.name}`)
+    .filter((path) => path !== keep);
   if (stale.length === 0) return;
   const removal = await supabase.storage.from(AVATAR_BUCKET).remove(stale);
   if (removal.error) log.warn("avatar cleanup failed", { userId }, removal.error);
@@ -100,6 +116,16 @@ export async function createHandoffLinkAction(): Promise<HandoffResult> {
     url: `${getSiteUrl()}/wallet?t=${encodeURIComponent(token)}`,
     expiresAt: new Date(Date.now() + HANDOFF_TTL_SECONDS * 1000).toISOString(),
   };
+}
+
+export type DeleteContactResult = { ok: true } | { ok: false; error: string };
+
+/** Removes one contact request (RLS: only the card owner can delete it). */
+export async function deleteContactRequestAction(id: string): Promise<DeleteContactResult> {
+  const session = await requireUser();
+  if (!session) return { ok: false, error: "Tu sesión ha caducado." };
+  const deleted = await deleteContactRequest(session.supabase, String(id));
+  return deleted ? { ok: true } : { ok: false, error: "No hemos podido borrarlo. Inténtalo de nuevo." };
 }
 
 export type DeleteAccountResult = { ok: false; error: string };

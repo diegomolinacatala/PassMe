@@ -24,14 +24,14 @@ const CONTROL_CHARS_RE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
 const tooLong = (max: number) => `Máximo ${max} caracteres.`;
 
 /** Single-line text: strips control chars and collapses whitespace. */
-const line = (max: number) =>
+export const line = (max: number) =>
   z
     .string()
     .transform((s) => s.replace(CONTROL_CHARS_RE, "").replace(/\s+/g, " ").trim())
     .pipe(z.string().max(max, tooLong(max)));
 
 /** Multi-line text (bio): keeps newlines but caps consecutive blank lines. */
-const paragraph = (max: number) =>
+export const paragraph = (max: number) =>
   z
     .string()
     .transform((s) =>
@@ -68,6 +68,8 @@ export const cardInputSchema = z
     typeface: z.enum(TYPEFACES, { error: "Letra no válida." }),
     avatarPath: z.string().max(200).nullable(),
     isPublished: z.boolean(),
+    // Optional so an editor tab opened before this field existed can still save.
+    acceptsContactRequests: z.boolean().optional(),
     links: z.array(linkSchema).max(MAX_LINKS, `Máximo ${MAX_LINKS} enlaces.`),
   })
   .superRefine((card, ctx) => {

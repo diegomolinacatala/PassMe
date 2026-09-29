@@ -2,13 +2,13 @@ import { after, type NextRequest } from "next/server";
 import { z } from "zod";
 import { SLUG_MAX_LENGTH } from "@/lib/card/slug";
 import { recordEventBySlug } from "@/lib/data/events";
-import { createRateLimiter } from "@/lib/rate-limit";
-import { getClientIp, isBot, parseVisitSource } from "@/lib/request";
+import { createSharedRateLimiter } from "@/lib/data/rate-limits";
+import { clientRateKey, isBot, parseVisitSource, readTextLimited } from "@/lib/request";
 
 export const runtime = "nodejs";
 
 const MAX_BODY_BYTES = 1024;
-const limiter = createRateLimiter({ limit: 60, windowMs: 60_000 });
+const limiter = createSharedRateLimiter({ name: "events-ip", limit: 60, windowMs: 60_000 });
 
 const eventSchema = z.object({
   slug: z.string().min(1).max(SLUG_MAX_LENGTH).regex(/^[a-z0-9-]+$/),
@@ -21,11 +21,11 @@ const eventSchema = z.object({
 export async function POST(request: NextRequest) {
   const noContent = new Response(null, { status: 204 });
 
-  if (!limiter.check(getClientIp(request.headers)).ok) return new Response(null, { status: 429 });
   if (isBot(request.headers.get("user-agent"))) return noContent;
+  if (!(await limiter.check(clientRateKey(request.headers))).ok) return new Response(null, { status: 429 });
 
-  const raw = await request.text();
-  if (raw.length > MAX_BODY_BYTES) return new Response(null, { status: 413 });
+  const raw = await readTextLimited(request, MAX_BODY_BYTES);
+  if (raw === null) return new Response(null, { status: 413 });
 
   let json: unknown;
   try {

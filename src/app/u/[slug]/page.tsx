@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Mark } from "@/components/brand/logo";
+import { ContactForm } from "@/components/card/contact-form";
 import { ProfileCard } from "@/components/card/profile-card";
 import { ViewTracker } from "@/components/card/profile-actions";
 import { resolveDesign } from "@/lib/card/design";
-import { getPublicCard } from "@/lib/data/cards";
+import { getPublicCard, resolveSlugRedirect } from "@/lib/data/cards";
+import { getTurnstileSiteKey } from "@/lib/env";
 import { parseVisitSource } from "@/lib/request";
 
 export async function generateMetadata({ params }: PageProps<"/u/[slug]">): Promise<Metadata> {
@@ -26,10 +28,16 @@ export async function generateMetadata({ params }: PageProps<"/u/[slug]">): Prom
 
 export default async function PublicCardPage({ params, searchParams }: PageProps<"/u/[slug]">) {
   const [{ slug }, query] = await Promise.all([params, searchParams]);
-  const card = await getPublicCard(slug);
-  if (!card) notFound();
-
   const source = parseVisitSource(typeof query.src === "string" ? query.src : null);
+  const card = await getPublicCard(slug);
+  if (!card) {
+    // An old handle (the owner renamed the card): follow it, keeping the QR/share source.
+    // Temporary redirect on purpose — the owner may switch back to this handle later.
+    const current = await resolveSlugRedirect(slug);
+    if (current) redirect(`/u/${current}${source === "direct" ? "" : `?src=${source}`}`);
+    notFound();
+  }
+
   const { background } = resolveDesign(card);
 
   return (
@@ -40,6 +48,12 @@ export default async function PublicCardPage({ params, searchParams }: PageProps
     >
       <div className="mx-auto w-full max-w-[440px] animate-rise">
         <ProfileCard card={card} />
+
+        {card.acceptsContactRequests ? (
+          <div className="mt-5">
+            <ContactForm slug={card.slug} ownerName={card.fullName} source={source} captchaSiteKey={getTurnstileSiteKey()} />
+          </div>
+        ) : null}
 
         <footer className="mt-8 flex flex-col items-center gap-2 text-center">
           <Link

@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { getSupabasePublicConfig } from "@/lib/env";
+import { getSupabasePublicConfig, getTurnstileSiteKey, TURNSTILE_ORIGIN } from "@/lib/env";
 
 /**
  * Runs before every page/API request (see matcher):
@@ -16,15 +16,19 @@ function buildCsp(nonce: string, supabaseUrl: string | null, isHttps: boolean): 
   const isDev = process.env.NODE_ENV === "development";
   const supabase = supabaseUrl ? ` ${supabaseUrl}` : "";
   const supabaseRealtime = supabaseUrl ? ` ${supabaseUrl.replace(/^http/, "ws")}` : "";
+  // Cloudflare Turnstile (optional CAPTCHA): its script is injected by our bundle
+  // ('strict-dynamic'); the host is listed for CSP2 browsers, and the widget is an iframe.
+  const captcha = getTurnstileSiteKey() ? ` ${TURNSTILE_ORIGIN}` : "";
 
   const directives = [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}`,
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${captcha}${isDev ? " 'unsafe-eval'" : ""}`,
     // Inline style attributes are needed for per-card accent colors.
     "style-src 'self' 'unsafe-inline'",
     `img-src 'self' blob: data:${supabase}`,
     "font-src 'self'",
     `connect-src 'self'${supabase}${supabaseRealtime}`,
+    `frame-src 'self'${captcha}`,
     "frame-ancestors 'none'",
     "form-action 'self'",
     "base-uri 'self'",

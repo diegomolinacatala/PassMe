@@ -9,7 +9,7 @@ import { DEFAULT_PATTERN, toPatternKind } from "@/lib/card/pattern";
 import { DEMO_CARD, DEMO_SLUG } from "@/lib/card/demo";
 import type { ValidCardInput } from "@/lib/card/schema";
 import { sanitizeStoredLinks } from "@/lib/card/schema";
-import { checkSlug, slugCandidate } from "@/lib/card/slug";
+import { checkSlug, PLACEHOLDER_SLUG_BASE, slugCandidate } from "@/lib/card/slug";
 import type { OwnerCard, PublicCard } from "@/lib/card/types";
 import { avatarPublicUrl, getSupabasePublicConfig } from "@/lib/env";
 import { log } from "@/lib/log";
@@ -19,21 +19,28 @@ import type { TypedSupabaseClient } from "@/lib/supabase/server";
 const UNIQUE_VIOLATION = "23505";
 const CHECK_VIOLATION = "23514";
 const MAX_SLUG_ATTEMPTS = 6;
+const SLUG_CHANGE_LIMIT_ERROR =
+  "Has cambiado tu enlace demasiadas veces. Vuelve a uno que ya usaste o escríbenos si necesitas otro.";
 /** PostgREST (schema cache) and Postgres codes for "that column doesn't exist". */
 const MISSING_COLUMN_CODES = new Set(["PGRST204", "42703"]);
 
-type DesignWrite = Pick<Database["public"]["Tables"]["profiles"]["Update"], "detail_color" | "pattern" | "pattern_seed" | "typeface">;
+type DesignWrite = Pick<
+  Database["public"]["Tables"]["profiles"]["Update"],
+  "detail_color" | "pattern" | "pattern_seed" | "typeface" | "accepts_contact_requests"
+>;
 type DbError = { code?: string; message?: string } | null;
 
 /**
- * Design fields the database can't store yet because a migration is pending:
- *   20260928120000_card_design.sql  → detail_color, pattern, pattern_seed
- *   20260928180000_pass_redesign.sql → typeface and the new motifs
+ * Optional fields the database can't store yet because a migration is pending:
+ *   20260928120000_card_design.sql      → detail_color, pattern, pattern_seed
+ *   20260928180000_pass_redesign.sql    → typeface and the new motifs
+ *   20260929130000_contact_requests.sql → accepts_contact_requests
  */
 function unsupportedDesignFields(error: DbError): ReadonlyArray<keyof DesignWrite> {
   if (!error?.code) return [];
   const message = error.message ?? "";
   if (MISSING_COLUMN_CODES.has(error.code)) {
+    if (/accepts_contact_requests/.test(message)) return ["accepts_contact_requests"];
     if (/detail_color|pattern/.test(message)) return ["detail_color", "pattern", "pattern_seed", "typeface"];
     if (/typeface/.test(message)) return ["typeface"];
   }
@@ -61,7 +68,7 @@ async function withDesignFallback<R extends { error: DbError }>(
   let fields = design;
   let result = await write(fields);
   const dropped: Array<keyof DesignWrite> = [];
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
     const unsupported = unsupportedDesignFields(result.error).filter((key) => key in fields);
     if (unsupported.length === 0) break;
     log.warn("card design migration pending: writing without some design fields", { operation, fields: unsupported.join(",") });
@@ -88,6 +95,7 @@ export function toPublicCard(card: OwnerCard | PublicCard): PublicCard {
     typeface: card.typeface,
     avatarUrl: card.avatarUrl,
     links: card.links.filter((l) => l.visible),
+    acceptsContactRequests: card.acceptsContactRequests,
   };
 }
 
@@ -127,6 +135,8 @@ export function rowToOwnerCard(row: ProfileRow): OwnerCard {
     avatarPath: row.avatar_path,
     avatarUrl: avatarPublicUrl(row.avatar_path),
     links: sanitizeStoredLinks(row.links),
+    // Undefined until migration 20260929130000 adds the column.
+    acceptsContactRequests: row.accepts_contact_requests === true,
     isPublished: row.is_published,
     updatedAt: row.updated_at,
   };
@@ -141,6 +151,7 @@ interface PublicCardJson extends DesignColumns {
   pronouns?: string;
   bio?: string;
   avatar_path?: string | null;
+  accepts_contact_requests?: boolean;
   links?: Json;
 }
 
@@ -158,6 +169,7 @@ function jsonToPublicCard(json: PublicCardJson): PublicCard | null {
     avatarUrl: avatarPublicUrl(json.avatar_path),
     // The RPC already strips hidden links; re-validate anyway (defense in depth).
     links: sanitizeStoredLinks(json.links).filter((l) => l.visible),
+    acceptsContactRequests: json.accepts_contact_requests === true,
   };
 }
 
@@ -188,6 +200,24 @@ export const getPublicCard = cache(async (rawSlug: string): Promise<PublicCard |
   return jsonToPublicCard(data as PublicCardJson);
 });
 
+/**
+ * Current handle for an old one (the owner renamed their card), so printed QRs
+ * keep working. Null when unknown, unpublished or the migration is pending.
+ */
+export const resolveSlugRedirect = cache(async (rawSlug: string): Promise<string | null> => {
+  const slug = rawSlug.toLowerCase();
+  if (!checkSlug(slug).ok) return null;
+  const supabase = createAnonSupabase();
+  if (!supabase) return null;
+
+  const { data, error } = await supabase.rpc("resolve_slug_redirect", { p_slug: slug });
+  if (error) {
+    if (error.code !== "PGRST202") log.warn("resolve_slug_redirect failed", { slug }, error);
+    return null;
+  }
+  return typeof data === "string" && data !== slug && checkSlug(data).ok ? data : null;
+});
+
 async function findOwnProfile(supabase: TypedSupabaseClient, userId: string): Promise<ProfileRow | null> {
   const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
   if (error) throw new Error(`Could not load profile: ${error.message}`);
@@ -214,7 +244,8 @@ export async function getOrCreateOwnerCard(
   };
 
   for (let attempt = 0; attempt < MAX_SLUG_ATTEMPTS; attempt += 1) {
-    const slug = slugCandidate(user.email ?? "", randomBytes(3).toString("hex"));
+    // Never derived from the email: the handle is public and the owner picks a real one in the editor.
+    const slug = slugCandidate(PLACEHOLDER_SLUG_BASE, randomBytes(3).toString("hex"));
     // New cards simply start with the column defaults if some design fields can't be stored yet.
     const {
       result: { data, error },
@@ -243,7 +274,9 @@ export type SaveCardResult =
       previousAvatarPath: string | null;
       slugChanged: boolean;
       previousSlug: string;
-      /** The database couldn't store part of the design yet (a migration is pending). */
+      /** False when the save didn't change anything (no need to update the passes). */
+      changed: boolean;
+      /** The database couldn't store some newer fields yet (a migration is pending). */
       designPending: boolean;
     }
   | { ok: false; errors: Record<string, string> };
@@ -278,6 +311,7 @@ export async function saveOwnerCard(
     pattern: input.pattern,
     pattern_seed: input.patternSeed,
     typeface: input.typeface,
+    ...(input.acceptsContactRequests === undefined ? {} : { accepts_contact_requests: input.acceptsContactRequests }),
   };
   const {
     result: { data, error },
@@ -293,6 +327,9 @@ export async function saveOwnerCard(
 
   if (error || !data) {
     if (error?.code === UNIQUE_VIOLATION) return { ok: false, errors: { slug: "Ese enlace ya está cogido." } };
+    if (error?.code === CHECK_VIOLATION && /slug change limit/.test(error.message ?? "")) {
+      return { ok: false, errors: { slug: SLUG_CHANGE_LIMIT_ERROR } };
+    }
     log.error("saveOwnerCard failed", { userId }, error);
     return { ok: false, errors: { _form: "No hemos podido guardar. Inténtalo de nuevo." } };
   }
@@ -303,6 +340,7 @@ export async function saveOwnerCard(
     previousAvatarPath: current.avatar_path !== data.avatar_path ? current.avatar_path : null,
     slugChanged: current.slug !== data.slug,
     previousSlug: current.slug,
+    changed: current.updated_at !== data.updated_at,
     designPending: dropped.length > 0,
   };
 }

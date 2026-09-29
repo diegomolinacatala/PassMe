@@ -50,6 +50,7 @@ function profile(overrides: Partial<ProfileRow> = {}): ProfileRow {
     avatar_path: null,
     links: [{ id: "l-email-1", kind: "email", value: "alex@example.com", visible: true }],
     is_published: true,
+    accepts_contact_requests: false,
     created_at: "2026-09-01T00:00:00Z",
     updated_at: "2026-09-02T00:00:00Z",
     ...overrides,
@@ -93,15 +94,26 @@ describe("events", () => {
     expect(fake.queries).toHaveLength(0);
   });
 
-  it("looks up published cards and inserts the event", async () => {
-    const fake = useAdmin((q) => (first(q) === "select" ? { data: { id: USER } } : {}));
+  it("records visitor events in one validated database call", async () => {
+    const fake = useAdmin(() => ({ data: true }));
+    await recordEventBySlug("alex", { kind: "link_click", source: "qr", linkId: "l-email-1" });
+    expect(fake.queries).toHaveLength(1);
+    expect(fake.queries[0]!.table).toBe("rpc:record_card_event");
+    expect(fake.queries[0]!.calls[0]![1][0]).toEqual({ p_slug: "alex", p_kind: "link_click", p_source: "qr", p_link_id: "l-email-1" });
+  });
+
+  it("falls back to lookup + insert while the migration is pending", async () => {
+    const fake = useAdmin((q) => {
+      if (q.table === "rpc:record_card_event") return { error: { message: "missing", code: "PGRST202" } };
+      return first(q) === "select" ? { data: { id: USER } } : {};
+    });
     await recordEventBySlug("alex", { kind: "link_click", source: "qr", linkId: "l-email-1" });
     const insert = fake.queries.find((q) => first(q) === "insert")!;
     expect(insert.calls[0]![1][0]).toEqual({ profile_id: USER, kind: "link_click", source: "qr", link_id: "l-email-1" });
   });
 
   it("skips the insert when the card is unknown or the lookup fails", async () => {
-    const unknown = useAdmin(() => ({ data: null }));
+    const unknown = useAdmin((q) => (q.table.startsWith("rpc:") ? { error: { message: "missing", code: "PGRST202" } } : { data: null }));
     await recordEventBySlug("ghost", { kind: "view" });
     expect(unknown.queries.some((q) => first(q) === "insert")).toBe(false);
     const failing = useAdmin(() => ({ error: { message: "down" } }));

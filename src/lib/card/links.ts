@@ -138,6 +138,14 @@ function normalizeEmail(raw: string): NormalizeResult {
   return ok(value);
 }
 
+/**
+ * `mailto:` with URI-significant characters escaped: an address like
+ * `x?bcc=someone@evil.test` must stay one address, not become a Bcc header.
+ */
+function mailtoHref(email: string): string {
+  return `mailto:${email.replace(/[%?&=#/"<>\s]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`)}`;
+}
+
 function normalizePhone(raw: string, requireInternational: boolean): NormalizeResult {
   const value = clean(raw).replace(/^00/, "+");
   if (!value) return fail("Introduce un número.");
@@ -243,7 +251,7 @@ const DEFS: Record<LinkKind, LinkKindDef> = {
     placeholder: "tu@empresa.com",
     inputMode: "email",
     normalize: normalizeEmail,
-    href: (v) => `mailto:${v}`,
+    href: mailtoHref,
     display: (v) => v,
   },
   phone: {

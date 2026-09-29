@@ -73,8 +73,16 @@ if (!sbUrl || !sbKey) {
     headers: { apikey: sbKey, "Content-Type": "application/json" },
     body: JSON.stringify({ p_slug: "doctor-check" }),
   });
-  if (rpc?.ok) ok("Migración aplicada (get_public_card existe).");
+  if (rpc?.ok) ok("Migración inicial aplicada (get_public_card existe).");
   else fail("La migración no está aplicada: ejecuta supabase/migrations/*.sql (ver docs/SETUP.md).");
+
+  const redirect = await http(`${sbUrl}/rest/v1/rpc/resolve_slug_redirect`, {
+    method: "POST",
+    headers: { apikey: sbKey, "Content-Type": "application/json" },
+    body: JSON.stringify({ p_slug: "doctor-check" }),
+  });
+  if (redirect?.ok) ok("Migración 20260929120000 aplicada (historial de enlaces, límites compartidos).");
+  else fail("Falta la migración 20260929120000_launch_hardening.sql (ver docs/SETUP.md › Migraciones).");
 
   if (!sbSecret) {
     fail("Falta SUPABASE_SECRET_KEY: sin ella no hay pases, métricas ni borrado de cuentas.");
@@ -83,6 +91,14 @@ if (!sbUrl || !sbKey) {
     const secrets = await http(`${sbUrl}/rest/v1/wallet_pass_secrets?select=profile_id&limit=1`, { headers: adminHeaders });
     if (secrets?.ok) ok("Clave secreta válida (puede leer tablas protegidas).");
     else fail(`La clave secreta no funciona (HTTP ${secrets?.status ?? "sin respuesta"}).`);
+
+    const typeface = await http(`${sbUrl}/rest/v1/profiles?select=typeface&limit=1`, { headers: adminHeaders });
+    if (typeface?.ok) ok("Migración 20260928180000 aplicada (rediseño del pase).");
+    else fail("Falta la migración 20260928180000_pass_redesign.sql.");
+
+    const contacts = await http(`${sbUrl}/rest/v1/contact_requests?select=id&limit=1`, { headers: adminHeaders });
+    if (contacts?.ok) ok("Migración 20260929130000 aplicada (contactos recibidos).");
+    else fail("Falta la migración 20260929130000_contact_requests.sql.");
 
     const bucket = await http(`${sbUrl}/storage/v1/bucket/avatars`, { headers: adminHeaders });
     if (bucket?.ok) {
@@ -142,6 +158,20 @@ if (!env.APPLE_PASS_TYPE_ID && !cert) {
 }
 
 // --- Google Wallet ---------------------------------------------------------------
+section("Lanzamiento");
+if (env.NEXT_PUBLIC_LEGAL_NAME && env.NEXT_PUBLIC_LEGAL_TAX_ID && env.NEXT_PUBLIC_LEGAL_ADDRESS && env.NEXT_PUBLIC_CONTACT_EMAIL) {
+  ok("Datos del titular para aviso legal y privacidad.");
+} else {
+  warn("Faltan NEXT_PUBLIC_LEGAL_NAME / _TAX_ID / _ADDRESS / NEXT_PUBLIC_CONTACT_EMAIL: las páginas legales muestran huecos.");
+}
+if (env.RESEND_API_KEY && env.PASSME_EMAIL_FROM) ok("Avisos por email (Resend) configurados.");
+else warn("Sin RESEND_API_KEY / PASSME_EMAIL_FROM: no se avisará por email de los contactos recibidos (opcional).");
+if (env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && env.TURNSTILE_SECRET_KEY) ok("CAPTCHA (Cloudflare Turnstile) configurado.");
+else if (env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) warn("Hay NEXT_PUBLIC_TURNSTILE_SITE_KEY pero falta TURNSTILE_SECRET_KEY (el formulario de contacto no lo verificará).");
+else warn("Sin CAPTCHA (opcional, recomendado cuando haya tráfico real).");
+if ((env.CRON_SECRET ?? "").length >= 16) ok("CRON_SECRET configurado (limpieza diaria).");
+else warn("Sin CRON_SECRET (≥ 16 caracteres): la limpieza diaria de datos caducados no se ejecutará.");
+
 section("Google Wallet");
 const saRaw = env.GOOGLE_WALLET_SERVICE_ACCOUNT_JSON;
 if (!env.GOOGLE_WALLET_ISSUER_ID && !saRaw && !env.GOOGLE_WALLET_PRIVATE_KEY) {

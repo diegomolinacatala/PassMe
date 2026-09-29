@@ -6,7 +6,7 @@ import { BRAND } from "@/lib/brand";
 import { DEMO_CARD } from "@/lib/card/demo";
 import { themeDesign } from "@/lib/card/design";
 import { toPublicCard } from "@/lib/data/cards";
-import { isGoogleAuthEnabled, isSupabaseConfigured } from "@/lib/env";
+import { getTurnstileSiteKey, isGoogleAuthEnabled, isSupabaseConfigured } from "@/lib/env";
 import { safeNextPath } from "@/lib/request";
 import { LoginForm } from "./login-form";
 
@@ -38,7 +38,12 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
 
           <div className="mt-10">
             {configured ? (
-              <LoginForm next={next} googleEnabled={isGoogleAuthEnabled()} initialError={ERRORS[errorKey]} />
+              <LoginForm
+                next={next}
+                googleEnabled={isGoogleAuthEnabled()}
+                captchaSiteKey={getTurnstileSiteKey()}
+                initialError={ERRORS[errorKey]}
+              />
             ) : (
               <div className="rounded-2xl border border-dashed border-line-strong bg-card p-5 text-sm leading-relaxed text-ink-soft">
                 <p className="font-medium text-ink">Modo demo</p>

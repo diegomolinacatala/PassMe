@@ -1,12 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   clearOtpFailures,
   hashEmail,
-  isOtpLocked,
   OTP_LOCK_WINDOW_MS,
-  OTP_MAX_FAILURES,
-  recordOtpFailure,
+  OTP_MAX_ATTEMPTS,
+  registerOtpAttempt,
 } from "@/lib/data/otp-attempts";
+
+afterEach(() => vi.unstubAllEnvs());
 
 // No Supabase env in tests → exercises the in-memory fallback path.
 describe("OTP lockout", () => {
@@ -15,23 +16,30 @@ describe("OTP lockout", () => {
     expect(hashEmail("a@example.com")).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  it("locks an email after too many failures and unlocks after the window", async () => {
-    const email = "victim@example.com";
-    const t0 = 1_000_000;
-    for (let i = 0; i < OTP_MAX_FAILURES - 1; i += 1) await recordOtpFailure(email, t0 + i);
-    expect(await isOtpLocked(email, t0 + 10)).toBe(false);
-
-    await recordOtpFailure(email, t0 + 20);
-    expect(await isOtpLocked(email, t0 + 30)).toBe(true);
-    expect(await isOtpLocked("other@example.com", t0 + 30)).toBe(false);
-    expect(await isOtpLocked(email, t0 + 20 + OTP_LOCK_WINDOW_MS)).toBe(false);
+  it("keys the hash with the signing secret when there is one", () => {
+    const plain = hashEmail("alex@example.com");
+    vi.stubEnv("PASSME_SIGNING_SECRET", "s".repeat(40));
+    const keyed = hashEmail("alex@example.com");
+    expect(keyed).toMatch(/^[0-9a-f]{64}$/);
+    expect(keyed).not.toBe(plain);
   });
 
-  it("clears failures after a successful login", async () => {
+  it("allows a few attempts, then locks until the window passes", async () => {
+    const email = "victim@example.com";
+    const t0 = 1_000_000;
+    for (let i = 0; i < OTP_MAX_ATTEMPTS; i += 1) {
+      expect(await registerOtpAttempt(email, t0 + i)).toBe(true);
+    }
+    expect(await registerOtpAttempt(email, t0 + 10)).toBe(false);
+    expect(await registerOtpAttempt("other@example.com", t0 + 10)).toBe(true);
+    expect(await registerOtpAttempt(email, t0 + 20 + OTP_LOCK_WINDOW_MS)).toBe(true);
+  });
+
+  it("starts from zero after a successful login", async () => {
     const email = "ok@example.com";
-    for (let i = 0; i < OTP_MAX_FAILURES; i += 1) await recordOtpFailure(email);
-    expect(await isOtpLocked(email)).toBe(true);
+    for (let i = 0; i < OTP_MAX_ATTEMPTS; i += 1) await registerOtpAttempt(email);
+    expect(await registerOtpAttempt(email)).toBe(false);
     await clearOtpFailures(email);
-    expect(await isOtpLocked(email)).toBe(false);
+    expect(await registerOtpAttempt(email)).toBe(true);
   });
 });

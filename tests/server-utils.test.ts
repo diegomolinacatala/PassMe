@@ -5,7 +5,7 @@ import { avatarPublicUrl, getSiteUrl, profileUrl } from "@/lib/env";
 import { parseApplePassAuth } from "@/lib/data/wallet";
 import { signHandoffToken, verifyHandoffToken, HANDOFF_TTL_SECONDS } from "@/lib/pass/handoff";
 import { createRateLimiter } from "@/lib/rate-limit";
-import { getClientIp, isBot, parseVisitSource, safeNextPath } from "@/lib/request";
+import { clientRateKey, getClientIp, isBot, parseVisitSource, readTextLimited, safeNextPath } from "@/lib/request";
 
 const USER = "11111111-1111-4111-8111-111111111111";
 const PEM = "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----";
@@ -129,6 +129,33 @@ describe("request helpers", () => {
     expect(getClientIp(new Headers({ "x-forwarded-for": "1.2.3.4, 10.0.0.1" }))).toBe("1.2.3.4");
     expect(getClientIp(new Headers({ "x-real-ip": "5.6.7.8" }))).toBe("5.6.7.8");
     expect(getClientIp(new Headers())).toBe("unknown");
+    // Vercel's own header wins over a client-supplied X-Forwarded-For.
+    expect(getClientIp(new Headers({ "x-vercel-forwarded-for": "9.9.9.9", "x-forwarded-for": "1.2.3.4" }))).toBe("9.9.9.9");
+  });
+
+  it("buckets IPv6 clients by their /64 for rate limits", () => {
+    const key = (ip: string) => clientRateKey(new Headers({ "x-forwarded-for": ip }));
+    expect(key("2001:db8:abcd:12:1::7")).toBe("2001:db8:abcd:12::/64");
+    expect(key("2001:0db8:abcd:0012:ffff:ffff:ffff:ffff")).toBe("2001:db8:abcd:12::/64");
+    expect(key("::1")).toBe("0:0:0:0::/64");
+    expect(key("203.0.113.9")).toBe("203.0.113.9");
+    expect(key("not:an:ip:1:2:3:4:5:6")).toBe("not:an:ip:1:2:3:4:5:6");
+  });
+
+  it("reads request bodies only up to a byte limit", async () => {
+    const post = (body: BodyInit, headers: Record<string, string> = {}) =>
+      new Request("https://passme.test/api", { method: "POST", body, headers, duplex: "half" } as RequestInit);
+    expect(await readTextLimited(post("hola"), 10)).toBe("hola");
+    expect(await readTextLimited(post("x".repeat(11)), 10)).toBeNull();
+    expect(await readTextLimited(post("hola", { "content-length": "999" }), 10)).toBeNull();
+    // A streamed body without Content-Length is cut off as well.
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (let i = 0; i < 5; i += 1) controller.enqueue(new TextEncoder().encode("xxxx"));
+        controller.close();
+      },
+    });
+    expect(await readTextLimited(post(stream), 10)).toBeNull();
   });
 
   it("detects bots and link previews", () => {

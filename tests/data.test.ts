@@ -6,6 +6,7 @@ import {
   getOwnStats,
   getPublicCard,
   isSlugAvailable,
+  resolveSlugRedirect,
   rowToOwnerCard,
   saveOwnerCard,
   toPublicCard,
@@ -48,6 +49,7 @@ function row(overrides: Partial<ProfileRow> = {}): ProfileRow {
       { id: "bad", kind: "email", value: "x", visible: true },
     ],
     is_published: true,
+    accepts_contact_requests: false,
     created_at: "2026-09-01T00:00:00Z",
     updated_at: "2026-09-02T00:00:00Z",
     ...overrides,
@@ -110,7 +112,7 @@ describe("getOrCreateOwnerCard", () => {
     expect(queries).toHaveLength(1);
   });
 
-  it("creates a draft with a slug derived from the email", async () => {
+  it("creates a draft with a placeholder slug that never reveals the email", async () => {
     let inserted: Record<string, unknown> | null = null;
     const { client } = fakeSupabase((q) => {
       if (first(q) === "insert") {
@@ -122,7 +124,8 @@ describe("getOrCreateOwnerCard", () => {
     const card = await getOrCreateOwnerCard(client, { id: USER, email: "Jose.Nunez@example.com" });
     expect(inserted).toMatchObject({ id: USER, accent_color: "#EF7A4A", detail_color: "#FFE3D1", pattern: "orbitas", typeface: "clasica" });
     expect((inserted as unknown as { pattern_seed: number }).pattern_seed).toBeGreaterThanOrEqual(0);
-    expect(card.slug).toMatch(/^jose-nunez-[0-9a-f]{6}$/);
+    expect(card.slug).toMatch(/^tarjeta-[0-9a-f]{6}$/);
+    expect(JSON.stringify(inserted)).not.toContain("jose");
   });
 
   it("creates cards on databases without the design migration", async () => {
@@ -219,6 +222,40 @@ describe("saveOwnerCard", () => {
     expect(queries.filter((q) => first(q) === "update")).toHaveLength(1);
   });
 
+  it("maps the slug-change limit to a slug error", async () => {
+    const limit = { message: "slug change limit reached for 1111", code: "23514" };
+    const { client } = fakeSupabase((q) => (first(q) === "update" ? { error: limit } : { data: row() }));
+    const result = await saveOwnerCard(client, USER, input);
+    expect(result).toMatchObject({ ok: false, errors: { slug: expect.stringMatching(/demasiadas veces/) } });
+  });
+
+  it("saves the contact-form switch, and drops it while its migration is pending", async () => {
+    const missing = { message: "Could not find the 'accepts_contact_requests' column of 'profiles' in the schema cache", code: "PGRST204" };
+    let updates = 0;
+    const { client, queries } = fakeSupabase((q) => {
+      if (first(q) !== "update") return { data: row() };
+      updates += 1;
+      return updates === 1 ? { error: missing } : { data: row() };
+    });
+    expect(await saveOwnerCard(client, USER, { ...input, acceptsContactRequests: true })).toMatchObject({ ok: true, designPending: true });
+    const payloads = queries.filter((q) => first(q) === "update").map((q) => q.calls[0]![1][0] as Record<string, unknown>);
+    expect(payloads[0]).toHaveProperty("accepts_contact_requests", true);
+    expect(payloads[1]).not.toHaveProperty("accepts_contact_requests");
+    expect(payloads[1]).toHaveProperty("typeface", "moderna");
+
+    // Older editor tabs don't send the field at all: leave the stored value alone.
+    const old = fakeSupabase((q) => (first(q) === "update" ? { data: row() } : { data: row() }));
+    await saveOwnerCard(old.client, USER, input);
+    expect(old.queries.find((q) => first(q) === "update")!.calls[0]![1][0]).not.toHaveProperty("accepts_contact_requests");
+  });
+
+  it("tells callers whether anything changed", async () => {
+    const same = fakeSupabase(() => ({ data: row() }));
+    expect(await saveOwnerCard(same.client, USER, input)).toMatchObject({ ok: true, changed: false });
+    const edited = fakeSupabase((q) => ({ data: first(q) === "update" ? row({ updated_at: "2026-09-29T00:00:00Z" }) : row() }));
+    expect(await saveOwnerCard(edited.client, USER, input)).toMatchObject({ ok: true, changed: true });
+  });
+
   it("maps a unique violation to a slug error", async () => {
     const { client } = fakeSupabase((q) => (first(q) === "update" ? { error: UNIQUE } : { data: row() }));
     expect(await saveOwnerCard(client, USER, input)).toEqual({ ok: false, errors: { slug: "Ese enlace ya está cogido." } });
@@ -275,6 +312,19 @@ describe("stats and slug availability", () => {
     });
     const failing = fakeSupabase(() => ({ error: { message: "nope" } }));
     expect((await getOwnStats(failing.client)).views).toBe(0);
+  });
+
+  it("follows renamed handles only when Supabase answers with a valid one", async () => {
+    expect(await resolveSlugRedirect("old-handle")).toBeNull(); // no Supabase in tests
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "sb_publishable_test");
+    const fetchMock = vi.fn(async () => Response.json("new-handle"));
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await resolveSlugRedirect("Old-Handle-2")).toBe("new-handle");
+    expect(await resolveSlugRedirect("../x")).toBeNull();
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json("javascript:alert(1)")));
+    expect(await resolveSlugRedirect("old-handle-3")).toBeNull();
+    vi.unstubAllGlobals();
   });
 
   it("checks slug availability through the RPC", async () => {

@@ -15,6 +15,12 @@ type ImageSet = Record<string, Buffer>;
 const ICON_SIZES = { "icon.png": 29, "icon@2x.png": 58, "icon@3x.png": 87 } as const;
 const LOGO_SIZES = { "logo.png": 50, "logo@2x.png": 100, "logo@3x.png": 150 } as const;
 const AVATAR_FETCH_TIMEOUT_MS = 5_000;
+/**
+ * Uploads are resized to 512 px in the browser, but the storage API accepts any
+ * ≤ 2 MB image: cap the decoded size so a tiny file can't expand into gigabytes.
+ */
+export const AVATAR_MAX_INPUT_PIXELS = 4096 * 4096;
+const AVATAR_FORMATS: ReadonlySet<string> = new Set(["jpeg", "png", "webp"]);
 const MAX_CACHE_ENTRIES = 64;
 
 const cache = new Map<string, Promise<ImageSet>>();
@@ -71,7 +77,11 @@ export async function fetchAvatar(url: string | null): Promise<Buffer | null> {
     if (declared > AVATAR_MAX_BYTES) return null;
     const buffer = Buffer.from(await response.arrayBuffer());
     if (buffer.byteLength > AVATAR_MAX_BYTES) return null;
-    await sharp(buffer).metadata(); // throws if it isn't an image
+    // Throws if it isn't an image or if it decodes to more than the pixel cap.
+    const meta = await sharp(buffer, { limitInputPixels: AVATAR_MAX_INPUT_PIXELS }).metadata();
+    if (!meta.width || !meta.height || meta.width * meta.height > AVATAR_MAX_INPUT_PIXELS) return null;
+    // The bucket only checks the declared type: an SVG or TIFF sent as image/png stays out.
+    if (!AVATAR_FORMATS.has(meta.format ?? "")) return null;
     return buffer;
   } catch (error) {
     log.warn("avatar fetch error", {}, error);
@@ -81,6 +91,10 @@ export async function fetchAvatar(url: string | null): Promise<Buffer | null> {
 
 /** Small JPEG for embedding in a vCard PHOTO field. */
 export async function avatarForVCard(avatar: Buffer): Promise<string> {
-  const jpeg = await sharp(avatar).rotate().resize(256, 256, { fit: "cover" }).jpeg({ quality: 80 }).toBuffer();
+  const jpeg = await sharp(avatar, { limitInputPixels: AVATAR_MAX_INPUT_PIXELS })
+    .rotate()
+    .resize(256, 256, { fit: "cover" })
+    .jpeg({ quality: 80 })
+    .toBuffer();
   return jpeg.toString("base64");
 }
