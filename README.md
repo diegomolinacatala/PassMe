@@ -20,11 +20,12 @@ cartera, junto a tus tarjetas y billetes.
 - **Un pase que no se parece a ningún otro**: eliges tema, motivo generativo (órbitas, relieve, trama, tu monograma…), su variación y la letra de tu nombre; el editor te enseña tu propia tarjeta en cada opción. El arte se renderiza en el servidor y la vista previa es idéntica al pase real.
 - **Página al escanear** (`/u/tu-nombre`): tarjeta con tus contactos, botón **Guardar contacto** (vCard con foto) y compartir.
 - **Te dejo mi contacto** (opcional): quien escanea tu QR puede dejarte su nombre, email o teléfono. Lo ves en el editor, lo exportas a CSV o a Contactos, y te avisamos por email.
+- **Crea la tuya** (`/crear`): quien escanea una tarjeta puede hacerse la suya en un minuto, viendo su pase mientras escribe; el email se pide al final y al terminar tiene su QR listo para enseñarlo.
 - **Enlaces que no se rompen**: si cambias tu enlace, el antiguo sigue llevando a tu tarjeta y nadie puede quedárselo.
 - **Privacidad por diseño**: cada contacto se puede ocultar; lo oculto **no sale del servidor** (lo filtra la base de datos). Métricas sin IPs ni cookies.
 - **Siempre actualizada**: al editar tu tarjeta, los pases de Apple se actualizan solos (web service + push APNs) y el de Google se sincroniza por API.
 - **Del ordenador al móvil**: el editor genera un QR temporal para añadir el pase en tu teléfono sin iniciar sesión allí.
-- **Login sin contraseñas**: enlace mágico o código de un solo uso (y Google opcional), con bloqueo anti fuerza bruta y CAPTCHA opcional.
+- **Login sin contraseñas**: código de 8 cifras que se escribe en la misma pantalla (o el botón del email, y Google opcional), con bloqueo anti fuerza bruta y CAPTCHA opcional.
 - **Métricas**: visitas, escaneos del QR, contactos guardados, pases añadidos y clics por enlace.
 - **Modo demo**: sin configurar nada, todo funciona en local con una tarjeta de ejemplo.
 
@@ -38,6 +39,7 @@ npm run dev          # http://localhost:3000 — modo demo sin variables
 ```
 
 - Tarjeta de ejemplo: <http://localhost:3000/u/demo>
+- Crear una tarjeta (demo, el código es `00000000`): <http://localhost:3000/crear>
 - Editor (demo): <http://localhost:3000/dashboard>
 
 Para conectarlo de verdad (Supabase, Vercel, Apple, Google) sigue **[docs/SETUP.md](docs/SETUP.md)**. Después comprueba la configuración con:
@@ -72,7 +74,7 @@ Arquitectura, modelo de datos y decisiones: **[docs/ARCHITECTURE.md](docs/ARCHIT
 
 ```
 src/
-  app/                 rutas (landing, /u/[slug], /dashboard, /login, /wallet, api/*)
+  app/                 rutas (landing, /u/[slug], /crear, /dashboard, /login, /wallet, api/*)
   components/          brand · card (pase, tarjeta, QR) · editor · landing · ui
   lib/
     card/              dominio: tipos de enlace, validación, vCard, colores, diseño y motivos, slugs
