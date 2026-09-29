@@ -22,7 +22,7 @@ cuando tengas las cuentas.
 
 ## 0. Código
 
-Todo el trabajo está en la rama `feat/mvp`. Fusiónala en `main` (GitHub → *Compare & pull request* → *Merge*) para que Vercel despliegue producción desde `main`.
+Vercel despliega producción desde `main`. Si hay trabajo pendiente en otra rama (p. ej. `feat/launch-ready`), **aplica primero sus migraciones** (paso 1.3) y después fusiónala (GitHub → *Compare & pull request* → *Merge*).
 
 ```bash
 git checkout main && git pull
@@ -48,8 +48,10 @@ Sin tocar nada, `npm run dev` ya funciona en **modo demo**: landing, tarjeta de 
    1. [`supabase/migrations/20260927120000_init.sql`](../supabase/migrations/20260927120000_init.sql) — tablas, políticas RLS, funciones y el bucket `avatars`.
    2. [`supabase/migrations/20260928120000_card_design.sql`](../supabase/migrations/20260928120000_card_design.sql) — diseño del pase (tinta de detalle, motivo y variación).
    3. [`supabase/migrations/20260928180000_pass_redesign.sql`](../supabase/migrations/20260928180000_pass_redesign.sql) — motivos nuevos y letra del nombre. Pasa las tarjetas existentes al motivo más parecido.
+   4. [`supabase/migrations/20260929120000_launch_hardening.sql`](../supabase/migrations/20260929120000_launch_hardening.sql) — seguridad para el lanzamiento: historial de enlaces (los QR antiguos siguen funcionando y nadie puede quedarse tu enlace viejo), límites de peticiones compartidos, métricas validadas, tope de dispositivos por pase y limpieza de datos caducados.
+   5. [`supabase/migrations/20260929130000_contact_requests.sql`](../supabase/migrations/20260929130000_contact_requests.sql) — «Te dejo mi contacto»: quien ve tu tarjeta puede dejarte sus datos.
 
-   Cada una debe terminar con *Success. No rows returned*. Si ya aplicaste las anteriores, ejecuta solo las que falten. Mientras falte alguna la app sigue guardando, pero sin los campos de diseño que la base de datos aún no conoce (lo avisa en los logs).
+   Cada una debe terminar con *Success. No rows returned*. Si ya aplicaste las anteriores, ejecuta solo las que falten. Mientras falte alguna la app sigue funcionando con lo que la base de datos ya conoce (lo avisa en los logs, y `npm run doctor` te dice cuál falta).
    - Alternativa con CLI: `npx supabase login && npx supabase init && npx supabase link --project-ref <ref> && npx supabase db push`.
 4. **URLs de autenticación** → *Authentication → URL Configuration*:
    - *Site URL*: `http://localhost:3000` por ahora (en el paso 3 pondrás la de producción).
@@ -62,10 +64,16 @@ Sin tocar nada, `npm run dev` ya funciona en **modo demo**: landing, tarjeta de 
      [`supabase/templates/magic-link.html`](../supabase/templates/magic-link.html).
    - Asunto sugerido: `Tu acceso a PassMe: {{ .Token }}`.
    - Así el email trae un **enlace que funciona en cualquier dispositivo** (`/auth/confirm`) y un **código de 6 dígitos** que se puede escribir en la pantalla de login.
-   - *Authentication → Sign In / Providers → Email*: baja **Email OTP Expiration** a `900` segundos (15 min). La app ya bloquea un email tras 5 códigos fallidos; caducar antes reduce aún más el riesgo.
+   - *Authentication → Sign In / Providers → Email*: pon **Email OTP Length** a `8` y **Email OTP Expiration** a `600` segundos (10 min). La app bloquea un email tras 5 intentos, pero la API de verificación de Supabase también es pública: un código de 8 dígitos que caduca pronto hace inviable adivinarlo por esa vía. (La pantalla de login ya acepta de 6 a 10 dígitos.)
+   - *Authentication → Rate Limits*: deja **Token verifications** en un valor bajo (p. ej. 30 cada 5 min por IP).
 6. **(Opcional) Login con Google** → *Authentication → Sign In / Providers → Google*:
    - En [Google Cloud Console](https://console.cloud.google.com/apis/credentials) crea un *OAuth client ID* (tipo *Web*) con *Authorized redirect URI* `https://<ref>.supabase.co/auth/v1/callback`.
    - Pega *Client ID* y *Client secret* en Supabase y pon `NEXT_PUBLIC_AUTH_GOOGLE_ENABLED=true`.
+   - En *Google Auth Platform → Audience* pulsa **Publish app** (pasa a *In production*). Mientras esté en *Testing* solo pueden entrar las cuentas que añadas como usuarios de prueba.
+7. **(Opcional, recomendado con tráfico real) CAPTCHA** con Cloudflare Turnstile. Frena a los bots que crean cuentas o envían emails de acceso a terceros:
+   1. [dash.cloudflare.com](https://dash.cloudflare.com) → *Turnstile → Add widget* → tu dominio de producción (y `localhost` si quieres probar) → modo *Managed*. Copia **Site key** → `NEXT_PUBLIC_TURNSTILE_SITE_KEY` y **Secret key** → `TURNSTILE_SECRET_KEY`.
+   2. Despliega con esas dos variables (el login y el formulario de contacto muestran la verificación).
+   3. **Después**, en Supabase → *Authentication → Attack Protection* activa *CAPTCHA protection* con proveedor *Turnstile* y la misma Secret key. Si lo activas antes de desplegar, el login fallará con «Completa la verificación anti-spam».
 
 > ⚠️ El servidor de email por defecto de Supabase **solo envía a los miembros de tu organización** y con un límite muy bajo por hora. Para probar tú mismo vale; para usuarios reales configura SMTP (paso 4).
 
@@ -86,7 +94,8 @@ Sin tocar nada, `npm run dev` ya funciona en **modo demo**: landing, tarjeta de 
 ## 3. Vercel
 
 1. [vercel.com](https://vercel.com) → *Add New → Project* → importa `diegomolinacatala/PassMe`. Framework: Next.js (automático).
-2. *Environment Variables*: copia todas las de `.env.local` **excepto** `NEXT_PUBLIC_SITE_URL`, que en producción debe ser la URL pública final (`https://passme-xxx.vercel.app` o tu dominio). Márcalas para *Production* y *Preview*.
+2. *Environment Variables*: copia todas las de `.env.local` **excepto** `NEXT_PUBLIC_SITE_URL`, que en producción debe ser la URL pública final (`https://passme-xxx.vercel.app` o tu dominio). Márcalas para *Production*; en *Preview* pon solo lo necesario para probar (los despliegues de preview compartirían tu base de datos y tu certificado de Apple).
+   - Añade también `CRON_SECRET` (16 caracteres aleatorios o más: `openssl rand -hex 24`). Activa la limpieza diaria de datos caducados que programa `vercel.json`.
 3. La región de las funciones ya viene fijada a **Frankfurt (fra1)** en `vercel.json` (misma zona que Supabase = menos latencia). Si creaste Supabase en otra región, cámbiala ahí (p. ej. `dub1` para Irlanda).
 4. *Deploy*. Después:
    - Abre `https://TU-URL/api/health` → debe devolver `"supabase": true`.
@@ -105,6 +114,7 @@ Sin tocar nada, `npm run dev` ya funciona en **modo demo**: landing, tarjeta de 
    - Host `smtp.resend.com`, puerto `465`, usuario `resend`, contraseña = la API key.
    - Remitente: `PassMe <hola@tu-dominio.com>`.
 4. *Authentication → Rate Limits*: sube el límite de emails por hora (p. ej. 60).
+5. **Avisos de «Te dejo mi contacto»** (opcional): con la misma API key, pon en Vercel `RESEND_API_KEY` y `PASSME_EMAIL_FROM=PassMe <hola@tu-dominio.com>`. Cuando alguien deje su contacto en una tarjeta, su dueño recibe un email.
 
 ---
 
@@ -128,7 +138,7 @@ Necesitas el **Apple Developer Program** (99 $/año). Si te das de alta como emp
    ```
    Comprueba que certificado y clave coinciden e imprime `APPLE_PASS_TYPE_ID`, `APPLE_TEAM_ID`, `APPLE_PASS_CERT`, `APPLE_PASS_KEY` y `APPLE_WWDR_CERT` listas para pegar en `.env.local` y Vercel.
 6. `npm run doctor` → sección *Apple Wallet* en ✔.
-7. **Prueba**: desde el iPhone abre `https://TU-URL/api/pass/apple?demo=1` en Safari → *Añadir*. Luego añade tu tarjeta real desde el editor (o con el QR «¿Estás en el ordenador?»).
+7. **Prueba**: desde el iPhone, con la sesión iniciada en PassMe, abre `https://TU-URL/api/pass/apple?demo=1` en Safari → *Añadir* (una vez conectado Supabase, el pase de ejemplo solo se descarga con sesión). Luego añade tu tarjeta real desde el editor (o con el QR «¿Estás en el ordenador?»).
 8. **Actualizaciones automáticas**: con `https` y `SUPABASE_SECRET_KEY`, cada pase incluye un *web service*. Al guardar cambios, la app envía un push a los iPhone que tienen el pase y Wallet descarga la versión nueva (puede tardar unos segundos o minutos). Si algo falla, busca `[passme]` en los logs de Vercel: Wallet reporta errores en `/api/wallet/v1/log`.
 
 > 🗓️ El certificado caduca al año. Apunta la fecha (el doctor avisa 30 días antes).
@@ -147,7 +157,7 @@ Necesitas el **Apple Developer Program** (99 $/año). Si te das de alta como emp
    ```
 6. `npm run doctor` → *Google Wallet* en ✔ (hace un intercambio de token real con Google).
 7. **Modo prueba**: hasta que Google apruebe tu cuenta de emisor solo pueden guardar pases los usuarios de prueba. En la Wallet Console añade tu cuenta de Google como *test user*. Prueba con `https://TU-URL/api/pass/google?demo=1` desde Android o Chrome.
-8. **Publicar**: cuando todo funcione, *Request publishing access* en la Wallet Console (Google revisa el diseño de la clase).
+8. **Publicar** (imprescindible para que otras personas puedan guardar el pase): cuando todo funcione, *Request publishing access* en la Wallet Console. Google revisa el diseño de la clase y tarda unos días; hasta entonces solo funciona con los *test users*.
 9. **Imagen del pase**: el arte de cada tarjeta (el motivo alrededor de la marca) se sirve desde `/u/<slug>/hero`, así que `NEXT_PUBLIC_SITE_URL` debe ser una URL pública para que Google pueda descargarla. Si algún día cambias las filas de la plantilla de la clase (`buildGenericClass`), sube la versión en `GOOGLE_WALLET_CLASS_SUFFIX` (`passme_card_v2`…): Google no actualiza una clase ya creada desde el JWT.
 
 ---
@@ -155,8 +165,8 @@ Necesitas el **Apple Developer Program** (99 $/año). Si te das de alta como emp
 ## 7. Dominio y lanzamiento
 
 - **Dominio**: Vercel → *Settings → Domains*. Después actualiza `NEXT_PUBLIC_SITE_URL`, redespliega y cambia la *Site URL* de Supabase. Hazlo antes de repartir pases: el QR lleva la URL dentro (los pases de Apple se actualizan solos con el web service, pero los QR ya enseñados no).
-- **Legal**: [`src/app/privacidad/page.tsx`](../src/app/privacidad/page.tsx) es una plantilla honesta con lo que hace la app. Rellena `NEXT_PUBLIC_CONTACT_EMAIL`, añade los datos del responsable y revísala con alguien que sepa de RGPD.
-- **Límites de uso**: el *rate limiting* es en memoria (por instancia). Para tráfico serio activa *Vercel Firewall → Rate limiting* o migra a Upstash (`src/lib/rate-limit.ts`).
+- **Legal**: `/privacidad`, `/terminos` y `/aviso-legal` son plantillas honestas con lo que hace la app. Rellena `NEXT_PUBLIC_LEGAL_NAME`, `NEXT_PUBLIC_LEGAL_TAX_ID`, `NEXT_PUBLIC_LEGAL_ADDRESS` y `NEXT_PUBLIC_CONTACT_EMAIL` (hasta entonces salen huecos entre corchetes) y revísalas con alguien que sepa de RGPD y LSSI.
+- **Límites de uso**: los contadores viven en Postgres (`rate_limit_hit`, migración 20260929120000), así que valen para todas las instancias de Vercel. Si algún día hay picos serios, añade *Vercel Firewall → Rate limiting* delante.
 
 ### Checklist final
 
@@ -167,6 +177,9 @@ Necesitas el **Apple Developer Program** (99 $/año). Si te das de alta como emp
 - [ ] Apple Wallet: añadir pase, editar el cargo, ver que se actualiza
 - [ ] Google Wallet: añadir pase como usuario de prueba
 - [ ] Compartir `/u/<slug>` en WhatsApp muestra la vista previa con tu nombre
+- [ ] Activar «Deja que te dejen su contacto», dejarte uno desde otro móvil y verlo en *Contactos recibidos* (y el email, si configuraste Resend)
+- [ ] Cambiar tu enlace y comprobar que el antiguo redirige al nuevo
+- [ ] Añadir el pase en el móvil de **otra persona** (Apple: cualquier iPhone; Google: exige *publishing access* aprobado)
 
 ---
 
@@ -183,3 +196,5 @@ Necesitas el **Apple Developer Program** (99 $/año). Si te das de alta como emp
 | Google Wallet: «No se puede añadir» | Tu cuenta no es *test user* o la cuenta de servicio no es *Developer* | Paso 6.4 y 6.7 |
 | Usuarios nuevos: el enlace del email falla pero el código funciona | Tu versión de Supabase quiere `type=signup` en *Confirm signup* | En esa plantilla cambia `type=email` por `type=signup` (la app acepta ambos) |
 | La foto no se sube | Migración sin el bucket o políticas | Re-ejecuta la migración; `npm run doctor` |
+| «Completa la verificación anti-spam» al pedir el email | CAPTCHA activo en Supabase pero falta `NEXT_PUBLIC_TURNSTILE_SITE_KEY` en el despliegue | Añade la variable y redespliega, o desactiva el CAPTCHA en Supabase |
+| No aparece «Contactos recibidos» o avisa de un paso pendiente | Falta la migración 20260929130000 | Paso 1.3 |
