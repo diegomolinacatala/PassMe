@@ -52,7 +52,7 @@ export function LoginForm({ next, googleEnabled, captchaSiteKey, initialError }:
               maxLength={12}
               required
               autoFocus
-              placeholder="123456"
+              placeholder="12345678"
               aria-invalid={Boolean(error)}
               aria-describedby={error ? "code-error" : undefined}
               className={cn(INPUT, "mt-2 text-center font-mono text-2xl tracking-[0.4em]")}

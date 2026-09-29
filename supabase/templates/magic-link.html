@@ -3,7 +3,8 @@
   (use the same body for "Confirm signup"). Subject suggestion:
     Tu acceso a PassMe: {{ .Token }}
   The link goes to /auth/confirm (token_hash), which works even if the email is
-  opened on another device; the 6-digit code can be typed in the login screen.
+  opened on another device; the code (8 digits, see docs/SETUP.md) can be typed
+  in the login screen. Keep the expiry sentence in sync with Email OTP Expiration.
 -->
 <!doctype html>
 <html lang="es">
@@ -30,7 +31,7 @@
                   Entrar en mi tarjeta
                 </a>
                 <p style="margin:28px 0 0;font-size:13px;line-height:1.5;color:#6a5f55;">
-                  El enlace y el código caducan en una hora y solo sirven una vez. Si no has pedido este email, ignóralo: nadie puede entrar sin él.
+                  El enlace y el código caducan en 10 minutos y solo sirven una vez. Si no has pedido este email, ignóralo: nadie puede entrar sin él.
                 </p>
               </td>
             </tr>

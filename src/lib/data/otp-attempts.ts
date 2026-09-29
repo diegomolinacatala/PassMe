@@ -7,7 +7,7 @@ import { createAdminSupabase } from "@/lib/supabase/admin";
 /**
  * Per-email lockout for one-time login codes.
  *
- * A 6-digit code has 10⁶ combinations and stays valid for a while, so an
+ * A one-time code (8 digits in production) stays valid for minutes, so an
  * IP-only limiter is not enough (attackers rotate IPs and Vercel runs many
  * instances). Every attempt is stored in Supabase *before* the code is checked
  * — so parallel guesses can't all slip past a "not locked yet" read — and a
