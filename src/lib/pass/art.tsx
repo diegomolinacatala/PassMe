@@ -7,6 +7,7 @@ import { HERO_BOX, PassArt, STRIP_BOX, type ArtVariant } from "@/components/card
 import { designVersion, resolveDesign } from "@/lib/card/design";
 import type { PublicCard } from "@/lib/card/types";
 import { loadOgFonts, OG_SANS, SERIF } from "@/lib/og";
+import { AVATAR_MAX_INPUT_PIXELS } from "./images";
 
 /**
  * Server-side twin of <PassArt>: renders the artwork to PNG with Satori so the
@@ -61,7 +62,11 @@ export function artVersion(card: PublicCard, variant: ArtVariant): string {
 }
 
 async function avatarDataUri(avatar: Buffer): Promise<string> {
-  const jpeg = await sharp(avatar).rotate().resize(AVATAR_PX, AVATAR_PX, { fit: "cover" }).jpeg({ quality: 86 }).toBuffer();
+  const jpeg = await sharp(avatar, { limitInputPixels: AVATAR_MAX_INPUT_PIXELS })
+    .rotate()
+    .resize(AVATAR_PX, AVATAR_PX, { fit: "cover" })
+    .jpeg({ quality: 86 })
+    .toBuffer();
   return `data:image/jpeg;base64,${jpeg.toString("base64")}`;
 }
 

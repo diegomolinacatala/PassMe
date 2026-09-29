@@ -30,6 +30,9 @@ describe("email", () => {
   it("lowercases and builds mailto", () => {
     expect(value("email", "  Alex@Example.COM ")).toBe("alex@example.com");
     expect(linkHref("email", "alex@example.com")).toBe("mailto:alex@example.com");
+    // Characters that would turn the address into mailto: headers are escaped.
+    expect(linkHref("email", "x?bcc=evil@example.com")).toBe("mailto:x%3Fbcc%3Devil@example.com");
+    expect(linkHref("email", "a&body=hi@example.com")).toBe("mailto:a%26body%3Dhi@example.com");
   });
 
   it("rejects invalid emails", () => {

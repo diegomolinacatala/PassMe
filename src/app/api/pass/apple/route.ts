@@ -1,15 +1,21 @@
 import { after, type NextRequest } from "next/server";
 import { recordEventForProfile } from "@/lib/data/events";
+import { createSharedRateLimiter } from "@/lib/data/rate-limits";
 import { log } from "@/lib/log";
 import { PKPASS_CONTENT_TYPE } from "@/lib/pass/apple";
-import { buildApplePassForProfile, buildDemoApplePass, PassError, resolvePassOwnerId } from "@/lib/pass/service";
-import { createRateLimiter } from "@/lib/rate-limit";
-import { getClientIp } from "@/lib/request";
+import {
+  assertDemoPassAllowed,
+  buildApplePassForProfile,
+  buildDemoApplePass,
+  PassError,
+  resolvePassOwnerId,
+} from "@/lib/pass/service";
+import { clientRateKey } from "@/lib/request";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
-const limiter = createRateLimiter({ limit: 20, windowMs: 60_000 });
+const limiter = createSharedRateLimiter({ name: "pass-apple-ip", limit: 20, windowMs: 60_000 });
 
 function errorResponse(error: unknown): Response {
   if (error instanceof PassError) {
@@ -22,16 +28,17 @@ function errorResponse(error: unknown): Response {
 /**
  * GET /api/pass/apple            → the signed-in owner's pass
  * GET /api/pass/apple?t=<token>  → same, via a "send to phone" handoff link
- * GET /api/pass/apple?demo=1     → sample pass (to test certificates)
+ * GET /api/pass/apple?demo=1     → sample pass (to test certificates; needs a session once Supabase is set up)
  */
 export async function GET(request: NextRequest) {
-  if (!limiter.check(getClientIp(request.headers)).ok) {
+  if (!(await limiter.check(clientRateKey(request.headers))).ok) {
     return Response.json({ error: "rate_limited" }, { status: 429 });
   }
 
   try {
     const params = request.nextUrl.searchParams;
     const isDemo = params.get("demo") === "1";
+    if (isDemo) await assertDemoPassAllowed();
     const profileId = isDemo ? null : await resolvePassOwnerId(params.get("t"));
     const pass = profileId ? await buildApplePassForProfile(profileId) : await buildDemoApplePass();
 

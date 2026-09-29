@@ -6,10 +6,13 @@ import { saveCardAction } from "@/app/dashboard/actions";
 import { Button } from "@/components/ui/button";
 import { LIMITS, type FieldErrors } from "@/lib/card/schema";
 import type { OwnerCard } from "@/lib/card/types";
+import type { ContactRequest } from "@/lib/card/contact";
+import { isPlaceholderSlug, suggestSlug } from "@/lib/card/slug";
 import type { CardStats } from "@/lib/data/cards";
 import { cn } from "@/lib/cn";
 import { AccountPanel } from "./account-panel";
 import { AvatarField } from "./avatar-field";
+import { ContactsPanel } from "./contacts-panel";
 import { DesignField } from "./design-field";
 import { Section, Switch, TextField } from "./fields";
 import { LinksEditor } from "./links-editor";
@@ -29,6 +32,7 @@ import { WalletPanel, type WalletAvailability } from "./wallet-panel";
 interface CardEditorProps {
   initialCard: OwnerCard;
   stats: CardStats;
+  contacts: { available: boolean; requests: ContactRequest[] };
   wallet: WalletAvailability;
   siteUrl: string;
   email: string | null;
@@ -43,7 +47,7 @@ type SaveStatus =
   | { kind: "error"; message: string }
   | { kind: "demo" };
 
-export function CardEditor({ initialCard, stats, wallet, siteUrl, email, demo }: CardEditorProps) {
+export function CardEditor({ initialCard, stats, contacts, wallet, siteUrl, email, demo }: CardEditorProps) {
   const initialDraft = useMemo(() => draftFromCard(initialCard), [initialCard]);
   const editor = useCardDraft(initialDraft);
   const { draft, dirty } = editor;
@@ -58,6 +62,7 @@ export function CardEditor({ initialCard, stats, wallet, siteUrl, email, demo }:
   const [savedSlug, setSavedSlug] = useState(initialCard.slug);
   const [savedPublished, setSavedPublished] = useState(initialCard.isPublished);
   const [savedName, setSavedName] = useState(initialCard.fullName);
+  const [savedAcceptsContacts, setSavedAcceptsContacts] = useState(initialCard.acceptsContactRequests);
   const [touched, setTouched] = useState<ReadonlySet<string>>(new Set());
   const [submitted, setSubmitted] = useState(false);
   // Server errors belong to the exact draft that was submitted; any edit clears them.
@@ -92,6 +97,7 @@ export function CardEditor({ initialCard, stats, wallet, siteUrl, email, demo }:
         setSavedSlug(result.card.slug);
         setSavedPublished(result.card.isPublished);
         setSavedName(result.card.fullName);
+        setSavedAcceptsContacts(result.card.acceptsContactRequests);
         setServerResult(null);
         setSubmitted(false);
         setStatus(result.designPending ? { kind: "partial" } : { kind: "saved", at: Date.now() });
@@ -258,12 +264,31 @@ export function CardEditor({ initialCard, stats, wallet, siteUrl, email, demo }:
               siteHost={siteHost}
               demo={demo}
               serverError={serverErrors.slug}
+              suggestion={isPlaceholderSlug(draft.slug) ? suggestSlug(draft.fullName) : null}
               onChange={(v) => editor.setField("slug", v)}
             />
+            <div className="mt-6 flex items-start justify-between gap-4 border-t hairline pt-5">
+              <div>
+                <p className="text-sm font-medium text-ink-soft">Deja que te dejen su contacto</p>
+                <p className="mt-1 max-w-md text-sm text-muted">
+                  Tu página muestra un formulario para que quien te escanee te deje su nombre, email o teléfono. Lo verás en
+                  «Contactos recibidos».
+                </p>
+              </div>
+              <Switch
+                checked={draft.acceptsContactRequests}
+                onChange={editor.setAcceptsContactRequests}
+                label="Formulario de contacto en tu página"
+              />
+            </div>
           </Section>
         </div>
 
-        <aside className="space-y-6 lg:sticky lg:top-6">
+        {/*
+          Desktop: the column scrolls on its own (it's taller than the screen), so the
+          preview stays in reach and the lower panels don't wait for the page's end.
+        */}
+        <aside className="space-y-6 lg:sticky lg:top-6 lg:-mx-3 lg:max-h-[calc(100dvh-1.5rem)] lg:overflow-y-auto lg:overscroll-contain lg:px-3 lg:pb-28 lg:[scrollbar-width:thin]">
           <div className="hidden lg:block">
             <PreviewPanel card={preview} />
           </div>
@@ -277,10 +302,22 @@ export function CardEditor({ initialCard, stats, wallet, siteUrl, email, demo }:
               isPublished={savedPublished}
             />
           </Section>
-          <Section number="06" title="Actividad">
+          <Section
+            number="06"
+            title="Contactos recibidos"
+            description={contacts.requests.length > 0 ? `${contacts.requests.length} en total` : undefined}
+          >
+            <ContactsPanel
+              requests={contacts.requests}
+              available={contacts.available}
+              enabled={savedAcceptsContacts}
+              demo={demo}
+            />
+          </Section>
+          <Section number="07" title="Actividad">
             <StatsPanel stats={stats} links={draft.links} demo={demo} />
           </Section>
-          <Section number="07" title="Cuenta">
+          <Section number="08" title="Cuenta">
             <AccountPanel email={email} demo={demo} />
           </Section>
         </aside>
@@ -307,7 +344,7 @@ function SaveBar({ dirty, saving, status, errorCount, onSave }: SaveBarProps) {
       : dirty
         ? "Cambios sin guardar"
         : status.kind === "partial"
-          ? "Guardado, salvo el diseño nuevo: falta actualizar la base de datos."
+          ? "Guardado, salvo algunas opciones nuevas: falta actualizar la base de datos."
           : status.kind === "saved"
             ? "Guardado. Los pases se actualizarán en unos segundos."
             : status.kind === "demo"

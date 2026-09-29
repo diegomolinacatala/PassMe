@@ -30,6 +30,7 @@ export type Database = {
           avatar_path: string | null;
           links: Json;
           is_published: boolean;
+          accepts_contact_requests: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -50,6 +51,7 @@ export type Database = {
           avatar_path?: string | null;
           links?: Json;
           is_published?: boolean;
+          accepts_contact_requests?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -70,6 +72,7 @@ export type Database = {
           avatar_path?: string | null;
           links?: Json;
           is_published?: boolean;
+          accepts_contact_requests?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -126,6 +129,42 @@ export type Database = {
         Update: { id?: never; email_hash?: string; created_at?: string };
         Relationships: [];
       };
+      contact_requests: {
+        Row: {
+          id: string;
+          profile_id: string;
+          name: string;
+          email: string | null;
+          phone: string | null;
+          company: string;
+          message: string;
+          source: ProfileEventSource;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          profile_id: string;
+          name: string;
+          email?: string | null;
+          phone?: string | null;
+          company?: string;
+          message?: string;
+          source?: ProfileEventSource;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          profile_id?: string;
+          name?: string;
+          email?: string | null;
+          phone?: string | null;
+          company?: string;
+          message?: string;
+          source?: ProfileEventSource;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       apple_pass_registrations: {
         Row: {
           device_library_id: string;
@@ -159,6 +198,28 @@ export type Database = {
       get_public_card: { Args: { p_slug: string }; Returns: Json };
       is_slug_available: { Args: { p_slug: string }; Returns: boolean };
       get_card_stats: { Args: { p_days?: number }; Returns: Json };
+      resolve_slug_redirect: { Args: { p_slug: string }; Returns: string | null };
+      rate_limit_hit: {
+        Args: { p_key: string; p_limit: number; p_window_seconds: number };
+        Returns: Array<{ allowed: boolean; retry_after: number }>;
+      };
+      record_card_event: {
+        Args: { p_slug: string; p_kind: string; p_source?: string; p_link_id?: string | null };
+        Returns: boolean;
+      };
+      submit_contact_request: {
+        Args: {
+          p_slug: string;
+          p_name: string;
+          p_email: string | null;
+          p_phone: string | null;
+          p_company: string;
+          p_message: string;
+          p_source?: string;
+        };
+        Returns: string | null;
+      };
+      cleanup_expired_data: { Args: Record<string, never>; Returns: Json };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };
@@ -166,3 +227,4 @@ export type Database = {
 };
 
 export type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
+export type ContactRequestRow = Database["public"]["Tables"]["contact_requests"]["Row"];

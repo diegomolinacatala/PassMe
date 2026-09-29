@@ -35,6 +35,8 @@ export interface CardData {
   typeface: Typeface;
   avatarUrl: string | null;
   links: CardLink[];
+  /** Shows the "leave your contact" form on the public card. */
+  acceptsContactRequests: boolean;
 }
 
 /** What anonymous visitors receive: only visible links, no internal ids. */

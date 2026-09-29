@@ -3,19 +3,22 @@
 import { ArrowLeft, LoaderCircle, MailCheck } from "lucide-react";
 import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
+import { Turnstile } from "@/components/ui/turnstile";
 import { cn } from "@/lib/cn";
 import { requestLoginCode, signInWithGoogle, verifyLoginCode, type LoginState } from "./actions";
 
 interface LoginFormProps {
   next: string;
   googleEnabled: boolean;
+  /** Cloudflare Turnstile site key; null = no CAPTCHA. */
+  captchaSiteKey: string | null;
   initialError?: string;
 }
 
 const INPUT =
   "h-13 w-full rounded-2xl border border-line bg-card px-4 text-base text-ink placeholder:text-muted/70 transition-[border-color,box-shadow] outline-none focus:border-ink focus:shadow-[0_0_0_4px_rgb(20_20_20/0.06)]";
 
-export function LoginForm({ next, googleEnabled, initialError }: LoginFormProps) {
+export function LoginForm({ next, googleEnabled, captchaSiteKey, initialError }: LoginFormProps) {
   const [emailState, sendEmail, sending] = useActionState<LoginState, FormData>(requestLoginCode, {
     step: "email",
     error: initialError,
@@ -66,9 +69,14 @@ export function LoginForm({ next, googleEnabled, initialError }: LoginFormProps)
           </Button>
         </form>
 
-        <form action={sendEmail} className="mt-4 flex items-center justify-between text-sm">
+        <form action={sendEmail} className="mt-4 flex flex-wrap items-center justify-between gap-y-3 text-sm">
           <input type="hidden" name="email" value={email} />
           <input type="hidden" name="next" value={next} />
+          {captchaSiteKey ? (
+            <div className="w-full">
+              <Turnstile siteKey={captchaSiteKey} action="login-resend" resetKey={emailState} />
+            </div>
+          ) : null}
           <a href={`/login?next=${encodeURIComponent(next)}`} className="inline-flex items-center gap-1 text-muted hover:text-ink">
             <ArrowLeft className="size-4" aria-hidden /> Otro email
           </a>
@@ -105,6 +113,7 @@ export function LoginForm({ next, googleEnabled, initialError }: LoginFormProps)
             {error}
           </p>
         ) : null}
+        {captchaSiteKey ? <Turnstile siteKey={captchaSiteKey} action="login" resetKey={emailState} /> : null}
         <Button type="submit" size="lg" className="w-full" disabled={sending}>
           {sending ? <LoaderCircle className="size-5 animate-spin" aria-hidden /> : null}
           Enviarme un enlace de acceso
@@ -133,7 +142,11 @@ export function LoginForm({ next, googleEnabled, initialError }: LoginFormProps)
 
       <p className="mt-6 text-xs leading-relaxed text-muted">
         Sin contraseñas: te enviamos un enlace de un solo uso. Si es tu primera vez, se crea tu cuenta automáticamente. Al
-        continuar aceptas nuestra{" "}
+        continuar aceptas los{" "}
+        <a href="/terminos" className="underline underline-offset-2 hover:text-ink">
+          términos de uso
+        </a>{" "}
+        y la{" "}
         <a href="/privacidad" className="underline underline-offset-2 hover:text-ink">
           política de privacidad
         </a>

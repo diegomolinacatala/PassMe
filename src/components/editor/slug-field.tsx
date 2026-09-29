@@ -15,10 +15,12 @@ interface SlugFieldProps {
   siteHost: string;
   demo: boolean;
   serverError?: string;
+  /** Handle suggested from the owner's name while the card still has a placeholder one. */
+  suggestion?: string | null;
   onChange: (value: string) => void;
 }
 
-export function SlugField({ value, savedValue, siteHost, demo, serverError, onChange }: SlugFieldProps) {
+export function SlugField({ value, savedValue, siteHost, demo, serverError, suggestion, onChange }: SlugFieldProps) {
   const id = useId();
   const [remote, setRemote] = useState<{ slug: string; result: SlugCheckResult } | null>(null);
 
@@ -92,8 +94,20 @@ export function SlugField({ value, savedValue, siteHost, demo, serverError, onCh
         aria-live="polite"
         className={cn("mt-1.5 text-xs", status === "error" || serverError ? "text-danger" : status === "ok" ? "text-ok" : "text-muted")}
       >
-        {message ?? "Si lo cambias, los enlaces que ya compartiste dejarán de funcionar (los pases se actualizan solos)."}
+        {message ?? "Si lo cambias, el enlace antiguo seguirá llevando a tu tarjeta y los pases se actualizan solos."}
       </p>
+      {suggestion && suggestion !== value ? (
+        <button
+          type="button"
+          onClick={() => onChange(suggestion)}
+          className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-full bg-signal-wash px-3 py-1 text-xs text-signal-deep transition-colors hover:bg-glow"
+        >
+          <span className="shrink-0">Usar</span>
+          <span className="truncate font-mono">
+            {siteHost}/u/{suggestion}
+          </span>
+        </button>
+      ) : null}
     </div>
   );
 }

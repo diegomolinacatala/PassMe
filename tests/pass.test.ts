@@ -10,6 +10,7 @@ import type { AppleWalletConfig, GoogleWalletConfig } from "@/lib/config.server"
 import { toPublicCard } from "@/lib/data/cards";
 import { buildApplePassJson, createApplePass } from "@/lib/pass/apple";
 import { buildGenericObject, createGoogleSaveUrl, googleObjectId } from "@/lib/pass/google";
+import { fetchAvatar } from "@/lib/pass/images";
 import { createTestCerts, type TestCerts } from "./helpers/test-certs";
 
 const SITE = "https://passme.test";
@@ -206,5 +207,30 @@ describe("Google Wallet", () => {
     const inner = decodeJwt(jwt).payload as { genericClasses: unknown[]; genericObjects: Array<{ id: string }> };
     expect(inner.genericClasses).toHaveLength(1);
     expect(inner.genericObjects[0].id).toBe(googleObjectId(googleConfig, DEMO_CARD.id));
+  });
+});
+
+describe("avatar downloads", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const serve = (body: Buffer) =>
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(new Uint8Array(body), { status: 200 })));
+
+  it("accepts real JPEG/PNG/WebP photos only", async () => {
+    const png = await sharp({ create: { width: 8, height: 8, channels: 3, background: "#EF7A4A" } }).png().toBuffer();
+    serve(png);
+    expect(await fetchAvatar("https://x.supabase.co/storage/v1/object/public/avatars/u/a.png")).not.toBeNull();
+
+    // An SVG uploaded with an image/png content type is refused.
+    serve(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><rect width="8" height="8"/></svg>'));
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    expect(await fetchAvatar("https://x.supabase.co/storage/v1/object/public/avatars/u/b.png")).toBeNull();
+  });
+
+  it("refuses images that decode to too many pixels", async () => {
+    const huge = await sharp({ create: { width: 5000, height: 4000, channels: 3, background: "#000" } }).png().toBuffer();
+    serve(huge);
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    expect(await fetchAvatar("https://x.supabase.co/storage/v1/object/public/avatars/u/c.png")).toBeNull();
   });
 });

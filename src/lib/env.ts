@@ -46,6 +46,16 @@ export function isGoogleAuthEnabled(): boolean {
   return process.env.NEXT_PUBLIC_AUTH_GOOGLE_ENABLED === "true";
 }
 
+/**
+ * Cloudflare Turnstile site key. When set, the login and contact forms show the
+ * widget; enable the same provider in Supabase (Auth → Attack Protection).
+ */
+export function getTurnstileSiteKey(): string | null {
+  return process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || null;
+}
+
+export const TURNSTILE_ORIGIN = "https://challenges.cloudflare.com";
+
 export const AVATAR_BUCKET = "avatars";
 
 export function avatarPublicUrl(path: string | null | undefined): string | null {
