@@ -82,8 +82,8 @@ test.describe("editor (demo mode)", () => {
   });
 });
 
-test("login shows the demo notice when Supabase is not configured", async ({ page }) => {
+test("login explains the demo code when Supabase is not configured", async ({ page }) => {
   await page.goto("/login");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Entra y crea");
-  await expect(page.getByText("Modo demo", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Entra en tu tarjeta");
+  await expect(page.getByText(/Modo demo\..*el código es 00000000/)).toBeVisible();
 });

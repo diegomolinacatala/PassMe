@@ -34,31 +34,47 @@ describe("OTP lockout backed by Supabase", () => {
 
   it("records the attempt before counting, and locks past the limit", async () => {
     const fake = useAdmin(countIs(otp.OTP_MAX_ATTEMPTS));
-    expect(await otp.registerOtpAttempt("shared@example.com")).toBe(true);
-    expect(fake.queries.map(first).slice(0, 2)).toEqual(["insert", "select"]);
+    expect(await otp.registerOtpAttempt("shared@example.com", "203.0.113.1")).toBe(true);
+    expect(fake.queries.map(first).slice(0, 3)).toEqual(["insert", "select", "select"]);
 
     useAdmin(countIs(otp.OTP_MAX_ATTEMPTS + 1));
-    expect(await otp.registerOtpAttempt("shared2@example.com")).toBe(false);
+    expect(await otp.registerOtpAttempt("shared2@example.com", "203.0.113.1")).toBe(false);
+  });
+
+  it("also locks an email tried from too many places at once", async () => {
+    const email = "spread@example.com";
+    const global = otp.hashEmail(email);
+    // This client has barely tried, but the email as a whole is past its ceiling.
+    useAdmin((q) => {
+      if (first(q) !== "select") return {};
+      const isGlobal = q.calls.some(([method, args]) => method === "eq" && args[1] === global);
+      return { count: isGlobal ? otp.OTP_MAX_ATTEMPTS_PER_EMAIL + 1 : 1 };
+    });
+    expect(await otp.registerOtpAttempt(email, "198.51.100.7")).toBe(false);
   });
 
   it("fails closed if the attempt cannot be stored or counted", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
     useAdmin((q) => (first(q) === "insert" ? { error: { message: "db down" } } : { count: 0 }));
-    expect(await otp.registerOtpAttempt("anyone@example.com")).toBe(false);
+    expect(await otp.registerOtpAttempt("anyone@example.com", "203.0.113.2")).toBe(false);
     useAdmin((q) => (first(q) === "select" ? { error: { message: "db down" } } : {}));
-    expect(await otp.registerOtpAttempt("anyone2@example.com")).toBe(false);
+    expect(await otp.registerOtpAttempt("anyone2@example.com", "203.0.113.2")).toBe(false);
   });
 
   it("stores only a hash and clears on success", async () => {
     const fake = useAdmin(countIs(1));
     vi.spyOn(Math, "random").mockReturnValue(0.01); // also exercise the opportunistic cleanup
-    await otp.registerOtpAttempt("Hash.Me@example.com");
+    await otp.registerOtpAttempt("Hash.Me@example.com", "203.0.113.3");
     const insert = fake.queries.find((q) => first(q) === "insert")!;
-    expect(insert.calls[0]![1][0]).toEqual({ email_hash: otp.hashEmail("hash.me@example.com") });
+    const rows = insert.calls[0]![1][0] as Array<{ email_hash: string }>;
+    expect(rows).toHaveLength(2);
+    expect(rows).toContainEqual({ email_hash: otp.hashEmail("hash.me@example.com") });
+    rows.forEach((row) => expect(row.email_hash).toMatch(/^[0-9a-f]{64}$/));
     expect(JSON.stringify(fake.queries)).not.toContain("example.com");
+    expect(JSON.stringify(fake.queries)).not.toContain("203.0.113.3");
     expect(fake.queries.some((q) => first(q) === "delete")).toBe(true);
 
-    await otp.clearOtpFailures("hash.me@example.com");
+    await otp.clearOtpFailures("hash.me@example.com", "203.0.113.3");
     const clear = fake.queries.at(-1)!;
     expect(first(clear)).toBe("delete");
   });

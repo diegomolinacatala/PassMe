@@ -1,7 +1,7 @@
 "use client";
 
 import { CircleCheck, LoaderCircle, TriangleAlert } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
 import { saveCardAction } from "@/app/dashboard/actions";
 import { Button } from "@/components/ui/button";
 import { LIMITS, type FieldErrors } from "@/lib/card/schema";
@@ -37,6 +37,8 @@ interface CardEditorProps {
   siteUrl: string;
   email: string | null;
   demo: boolean;
+  /** Shown above everything (the welcome for a card that was just created). */
+  welcome?: ReactNode;
 }
 
 type SaveStatus =
@@ -47,7 +49,7 @@ type SaveStatus =
   | { kind: "error"; message: string }
   | { kind: "demo" };
 
-export function CardEditor({ initialCard, stats, contacts, wallet, siteUrl, email, demo }: CardEditorProps) {
+export function CardEditor({ initialCard, stats, contacts, wallet, siteUrl, email, demo, welcome }: CardEditorProps) {
   const initialDraft = useMemo(() => draftFromCard(initialCard), [initialCard]);
   const editor = useCardDraft(initialDraft);
   const { draft, dirty } = editor;
@@ -147,6 +149,7 @@ export function CardEditor({ initialCard, stats, contacts, wallet, siteUrl, emai
 
   return (
     <div className="mx-auto max-w-[1240px] px-4 pb-36 sm:px-8">
+      {welcome ? <div className="pt-6 sm:pt-10">{welcome}</div> : null}
       <div className="flex flex-wrap items-end justify-between gap-4 pt-6 pb-8 sm:pt-10">
         <div>
           <p className="eyebrow">{demo ? "Editor · modo demo" : "Editor"}</p>

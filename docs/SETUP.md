@@ -62,8 +62,8 @@ Sin tocar nada, `npm run dev` ya funciona en **modo demo**: landing, tarjeta de 
 5. **Plantillas de email** → *Authentication → Emails → Templates*:
    - En **Magic Link** *y* en **Confirm signup** pega el HTML de
      [`supabase/templates/magic-link.html`](../supabase/templates/magic-link.html).
-   - Asunto sugerido: `Tu acceso a PassMe: {{ .Token }}`.
-   - Así el email trae un **enlace que funciona en cualquier dispositivo** (`/auth/confirm`) y un **código de un solo uso** (8 dígitos con la configuración de abajo) que se puede escribir en la pantalla de login. Si cambias la caducidad, cambia también la frase «caducan en 10 minutos» de la plantilla.
+   - Asunto: `{{ .Token }} es tu código de PassMe` (con el código delante se lee en la notificación del móvil sin abrir el email).
+   - El email lleva primero el **código de un solo uso** (8 dígitos con la configuración de abajo), que se escribe en la misma pantalla donde se pidió, y debajo un **botón que funciona en cualquier dispositivo** (`/auth/confirm`). Si cambias la caducidad, cambia también la frase «Caduca en 10 minutos» de la plantilla.
    - *Authentication → Sign In / Providers → Email*: pon **Email OTP Length** a `8` y **Email OTP Expiration** a `600` segundos (10 min). La app bloquea un email tras 5 intentos, pero la API de verificación de Supabase también es pública: un código de 8 dígitos que caduca pronto hace inviable adivinarlo por esa vía. (La pantalla de login ya acepta de 6 a 10 dígitos.)
    - *Authentication → Rate Limits*: deja **Token verifications** en un valor bajo (p. ej. 30 cada 5 min por IP).
 6. **(Opcional) Login con Google** → *Authentication → Sign In / Providers → Google*:
@@ -171,7 +171,8 @@ Necesitas el **Apple Developer Program** (99 $/año). Si te das de alta como emp
 ### Checklist final
 
 - [ ] `/api/health` → `supabase`, `supabaseSecretKey`, `signingSecret` en `true`
-- [ ] Login por email (enlace y código) funciona en móvil y escritorio
+- [ ] Login por email (código y botón) funciona en móvil y escritorio; al pedir el código aparece «¡Código enviado!» y la cuenta atrás para reenviar
+- [ ] Desde el móvil de otra persona: escanear tu QR → «Crea la tuya» → rellenar → email → código → ver su QR en la bienvenida
 - [ ] Guardar tarjeta, subir foto, ocultar un contacto → no aparece en `/u/<slug>`
 - [ ] *Guardar contacto* abre la ficha nativa en iPhone y Android
 - [ ] Apple Wallet: añadir pase, editar el cargo, ver que se actualiza

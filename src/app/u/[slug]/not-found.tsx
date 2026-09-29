@@ -12,7 +12,7 @@ export default function CardNotFound() {
         <p className="mt-4 text-muted">
           Puede que el enlace esté mal escrito o que su dueño la haya retirado. Pídele que te la enseñe de nuevo.
         </p>
-        <Link href="/" className={buttonClasses({ variant: "ink", className: "mt-8" })}>
+        <Link href="/crear" className={buttonClasses({ variant: "ink", className: "mt-8" })}>
           Crear mi propia tarjeta
         </Link>
       </div>

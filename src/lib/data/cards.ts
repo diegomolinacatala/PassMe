@@ -4,11 +4,12 @@ import { createClient } from "@supabase/supabase-js";
 import { cache } from "react";
 import { isValidAvatarPath } from "@/lib/card/avatar";
 import { DEFAULT_ACCENT, isHexColor } from "@/lib/card/colors";
-import { DEFAULT_DETAIL, DEFAULT_TYPEFACE, isPatternSeed, isTypeface, randomPatternSeed } from "@/lib/card/design";
+import { DEFAULT_TYPEFACE, isPatternSeed, isTypeface } from "@/lib/card/design";
 import { DEFAULT_PATTERN, toPatternKind } from "@/lib/card/pattern";
 import { DEMO_CARD, DEMO_SLUG } from "@/lib/card/demo";
+import { quickDraftSlug, quickDraftToCardInput, type ValidQuickDraft } from "@/lib/card/quick";
 import type { ValidCardInput } from "@/lib/card/schema";
-import { sanitizeStoredLinks } from "@/lib/card/schema";
+import { parseCardInput, sanitizeStoredLinks } from "@/lib/card/schema";
 import { checkSlug, PLACEHOLDER_SLUG_BASE, slugCandidate } from "@/lib/card/slug";
 import type { OwnerCard, PublicCard } from "@/lib/card/types";
 import { avatarPublicUrl, getSupabasePublicConfig } from "@/lib/env";
@@ -224,47 +225,106 @@ async function findOwnProfile(supabase: TypedSupabaseClient, userId: string): Pr
   return data;
 }
 
+/** The signed-in user's card, or null while they have none (never creates one). */
+export async function findOwnerCard(supabase: TypedSupabaseClient, userId: string): Promise<OwnerCard | null> {
+  const row = await findOwnProfile(supabase, userId);
+  return row ? rowToOwnerCard(row) : null;
+}
+
+export type CreateCardResult =
+  | { ok: true; card: OwnerCard; /** False: the user already had a card, which was left untouched. */ created: boolean }
+  | { ok: false; error: string };
+
+const CREATE_FAILED = "No hemos podido crear tu tarjeta. Inténtalo de nuevo.";
+
 /**
- * Loads the signed-in user's card, creating an empty draft on first visit.
- * Profiles are created lazily (instead of an auth trigger) so a bug here can
- * never block sign-ups.
+ * A first card from the quick form ("Crea la tuya"). Asks for the handle made
+ * from the name ("jose-nunez") and, if it's taken, adds a short random suffix.
+ * A card that already has a name is never overwritten: signing in from /crear
+ * with an existing account simply leads back to it. Profiles are created here,
+ * lazily, instead of by an auth trigger, so a bug in them can never block sign-ups.
  */
-export async function getOrCreateOwnerCard(
+export async function createCardFromDraft(
   supabase: TypedSupabaseClient,
-  user: { id: string; email: string | null },
-): Promise<OwnerCard> {
-  const existing = await findOwnProfile(supabase, user.id);
-  if (existing) return rowToOwnerCard(existing);
+  userId: string,
+  draft: ValidQuickDraft,
+): Promise<CreateCardResult> {
+  let current = await findOwnProfile(supabase, userId);
+  if (current?.full_name) return { ok: true, card: rowToOwnerCard(current), created: false };
 
-  const design: DesignWrite = {
-    detail_color: DEFAULT_DETAIL,
-    pattern: DEFAULT_PATTERN,
-    pattern_seed: randomPatternSeed(),
-    typeface: DEFAULT_TYPEFACE,
-  };
-
+  const base = quickDraftSlug(draft);
+  const linkSalt = randomBytes(4).toString("hex");
+  let slugIndex = 0;
   for (let attempt = 0; attempt < MAX_SLUG_ATTEMPTS; attempt += 1) {
-    // Never derived from the email: the handle is public and the owner picks a real one in the editor.
-    const slug = slugCandidate(PLACEHOLDER_SLUG_BASE, randomBytes(3).toString("hex"));
-    // New cards simply start with the column defaults if some design fields can't be stored yet.
+    const slug =
+      slugIndex === 0 && base ? base : slugCandidate(base ?? PLACEHOLDER_SLUG_BASE, randomBytes(2).toString("hex"));
+    const parsed = parseCardInput(quickDraftToCardInput(draft, { slug, linkId: (i) => `l-${linkSalt}${i}` }));
+    if (!parsed.ok) {
+      if (parsed.errors.slug) {
+        slugIndex += 1;
+        continue;
+      }
+      log.warn("quick card failed validation", { fields: Object.keys(parsed.errors).join(",") });
+      return { ok: false, error: CREATE_FAILED };
+    }
+
+    // An empty card already exists (the editor creates one on first visit): fill it in.
+    if (current) {
+      const saved = await saveOwnerCard(supabase, userId, parsed.data);
+      if (saved.ok) return { ok: true, card: saved.card, created: true };
+      if (!saved.errors.slug) return { ok: false, error: saved.errors._form ?? CREATE_FAILED };
+      slugIndex += 1;
+      continue;
+    }
+
     const {
       result: { data, error },
-    } = await withDesignFallback("create", design, (fields) =>
+    } = await withDesignFallback("create", designColumns(parsed.data), (fields) =>
       supabase
         .from("profiles")
-        .insert({ id: user.id, slug, accent_color: DEFAULT_ACCENT, ...fields })
+        .insert({ id: userId, ...contentColumns(parsed.data), ...fields })
         .select("*")
         .single(),
     );
+    if (!error && data) return { ok: true, card: rowToOwnerCard(data), created: true };
+    if (error?.code !== UNIQUE_VIOLATION) {
+      log.error("createCardFromDraft failed", { userId }, error);
+      return { ok: false, error: CREATE_FAILED };
+    }
 
-    if (!error && data) return rowToOwnerCard(data);
-    if (error?.code !== UNIQUE_VIOLATION) throw new Error(`Could not create profile: ${error?.message}`);
-
-    // Either the slug collided or a parallel request created the row first.
-    const raced = await findOwnProfile(supabase, user.id);
-    if (raced) return rowToOwnerCard(raced);
+    // Either the handle is taken or another tab created the card first.
+    current = await findOwnProfile(supabase, userId);
+    if (current?.full_name) return { ok: true, card: rowToOwnerCard(current), created: false };
+    if (!current) slugIndex += 1;
   }
-  throw new Error("Could not generate a unique slug");
+  return { ok: false, error: CREATE_FAILED };
+}
+
+/** Everything about a card but the design fields (those go through withDesignFallback). */
+function contentColumns(input: ValidCardInput) {
+  return {
+    slug: input.slug,
+    full_name: input.fullName,
+    headline: input.headline,
+    company: input.company,
+    location: input.location,
+    pronouns: input.pronouns,
+    bio: input.bio,
+    accent_color: input.accentColor,
+    avatar_path: input.avatarPath,
+    links: input.links as unknown as Json,
+    is_published: input.isPublished,
+  };
+}
+
+function designColumns(input: ValidCardInput): DesignWrite {
+  return {
+    detail_color: input.detailColor,
+    pattern: input.pattern,
+    pattern_seed: input.patternSeed,
+    typeface: input.typeface,
+    ...(input.acceptsContactRequests === undefined ? {} : { accepts_contact_requests: input.acceptsContactRequests }),
+  };
 }
 
 export type SaveCardResult =
@@ -293,33 +353,13 @@ export async function saveOwnerCard(
   const current = await findOwnProfile(supabase, userId);
   if (!current) return { ok: false, errors: { _form: "No encontramos tu tarjeta. Recarga la página." } };
 
-  const content = {
-    slug: input.slug,
-    full_name: input.fullName,
-    headline: input.headline,
-    company: input.company,
-    location: input.location,
-    pronouns: input.pronouns,
-    bio: input.bio,
-    accent_color: input.accentColor,
-    avatar_path: input.avatarPath,
-    links: input.links as unknown as Json,
-    is_published: input.isPublished,
-  };
-  const design: DesignWrite = {
-    detail_color: input.detailColor,
-    pattern: input.pattern,
-    pattern_seed: input.patternSeed,
-    typeface: input.typeface,
-    ...(input.acceptsContactRequests === undefined ? {} : { accepts_contact_requests: input.acceptsContactRequests }),
-  };
   const {
     result: { data, error },
     dropped,
-  } = await withDesignFallback("save", design, (fields) =>
+  } = await withDesignFallback("save", designColumns(input), (fields) =>
     supabase
       .from("profiles")
-      .update({ ...content, ...fields })
+      .update({ ...contentColumns(input), ...fields })
       .eq("id", userId)
       .select("*")
       .single(),

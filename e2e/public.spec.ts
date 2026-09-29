@@ -31,7 +31,7 @@ test.describe("landing", () => {
 });
 
 test("key pages never scroll horizontally", async ({ page }) => {
-  for (const path of ["/", "/u/demo", "/dashboard", "/login", "/privacidad", "/terminos"]) {
+  for (const path of ["/", "/u/demo", "/crear", "/dashboard?nueva=1", "/login", "/privacidad", "/terminos"]) {
     await page.goto(path);
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,

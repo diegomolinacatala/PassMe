@@ -21,7 +21,20 @@ sequenceDiagram
     Web-->>Contacto: Tarjeta + "Guardar contacto" (vCard)
     Contacto->>Web: "Te dejo mi contacto" (opcional)
     Web->>DB: submit_contact_request → lo ve solo el dueño
+    Contacto->>Web: "Crea la tuya" → /crear?de=slug
+    Note over Contacto,Web: Rellena lo básico viendo su pase; al final email + código
+    Web->>DB: verifyOtp + createCardFromDraft (misma petición)
+    Web-->>Contacto: /dashboard?nueva=1 → su QR para enseñárselo al dueño
 ```
+
+### Alta y acceso
+
+- **La tarjeta primero, el email al final** (`/crear`): el borrador vive en el navegador (`localStorage`, 1 h) mientras la persona se identifica. Con el código de 8 cifras, la tarjeta se crea en la misma petición que lo comprueba (`authAction` → `createQuickCard`). Si entra por el botón del email o con Google (quizá en otra pestaña), vuelve a `/crear` con sesión y la tarjeta se crea sola a partir del borrador guardado. Nunca se sobrescribe una tarjeta que ya tiene nombre.
+- **El código es el camino principal** del email (iOS lo sugiere sobre el teclado; en Android se lee en la notificación) y el botón, la alternativa. La pestaña que espera el código detecta si el navegador ya inició sesión por el botón (al volver a ella o por `BroadcastChannel`) y continúa.
+- **El botón del email no inicia sesión al abrirse**: `/auth/confirm` lleva a `/auth/entrar`, que pide un toque y verifica por POST. Los antivirus de correo (p. ej. Microsoft Defender) abren todos los enlaces, y el botón y el código comparten el mismo token: sin ese toque lo gastarían antes que la persona.
+- La tarjeta creada sin intervención (al volver de Google o del botón) solo se crea si la sesión es de la misma cuenta a la que se envió el código; si no, el formulario espera un toque.
+- Un usuario con sesión pero sin tarjeta que entra en `/dashboard` va a `/crear`. Los perfiles se crean ahí, de forma perezosa (no hay trigger de `auth.users`), así que un fallo en ellos nunca bloquea el alta.
+- **Modo demo**: no se envía ningún email y el código es `00000000`, para poder probar el flujo completo (E2E incluidos).
 
 ## Módulos
 
@@ -30,7 +43,7 @@ sequenceDiagram
 | Dominio | `src/lib/card/*` | Tipos de enlace (validación + href seguro), esquema Zod, vCard 3.0, colores legibles, diseño (`design.ts`: temas, tintas, letra, variación) y motivos generativos (`pattern.ts`), slugs. Isomórfico: la misma validación en navegador y servidor. |
 | Datos | `src/lib/data/*` | Lecturas/escrituras en Supabase. Cliente con sesión (RLS) para el dueño, cliente anónimo para lo público y cliente *admin* solo donde es imprescindible. `rate-limits.ts` (límites compartidos en Postgres), `contact-requests.ts` (contactos recibidos). |
 | Pases | `src/lib/pass/*` | `apple.ts` (pass.json + firma), `google.ts` (objeto genérico + JWT + sync REST), `apns.ts` (push HTTP/2), `web-service.ts` (protocolo de Apple), `handoff.ts` (tokens de 30 min), `images.ts` (logo/icono con sharp), `art.tsx` (banda de Apple y *hero* de Google con Satori). |
-| Rutas | `src/app/**` | Páginas (landing, tarjeta, login, editor, handoff, legales) y API (`/api/pass/*`, `/api/wallet/v1/*`, `/api/events`, `/api/health`, `/api/cron/cleanup`). Exportación de contactos en `/dashboard/contactos`. |
+| Rutas | `src/app/**` | Páginas (landing, tarjeta, alta `/crear`, login, editor, handoff, legales) y API (`/api/pass/*`, `/api/wallet/v1/*`, `/api/events`, `/api/health`, `/api/cron/cleanup`). Exportación de contactos en `/dashboard/contactos`. |
 | Borde | `src/proxy.ts` | CSP con nonce por petición, refresco de sesión de Supabase, redirección de `/dashboard` sin sesión. |
 
 ## Modelo de datos
@@ -81,7 +94,7 @@ Además: `auth_otp_attempts` (HMAC de los emails que intentan un código, para b
 - **Enlaces seguros**: cada tipo normaliza la entrada y construye el `href` (solo `https:`, `mailto:`, `tel:`); `javascript:`/`data:` imposibles. Los `attributedValue` del pase de Apple se escapan.
 - **Avatares**: ruta validada en cliente, servidor y `CHECK` de Postgres; políticas de Storage limitadas a la carpeta del usuario; sin listado público.
 - **Pases**: se descargan con sesión o con un token HS256 de 30 min firmado con `PASSME_SIGNING_SECRET` (flujo "enviar a mi móvil"). El web service de Apple exige el token por pase (`ApplePass …`, comparación en tiempo constante).
-- **Login**: límites por IP y por destinatario, **bloqueo por email persistido** (el intento se registra *antes* de comprobar el código, así que no hay carrera) y CAPTCHA opcional (Turnstile). La API de verificación de Supabase también es pública: por eso el código es de 8 dígitos y caduca en 10 min (docs/SETUP.md). Redirecciones `next` limitadas a rutas relativas.
+- **Login**: límites por IP, **bloqueo del código persistido** en dos capas: 5 intentos por email y dispositivo (IP) y 30 por email en total cada 15 min, así nadie puede bloquear a otra persona con cuatro códigos falsos (el intento se registra *antes* de comprobar el código, así que no hay carrera) y CAPTCHA opcional (Turnstile). La API de verificación de Supabase también es pública: por eso el código es de 8 dígitos y caduca en 10 min (docs/SETUP.md). Redirecciones `next` limitadas a rutas relativas.
 - **Límites de peticiones** compartidos por todas las instancias (`rate_limit_hit` en Postgres, claves con hash) con respaldo en memoria si la base de datos no responde.
 - **Contactos recibidos**: formulario público con *honeypot*, límites por IP y por tarjeta y CAPTCHA opcional; se inserta con `submit_contact_request` (solo el servidor) y RLS limita la lectura y el borrado al dueño. Exportación CSV con fórmulas neutralizadas.
 - **Cabeceras**: CSP con nonce + `strict-dynamic` (todas las páginas se renderizan por petición para poder llevar nonce), HSTS, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`.

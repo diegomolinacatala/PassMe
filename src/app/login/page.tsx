@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { EmailCodeAuth } from "@/components/auth/email-code-auth";
 import { BrandMotif } from "@/components/brand/brand-motif";
 import { Logo } from "@/components/brand/logo";
 import { WalletPass } from "@/components/card/wallet-pass";
+import { DEMO_LOGIN_CODE } from "@/lib/auth/code";
 import { BRAND } from "@/lib/brand";
 import { DEMO_CARD } from "@/lib/card/demo";
 import { themeDesign } from "@/lib/card/design";
 import { toPublicCard } from "@/lib/data/cards";
 import { getTurnstileSiteKey, isGoogleAuthEnabled, isSupabaseConfigured } from "@/lib/env";
 import { safeNextPath } from "@/lib/request";
-import { LoginForm } from "./login-form";
 
 export const metadata: Metadata = { title: "Entrar", robots: { index: false } };
 
@@ -32,31 +34,46 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
         <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-16">
           <p className="eyebrow">Acceso</p>
           <h1 className="mt-3 font-display text-5xl leading-[0.95] tracking-tight">
-            Entra y crea <em className="text-signal">tu tarjeta.</em>
+            Entra en <em className="text-signal">tu tarjeta.</em>
           </h1>
-          <p className="mt-4 text-ink-soft">Solo necesitamos tu email. Sin contraseñas que recordar.</p>
+          <p className="mt-4 text-ink-soft">Te enviamos un código a tu email y listo. Sin contraseñas que recordar.</p>
 
-          <div className="mt-10">
-            {configured ? (
-              <LoginForm
-                next={next}
-                googleEnabled={isGoogleAuthEnabled()}
-                captchaSiteKey={getTurnstileSiteKey()}
-                initialError={ERRORS[errorKey]}
-              />
-            ) : (
-              <div className="rounded-2xl border border-dashed border-line-strong bg-card p-5 text-sm leading-relaxed text-ink-soft">
-                <p className="font-medium text-ink">Modo demo</p>
-                <p className="mt-1">
-                  Supabase todavía no está configurado, así que el login está desactivado. Puedes probar el editor en modo
-                  demo (no se guarda nada).
-                </p>
-                <a href="/dashboard" className="mt-4 inline-block font-medium text-signal-deep underline underline-offset-4">
-                  Abrir el editor demo →
-                </a>
-              </div>
-            )}
+          {configured ? null : (
+            <p className="mt-6 rounded-2xl border border-dashed border-signal/50 bg-signal-wash/60 px-4 py-3 text-sm text-signal-deep">
+              <strong>Modo demo.</strong> Supabase no está conectado: no se envía ningún email y el código es{" "}
+              <span className="font-mono">{DEMO_LOGIN_CODE}</span>.
+            </p>
+          )}
+
+          <div className="mt-8">
+            <EmailCodeAuth
+              next={next}
+              continueTo={next}
+              googleEnabled={configured && isGoogleAuthEnabled()}
+              captchaSiteKey={getTurnstileSiteKey()}
+              initialError={Object.hasOwn(ERRORS, errorKey) ? ERRORS[errorKey] : undefined}
+              submitLabel="Entrar"
+              autoFocus
+            />
           </div>
+
+          <p className="mt-8 text-sm text-ink-soft">
+            ¿Aún no tienes tarjeta?{" "}
+            <Link href="/crear" className="font-medium text-signal-deep underline underline-offset-4 hover:text-ink">
+              Créala en un minuto
+            </Link>
+          </p>
+          <p className="mt-3 text-xs leading-relaxed text-muted">
+            Si es tu primera vez, se crea tu cuenta al entrar. Al continuar aceptas los{" "}
+            <a href="/terminos" className="underline underline-offset-2 hover:text-ink">
+              términos de uso
+            </a>{" "}
+            y la{" "}
+            <a href="/privacidad" className="underline underline-offset-2 hover:text-ink">
+              política de privacidad
+            </a>
+            .
+          </p>
         </div>
       </section>
 

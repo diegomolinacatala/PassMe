@@ -1,30 +1,28 @@
-import type { EmailOtpType } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
-import { log } from "@/lib/log";
-import { safeNextPath } from "@/lib/request";
-import { createServerSupabase } from "@/lib/supabase/server";
-
-const OTP_TYPES: ReadonlySet<string> = new Set(["email", "magiclink", "signup", "invite", "recovery", "email_change"]);
+import { EMAIL_LINK_TYPES } from "@/lib/auth/email-link";
 
 /**
  * Magic-link landing for the custom email template (supabase/templates/*.html):
  *   {{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&next=/dashboard
- * Unlike the PKCE callback, this works when the link is opened on another device.
+ *
+ * It no longer signs in on GET: mail security scanners (Microsoft Defender
+ * Safe Links and the like) open every link in an email, and the token behind
+ * the button is the same one as the typed code — a scanner would burn both.
+ * /auth/entrar asks for one tap and verifies on POST instead. Works on any
+ * device, unlike the PKCE callback.
  */
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl;
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type");
-  const next = safeNextPath(searchParams.get("next"));
-
-  if (tokenHash && type && OTP_TYPES.has(type)) {
-    const supabase = await createServerSupabase();
-    if (supabase) {
-      const { error } = await supabase.auth.verifyOtp({ type: type as EmailOtpType, token_hash: tokenHash });
-      if (!error) return NextResponse.redirect(new URL(next, origin));
-      log.warn("verifyOtp(token_hash) failed", { type }, error);
-    }
+  if (!tokenHash || !type || !EMAIL_LINK_TYPES.has(type)) {
+    return NextResponse.redirect(new URL("/login?error=link", origin));
   }
 
-  return NextResponse.redirect(new URL("/login?error=link", origin));
+  const target = new URL("/auth/entrar", origin);
+  target.searchParams.set("token_hash", tokenHash);
+  target.searchParams.set("type", type);
+  const next = searchParams.get("next");
+  if (next) target.searchParams.set("next", next);
+  return NextResponse.redirect(target, { status: 303 });
 }
