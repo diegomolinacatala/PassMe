@@ -4,6 +4,7 @@ import {
   hashEmail,
   OTP_LOCK_WINDOW_MS,
   OTP_MAX_ATTEMPTS,
+  OTP_MAX_ATTEMPTS_PER_EMAIL,
   registerOtpAttempt,
 } from "@/lib/data/otp-attempts";
 
@@ -24,22 +25,39 @@ describe("OTP lockout", () => {
     expect(keyed).not.toBe(plain);
   });
 
-  it("allows a few attempts, then locks until the window passes", async () => {
+  it("allows a few attempts per client, then locks until the window passes", async () => {
     const email = "victim@example.com";
     const t0 = 1_000_000;
     for (let i = 0; i < OTP_MAX_ATTEMPTS; i += 1) {
-      expect(await registerOtpAttempt(email, t0 + i)).toBe(true);
+      expect(await registerOtpAttempt(email, "ip-a", t0 + i)).toBe(true);
     }
-    expect(await registerOtpAttempt(email, t0 + 10)).toBe(false);
-    expect(await registerOtpAttempt("other@example.com", t0 + 10)).toBe(true);
-    expect(await registerOtpAttempt(email, t0 + 20 + OTP_LOCK_WINDOW_MS)).toBe(true);
+    expect(await registerOtpAttempt(email, "ip-a", t0 + 10)).toBe(false);
+    expect(await registerOtpAttempt("other@example.com", "ip-a", t0 + 10)).toBe(true);
+    expect(await registerOtpAttempt(email, "ip-a", t0 + 20 + OTP_LOCK_WINDOW_MS)).toBe(true);
+  });
+
+  it("someone else's wrong guesses don't lock the owner out", async () => {
+    const email = "owner@example.com";
+    const t0 = 5_000_000;
+    for (let i = 0; i < OTP_MAX_ATTEMPTS + 1; i += 1) await registerOtpAttempt(email, "attacker", t0 + i);
+    expect(await registerOtpAttempt(email, "attacker", t0 + 10)).toBe(false);
+    expect(await registerOtpAttempt(email, "owner-phone", t0 + 10)).toBe(true);
+  });
+
+  it("still caps the email across every client", async () => {
+    const email = "spread@example.com";
+    const t0 = 9_000_000;
+    for (let i = 0; i < OTP_MAX_ATTEMPTS_PER_EMAIL; i += 1) {
+      expect(await registerOtpAttempt(email, `ip-${i}`, t0 + i)).toBe(true);
+    }
+    expect(await registerOtpAttempt(email, "fresh-ip", t0 + 100)).toBe(false);
   });
 
   it("starts from zero after a successful login", async () => {
     const email = "ok@example.com";
-    for (let i = 0; i < OTP_MAX_ATTEMPTS; i += 1) await registerOtpAttempt(email);
-    expect(await registerOtpAttempt(email)).toBe(false);
-    await clearOtpFailures(email);
-    expect(await registerOtpAttempt(email)).toBe(true);
+    for (let i = 0; i < OTP_MAX_ATTEMPTS; i += 1) await registerOtpAttempt(email, "ip-ok");
+    expect(await registerOtpAttempt(email, "ip-ok")).toBe(false);
+    await clearOtpFailures(email, "ip-ok");
+    expect(await registerOtpAttempt(email, "ip-ok")).toBe(true);
   });
 });

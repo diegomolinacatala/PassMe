@@ -26,6 +26,12 @@ export function SiteHeader({ ctaHref }: { ctaHref: string }) {
           >
             Ejemplo
           </Link>
+          <Link
+            href="/login"
+            className="hidden rounded-full px-3 py-2 text-sm text-ink-soft transition-colors hover:text-ink min-[400px]:inline-flex"
+          >
+            Entrar
+          </Link>
           <LinkButton href={ctaHref} size="sm" className="ml-1">
             Crear mi tarjeta
           </LinkButton>

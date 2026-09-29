@@ -8,10 +8,10 @@ import { SiteHeader } from "@/components/landing/site-header";
 import { LinkButton } from "@/components/ui/button";
 import { DEMO_CARD } from "@/lib/card/demo";
 import { toPublicCard } from "@/lib/data/cards";
-import { isSupabaseConfigured } from "@/lib/env";
 
 export default function HomePage() {
-  const ctaHref = isSupabaseConfigured() ? "/login" : "/dashboard";
+  // The card first, the email at the end (demo mode simulates the code).
+  const ctaHref = "/crear";
   const demo = toPublicCard(DEMO_CARD);
 
   return (

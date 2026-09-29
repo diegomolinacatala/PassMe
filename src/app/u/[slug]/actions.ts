@@ -16,9 +16,17 @@ import { clientRateKey, getClientIp, parseVisitSource } from "@/lib/request";
 
 export type ContactFormState =
   | { status: "idle" }
-  | { status: "sent"; demo?: boolean }
+  // `details` echoes what the visitor sent, so "Crea la tuya" can start from it.
+  | { status: "sent"; demo?: boolean; details?: SentDetails }
   // `values` refills the form: React resets uncontrolled fields after every submission.
   | { status: "error"; message: string; errors?: FieldErrors; values?: ContactFormValues };
+
+export interface SentDetails {
+  name: string;
+  email: string;
+  phone: string;
+  company: string;
+}
 
 export interface ContactFormValues {
   name: string;
@@ -97,8 +105,14 @@ export async function submitContactAction(
   const parsed = parseContactRequest(input);
   if (!parsed.ok) return fail("Revisa los campos marcados.", parsed.errors);
 
+  const details: SentDetails = {
+    name: parsed.data.name,
+    email: parsed.data.email ?? "",
+    phone: parsed.data.phone ?? "",
+    company: parsed.data.company,
+  };
   const cleanSlug = String(slug).toLowerCase();
-  if (cleanSlug === DEMO_SLUG || !isSupabaseConfigured()) return { status: "sent", demo: true };
+  if (cleanSlug === DEMO_SLUG || !isSupabaseConfigured()) return { status: "sent", demo: true, details };
   if (!checkSlug(cleanSlug).ok) return fail(GENERIC_ERROR);
 
   const requestHeaders = await headers();
@@ -119,5 +133,5 @@ export async function submitContactAction(
   if (!result.ok) return fail(result.reason === "closed" ? CLOSED : GENERIC_ERROR);
 
   after(() => notifyOwner(result.ownerId));
-  return { status: "sent" };
+  return { status: "sent", details };
 }

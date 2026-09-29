@@ -1,11 +1,14 @@
 "use client";
 
-import { CircleCheck, HandHeart, LoaderCircle } from "lucide-react";
+import { ArrowRight, CircleCheck, HandHeart, LoaderCircle } from "lucide-react";
+import Link from "next/link";
 import { useActionState, useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { submitContactAction, type ContactFormState } from "@/app/u/[slug]/actions";
-import { Button } from "@/components/ui/button";
+import { submitContactAction, type ContactFormState, type SentDetails } from "@/app/u/[slug]/actions";
+import { Button, buttonClasses } from "@/components/ui/button";
 import { Turnstile } from "@/components/ui/turnstile";
 import { CONTACT_LIMITS } from "@/lib/card/contact";
+import { rememberDetails } from "@/lib/card/draft-storage";
+import { createPath } from "@/lib/card/quick";
 import { cn } from "@/lib/cn";
 
 const INPUT =
@@ -44,7 +47,7 @@ function Field({ label, error, optional, children }: FieldProps) {
 }
 
 /** Confirmation that takes focus, so screen readers announce it and keyboard users aren't lost. */
-function SentMessage({ firstName, demo }: { firstName: string; demo: boolean }) {
+function SentMessage({ firstName, slug, demo, details }: { firstName: string; slug: string; demo: boolean; details?: SentDetails }) {
   const heading = useRef<HTMLParagraphElement>(null);
   useEffect(() => heading.current?.focus(), []);
   return (
@@ -56,6 +59,24 @@ function SentMessage({ firstName, demo }: { firstName: string; demo: boolean }) 
       <p className="mt-1 text-sm text-muted">
         {demo ? "Es la tarjeta de ejemplo: esta vez no se ha enviado nada." : "Te escribirá cuando pueda."}
       </p>
+      <div className="mt-5 border-t hairline pt-5">
+        <p className="text-sm text-ink-soft">¿Y si te haces tu propia tarjeta? Ya tenemos tus datos.</p>
+        <Link
+          href={createPath(slug)}
+          onClick={() => {
+            if (details) {
+              rememberDetails(
+                { fullName: details.name, email: details.email, phone: details.phone, company: details.company },
+                slug,
+              );
+            }
+          }}
+          className={buttonClasses({ variant: "signal", className: "group mt-3" })}
+        >
+          Crear la mía con estos datos
+          <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-0.5" aria-hidden />
+        </Link>
+      </div>
     </div>
   );
 }
@@ -74,7 +95,9 @@ export function ContactForm({ slug, ownerName, source, captchaSiteKey }: Contact
   const errors = state.status === "error" ? (state.errors ?? {}) : {};
   const values = state.status === "error" ? state.values : undefined;
 
-  if (state.status === "sent") return <SentMessage firstName={firstName} demo={Boolean(state.demo)} />;
+  if (state.status === "sent") {
+    return <SentMessage firstName={firstName} slug={slug} demo={Boolean(state.demo)} details={state.details} />;
+  }
 
   if (!open) {
     return (

@@ -1,10 +1,14 @@
 <!--
   Supabase → Authentication → Emails → Templates → "Magic Link"
-  (use the same body for "Confirm signup"). Subject suggestion:
-    Tu acceso a PassMe: {{ .Token }}
-  The link goes to /auth/confirm (token_hash), which works even if the email is
-  opened on another device; the code (8 digits, see docs/SETUP.md) can be typed
-  in the login screen. Keep the expiry sentence in sync with Email OTP Expiration.
+  (use the same body for "Confirm signup"). Subject:
+    {{ .Token }} es tu código de PassMe
+  The code comes first: the screen that asked for it waits for it (iOS even
+  suggests it above the keyboard, and on Android it shows in the notification),
+  so nobody has to leave the page. The button is the fallback: it goes to
+  /auth/confirm (token_hash), which works on any device and signs in only after
+  one more tap (mail scanners open links, and the button and the code share one
+  token). 8 digits and 10 minutes (docs/SETUP.md 1.5): keep the expiry sentence
+  in sync with Email OTP Expiration.
 -->
 <!doctype html>
 <html lang="es">
@@ -14,24 +18,32 @@
         <td align="center">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#fbf9f4;border-radius:24px;overflow:hidden;">
             <tr>
-              <td style="background:#221b17;padding:28px 32px;">
-                <span style="font-family:Georgia,'Times New Roman',serif;font-size:28px;color:#f3efe6;">Pass<em style="color:#f6c6a6;">Me</em></span>
+              <td style="background:#221b17;padding:24px 32px;">
+                <span style="font-family:Georgia,'Times New Roman',serif;font-size:26px;color:#f3efe6;">Pass<em style="color:#f6c6a6;">Me</em></span>
               </td>
             </tr>
             <tr>
-              <td style="padding:32px;">
-                <p style="margin:0 0 8px;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#6a5f55;">Tu acceso</p>
-                <h1 style="margin:0 0 16px;font-family:Georgia,'Times New Roman',serif;font-weight:400;font-size:32px;line-height:1.05;">Entra en PassMe</h1>
-                <p style="margin:0 0 24px;font-size:16px;line-height:1.5;color:#463b33;">
-                  Pulsa el botón para entrar. Si prefieres, escribe este código en la pantalla de acceso:
+              <td style="padding:32px 32px 28px;">
+                <p style="margin:0 0 8px;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#6a5f55;">Tu código de acceso</p>
+                <p style="margin:0 0 18px;font-family:'SFMono-Regular',Menlo,Consolas,monospace;font-size:40px;line-height:1.1;letter-spacing:8px;font-weight:700;color:#221b17;">{{ .Token }}</p>
+                <p style="margin:0 0 28px;font-size:16px;line-height:1.5;color:#463b33;">
+                  Escríbelo en la pantalla de PassMe donde lo pediste. Caduca en 10 minutos y solo sirve una vez.
                 </p>
-                <p style="margin:0 0 28px;font-family:'SFMono-Regular',Menlo,Consolas,monospace;font-size:34px;letter-spacing:10px;font-weight:600;">{{ .Token }}</p>
-                <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&next=/dashboard"
-                   style="display:inline-block;background:#c24e1c;color:#ffffff;text-decoration:none;font-weight:600;font-size:16px;padding:14px 26px;border-radius:999px;">
-                  Entrar en mi tarjeta
-                </a>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #dbd2c3;">
+                  <tr>
+                    <td style="padding-top:22px;">
+                      <p style="margin:0 0 14px;font-size:14px;line-height:1.5;color:#6a5f55;">
+                        ¿Has abierto este email en el mismo móvil u ordenador? También puedes entrar desde aquí:
+                      </p>
+                      <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&next=/dashboard"
+                         style="display:inline-block;background:#c24e1c;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:12px 22px;border-radius:999px;">
+                        Entrar en PassMe
+                      </a>
+                    </td>
+                  </tr>
+                </table>
                 <p style="margin:28px 0 0;font-size:13px;line-height:1.5;color:#6a5f55;">
-                  El enlace y el código caducan en 10 minutos y solo sirven una vez. Si no has pedido este email, ignóralo: nadie puede entrar sin él.
+                  Si no has pedido este email, ignóralo: nadie puede entrar sin este código.
                 </p>
               </td>
             </tr>

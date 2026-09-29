@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Mark } from "@/components/brand/logo";
 import { ContactForm } from "@/components/card/contact-form";
+import { CreateYoursBar, CreateYoursCta } from "@/components/card/create-yours";
 import { ProfileCard } from "@/components/card/profile-card";
 import { ViewTracker } from "@/components/card/profile-actions";
 import { resolveDesign } from "@/lib/card/design";
@@ -42,11 +43,12 @@ export default async function PublicCardPage({ params, searchParams }: PageProps
 
   return (
     <main
-      className="min-h-dvh px-4 pt-6 pb-14 sm:pt-12"
+      className="min-h-dvh px-4 pt-4 pb-14 sm:pt-8"
       // A faint halo of the card's own color, as if the pass lit up the paper.
       style={{ backgroundImage: `radial-gradient(60rem 28rem at 50% -6rem, ${background}33, transparent 70%)` }}
     >
       <div className="mx-auto w-full max-w-[440px] animate-rise">
+        <CreateYoursBar slug={card.slug} />
         <ProfileCard card={card} />
 
         {card.acceptsContactRequests ? (
@@ -55,14 +57,16 @@ export default async function PublicCardPage({ params, searchParams }: PageProps
           </div>
         ) : null}
 
-        <footer className="mt-8 flex flex-col items-center gap-2 text-center">
+        <CreateYoursCta slug={card.slug} ownerName={card.fullName} />
+
+        <footer className="mt-8 flex justify-center">
           <Link
             href="/"
             className="group inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm text-muted transition-colors hover:text-ink"
           >
             <Mark className="size-5 text-ink transition-transform duration-500 group-hover:-rotate-6" />
             <span>
-              Hecho con <span className="font-display text-base text-ink italic">PassMe</span> · crea la tuya
+              Hecho con <span className="font-display text-base text-ink italic">PassMe</span>
             </span>
           </Link>
         </footer>

@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DEMO_CARD } from "@/lib/card/demo";
 import type { ValidCardInput } from "@/lib/card/schema";
+import { parseQuickDraft, type ValidQuickDraft } from "@/lib/card/quick";
 import {
-  getOrCreateOwnerCard,
+  createCardFromDraft,
+  findOwnerCard,
   getOwnStats,
   getPublicCard,
   isSlugAvailable,
@@ -104,28 +106,102 @@ describe("getPublicCard", () => {
   });
 });
 
-describe("getOrCreateOwnerCard", () => {
-  it("returns the existing profile", async () => {
+function quickDraft(overrides: Record<string, unknown> = {}): ValidQuickDraft {
+  const parsed = parseQuickDraft({
+    fullName: "José Núñez",
+    headline: "CEO",
+    company: "Norte",
+    phone: "600 11 22 33",
+    email: "JOSE@example.com",
+    linkedin: "",
+    theme: "cafe",
+    patternSeed: 4242,
+    ...overrides,
+  });
+  if (!parsed.ok) throw new Error(JSON.stringify(parsed.errors));
+  return parsed.data;
+}
+
+describe("findOwnerCard", () => {
+  it("returns the card or null, never creating one", async () => {
+    const found = fakeSupabase(() => ({ data: row() }));
+    expect((await findOwnerCard(found.client, USER))?.slug).toBe("alex");
+    const missing = fakeSupabase(() => ({ data: null }));
+    expect(await findOwnerCard(missing.client, USER)).toBeNull();
+    expect(missing.queries.map(first)).toEqual(["select"]);
+  });
+});
+
+describe("createCardFromDraft", () => {
+  it("leaves an existing card untouched", async () => {
     const { client, queries } = fakeSupabase(() => ({ data: row() }));
-    const card = await getOrCreateOwnerCard(client, { id: USER, email: "alex@example.com" });
-    expect(card.slug).toBe("alex");
+    const result = await createCardFromDraft(client, USER, quickDraft());
+    expect(result).toMatchObject({ ok: true, created: false, card: { slug: "alex" } });
     expect(queries).toHaveLength(1);
   });
 
-  it("creates a draft with a placeholder slug that never reveals the email", async () => {
+  it("creates a published card with the handle made from the name", async () => {
     let inserted: Record<string, unknown> | null = null;
     const { client } = fakeSupabase((q) => {
-      if (first(q) === "insert") {
-        inserted = q.calls[0]![1][0] as Record<string, unknown>;
-        return { data: row({ slug: inserted.slug as string, full_name: "" }) };
-      }
-      return { data: null };
+      if (first(q) !== "insert") return { data: null };
+      inserted = q.calls[0]![1][0] as Record<string, unknown>;
+      return { data: row({ ...(inserted as Partial<ProfileRow>), full_name: "José Núñez" }) };
     });
-    const card = await getOrCreateOwnerCard(client, { id: USER, email: "Jose.Nunez@example.com" });
-    expect(inserted).toMatchObject({ id: USER, accent_color: "#EF7A4A", detail_color: "#FFE3D1", pattern: "orbitas", typeface: "clasica" });
-    expect((inserted as unknown as { pattern_seed: number }).pattern_seed).toBeGreaterThanOrEqual(0);
-    expect(card.slug).toMatch(/^tarjeta-[0-9a-f]{6}$/);
-    expect(JSON.stringify(inserted)).not.toContain("jose");
+    const result = await createCardFromDraft(client, USER, quickDraft());
+    expect(result).toMatchObject({ ok: true, created: true });
+    expect(inserted).toMatchObject({
+      id: USER,
+      slug: "jose-nunez",
+      full_name: "José Núñez",
+      headline: "CEO",
+      company: "Norte",
+      accent_color: "#3E2C23",
+      detail_color: "#F0A574",
+      pattern_seed: 4242,
+      is_published: true,
+    });
+    const links = (inserted as unknown as { links: Array<{ id: string; kind: string; value: string }> }).links;
+    expect(links.map((l) => [l.kind, l.value])).toEqual([
+      ["phone", "600 11 22 33"],
+      ["email", "jose@example.com"],
+    ]);
+    expect(new Set(links.map((l) => l.id)).size).toBe(2);
+    expect(inserted).not.toHaveProperty("accepts_contact_requests");
+  });
+
+  it("adds a suffix when the handle is taken", async () => {
+    const slugs: string[] = [];
+    const { client } = fakeSupabase((q) => {
+      if (first(q) !== "insert") return { data: null };
+      const payload = q.calls[0]![1][0] as { slug: string };
+      slugs.push(payload.slug);
+      return slugs.length === 1 ? { error: UNIQUE } : { data: row({ slug: payload.slug }) };
+    });
+    const result = await createCardFromDraft(client, USER, quickDraft());
+    expect(result).toMatchObject({ ok: true, created: true });
+    expect(slugs[0]).toBe("jose-nunez");
+    expect(slugs[1]).toMatch(/^jose-nunez-[0-9a-f]{4}$/);
+  });
+
+  it("uses a placeholder handle when the name can't be one", async () => {
+    let slug = "";
+    const { client } = fakeSupabase((q) => {
+      if (first(q) !== "insert") return { data: null };
+      slug = (q.calls[0]![1][0] as { slug: string }).slug;
+      return { data: row({ slug }) };
+    });
+    await createCardFromDraft(client, USER, quickDraft({ fullName: "Demo" }));
+    expect(slug).toMatch(/^tarjeta-[0-9a-f]{4}$/);
+  });
+
+  it("fills in an empty card the editor created earlier", async () => {
+    const { client, queries } = fakeSupabase((q) => {
+      if (first(q) === "update") return { data: row({ slug: "jose-nunez", full_name: "José Núñez", updated_at: "2026-09-03T00:00:00Z" }) };
+      return { data: row({ slug: "tarjeta-3f9a1c", full_name: "" }) };
+    });
+    const result = await createCardFromDraft(client, USER, quickDraft());
+    expect(result).toMatchObject({ ok: true, created: true, card: { slug: "jose-nunez" } });
+    expect(queries.some((q) => first(q) === "insert")).toBe(false);
   });
 
   it("creates cards on databases without the design migration", async () => {
@@ -134,37 +210,28 @@ describe("getOrCreateOwnerCard", () => {
       if (first(q) !== "insert") return { data: null };
       payloads.push(q.calls[0]![1][0] as Record<string, unknown>);
       return payloads.length === 1
-        ? { error: { message: "column \"detail_color\" of relation \"profiles\" does not exist", code: "42703" } }
+        ? { error: { message: 'column "detail_color" of relation "profiles" does not exist', code: "42703" } }
         : { data: row() };
     });
-    const card = await getOrCreateOwnerCard(client, { id: USER, email: "alex@example.com" });
-    expect(card.id).toBe(USER);
+    expect(await createCardFromDraft(client, USER, quickDraft())).toMatchObject({ ok: true });
     expect(payloads[0]).toHaveProperty("pattern_seed");
     expect(payloads[1]).not.toHaveProperty("pattern_seed");
-    expect(payloads[1]).not.toHaveProperty("typeface");
     expect(payloads[1]!.slug).toBe(payloads[0]!.slug);
   });
 
-  it("retries on slug collisions and survives a parallel insert", async () => {
-    let inserts = 0;
+  it("gives way to another tab that created the card first", async () => {
     let selects = 0;
     const { client } = fakeSupabase((q) => {
-      if (first(q) === "insert") {
-        inserts += 1;
-        return { error: UNIQUE };
-      }
+      if (first(q) === "insert") return { error: UNIQUE };
       selects += 1;
-      // First lookup: nothing. After two collisions another request wins the race.
-      return { data: selects >= 3 ? row({ slug: "winner" }) : null };
+      return { data: selects === 1 ? null : row({ slug: "winner" }) };
     });
-    const card = await getOrCreateOwnerCard(client, { id: USER, email: null });
-    expect(card.slug).toBe("winner");
-    expect(inserts).toBe(2);
+    expect(await createCardFromDraft(client, USER, quickDraft())).toMatchObject({ ok: true, created: false, card: { slug: "winner" } });
   });
 
-  it("throws on unexpected database errors", async () => {
-    const { client } = fakeSupabase((q) => (first(q) === "insert" ? { error: { message: "boom", code: "XX000" } } : {}));
-    await expect(getOrCreateOwnerCard(client, { id: USER, email: null })).rejects.toThrow(/boom/);
+  it("reports unexpected database errors instead of throwing", async () => {
+    const { client } = fakeSupabase((q) => (first(q) === "insert" ? { error: { message: "boom", code: "XX000" } } : { data: null }));
+    expect(await createCardFromDraft(client, USER, quickDraft())).toEqual({ ok: false, error: expect.any(String) });
   });
 });
 
