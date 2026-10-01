@@ -83,14 +83,14 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
       >
         <BrandMotif
           color={BRAND.glow}
-          pattern="relieve"
+          pattern="corriente"
           size={900}
           seed={1618}
           className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-20"
         />
         <div className="relative h-[520px] w-[520px]">
           <div className="absolute top-10 left-2 w-[290px] -rotate-[10deg]">
-            <WalletPass card={{ ...demo, ...themeDesign("papel", "trama", 104_882, "cursiva"), fullName: "Marta Gil", headline: "Abogada", company: "Gil & Asociados", location: "Madrid" }} />
+            <WalletPass card={{ ...demo, ...themeDesign("papel", "persiana", 104_882, "cursiva"), fullName: "Marta Gil", headline: "Abogada", company: "Gil & Asociados", location: "Madrid" }} />
           </div>
           <div className="absolute top-24 right-0 w-[290px] rotate-[7deg]">
             <WalletPass card={{ ...demo, ...themeDesign("terracota", "cinta", 730_115), fullName: "Jon Etxeberria", headline: "Sales Lead", company: "Kobalt", location: "Bilbao" }} style="google" />

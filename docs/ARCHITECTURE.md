@@ -65,7 +65,7 @@ erDiagram
         text company
         text accent_color "fondo #RRGGBB"
         text detail_color "tinta de detalle o null (auto)"
-        text pattern "orbitas|relieve|halo|trama|cinta|rayos|monograma|liso"
+        text pattern "arco|corriente|persiana|pliegue|halo|cinta|monograma|liso"
         int pattern_seed "0..999999 = variación (no se muestra)"
         text typeface "clasica|cursiva|editorial|moderna"
         text avatar_path "uid/archivo.jpg"
@@ -148,7 +148,7 @@ Las imágenes se memorizan por versión del arte (colores, motivo, semilla, letr
 | Pase *store card* de Apple | Es el único estilo con banda de imagen a todo el ancho (375×144 pt): ahí va el arte de la tarjeta (motivo, foto y nombre en la letra elegida). Los campos de texto reales (cargo, ubicación) siguen debajo para VoiceOver y el Apple Watch. |
 | Un solo componente de arte (`components/card/pass-art.tsx`) | Estilos en línea y flexbox: el mismo árbol lo pinta el navegador (vista previa) y Satori en el servidor (PNG del pase). Lo que ves en el editor es lo que llega a la cartera. |
 | Motivo con semilla guardada | La semilla (`pattern_seed`) genera el motivo de forma determinista; editar el nombre no cambia el dibujo, «Otra variación» sí. El número nunca se enseña: se elige a ojo. |
-| Motivos retirados en lectura, no en validación | Los valores antiguos (`sello`, `senal`, `ondas`) se traducen al leer (`toPatternKind`) y el `CHECK` los sigue aceptando durante el despliegue; los clientes nuevos solo pueden enviar motivos actuales. |
+| Motivos retirados en lectura, no en validación | Los valores antiguos (`orbitas`, `relieve`, `trama`, `rayos`, y antes `sello`, `senal`, `ondas`) se traducen al leer (`toPatternKind`). El `CHECK` sigue aceptando los de la última tanda: las tarjetas los conservan hasta que su dueño vuelve a guardar, y la migración se puede ejecutar antes o después del despliegue. Los clientes nuevos solo pueden enviar motivos actuales. |
 | QR sin `altText` en Apple | Wallet imprime ese texto bajo el código y agranda la placa blanca; el enlace ya está en el reverso del pase. |
 | *Hero* de Google con `?v=` | Google cachea las imágenes por URL; la versión (hash de las entradas del arte) cambia solo cuando cambia el dibujo. |
 | JWT con clase + objeto para Google | No hace falta llamar a la API para crear el pase; la API solo se usa para actualizar. |

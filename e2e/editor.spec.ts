@@ -46,8 +46,8 @@ test.describe("editor (demo mode)", () => {
     const pass = page.getByLabel(/Vista previa del pase de Apple Wallet/).locator("visible=true");
     await expect(pass).toHaveCSS("background-color", "rgb(62, 44, 35)");
 
-    await page.getByRole("radio", { name: "Relieve" }).click();
-    await expect(page.getByRole("radio", { name: "Relieve" })).toHaveAttribute("aria-checked", "true");
+    await page.getByRole("radio", { name: "Corriente" }).click();
+    await expect(page.getByRole("radio", { name: "Corriente" })).toHaveAttribute("aria-checked", "true");
 
     // Variations re-roll the motif and can be undone; no number is ever shown.
     const previous = page.getByRole("button", { name: "Volver a la variación anterior" });

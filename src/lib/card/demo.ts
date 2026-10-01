@@ -18,7 +18,7 @@ export const DEMO_CARD: OwnerCard = {
   bio: "Diseño productos digitales que la gente entiende a la primera. Hablemos de interfaces, sistemas de diseño o café.",
   accentColor: "#EF7A4A",
   detailColor: "#FFE3D1",
-  pattern: "orbitas",
+  pattern: "arco",
   patternSeed: 48213,
   typeface: "clasica",
   avatarUrl: null,

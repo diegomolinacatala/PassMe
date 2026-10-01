@@ -50,6 +50,7 @@ Sin tocar nada, `npm run dev` ya funciona en **modo demo**: landing, tarjeta de 
    3. [`supabase/migrations/20260928180000_pass_redesign.sql`](../supabase/migrations/20260928180000_pass_redesign.sql) — motivos nuevos y letra del nombre. Pasa las tarjetas existentes al motivo más parecido.
    4. [`supabase/migrations/20260929120000_launch_hardening.sql`](../supabase/migrations/20260929120000_launch_hardening.sql) — seguridad para el lanzamiento: historial de enlaces (los QR antiguos siguen funcionando y nadie puede quedarse tu enlace viejo), límites de peticiones compartidos, métricas validadas, tope de dispositivos por pase y limpieza de datos caducados.
    5. [`supabase/migrations/20260929130000_contact_requests.sql`](../supabase/migrations/20260929130000_contact_requests.sql) — «Te dejo mi contacto»: quien ve tu tarjeta puede dejarte sus datos.
+   6. [`supabase/migrations/20261001120000_motif_refresh.sql`](../supabase/migrations/20261001120000_motif_refresh.sql) — motivos Arco, Corriente, Persiana y Pliegue. `npm run doctor` no puede comprobar esta: si falta, el editor avisa al guardar de que el motivo nuevo no se ha guardado.
 
    Cada una debe terminar con *Success. No rows returned*. Si ya aplicaste las anteriores, ejecuta solo las que falten. Mientras falte alguna la app sigue funcionando con lo que la base de datos ya conoce (lo avisa en los logs, y `npm run doctor` te dice cuál falta).
    - Alternativa con CLI: `npx supabase login && npx supabase init && npx supabase link --project-ref <ref> && npx supabase db push`.

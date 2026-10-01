@@ -240,7 +240,7 @@ function VariationControl({ seed, enabled, onChange }: VariationControlProps) {
         <p className="mt-0.5 text-xs text-muted">
           {enabled
             ? "Cada tirada dibuja tu motivo de otra forma. Nadie más tiene la tuya."
-            : "Este motivo es siempre igual: prueba Órbitas, Relieve o Trama para tirar los dados."}
+            : "Este motivo es siempre igual: prueba Arco, Corriente o Persiana para tirar los dados."}
         </p>
       </div>
       <div className="flex items-center gap-2">

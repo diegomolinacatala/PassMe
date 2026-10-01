@@ -179,10 +179,10 @@ export function PrivacySection() {
 }
 
 export function AlwaysUpdated({ card }: { card: PublicCard }) {
-  const before: PublicCard = { ...card, ...themeDesign("arena", "orbitas", 48_213), headline: "Product Designer", company: "Estudio Norte" };
+  const before: PublicCard = { ...card, ...themeDesign("arena", "arco", 48_213), headline: "Product Designer", company: "Estudio Norte" };
   const after: PublicCard = {
     ...card,
-    ...themeDesign("cafe", "relieve", 48_213, "editorial"),
+    ...themeDesign("cafe", "corriente", 48_213, "editorial"),
     headline: "Head of Design",
     company: "Norte & Co.",
   };
@@ -227,7 +227,7 @@ export function FinalCta({ ctaHref }: { ctaHref: string }) {
       <div className="relative isolate mx-auto max-w-[1240px] overflow-hidden rounded-[36px] bg-glow px-6 py-20 text-center text-ink sm:px-12 sm:py-28">
         <BrandMotif
           color={BRAND.signal}
-          pattern="rayos"
+          pattern="persiana"
           size={1100}
           height={760}
           seed={2026}

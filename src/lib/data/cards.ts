@@ -36,6 +36,7 @@ type DbError = { code?: string; message?: string } | null;
  *   20260928120000_card_design.sql      → detail_color, pattern, pattern_seed
  *   20260928180000_pass_redesign.sql    → typeface and the new motifs
  *   20260929130000_contact_requests.sql → accepts_contact_requests
+ *   20261001120000_motif_refresh.sql    → the 2026-10 motifs (arco, corriente, persiana, pliegue)
  */
 function unsupportedDesignFields(error: DbError): ReadonlyArray<keyof DesignWrite> {
   if (!error?.code) return [];

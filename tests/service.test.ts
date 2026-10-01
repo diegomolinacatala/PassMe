@@ -44,7 +44,7 @@ function profile(overrides: Partial<ProfileRow> = {}): ProfileRow {
     bio: "",
     accent_color: "#2340F5",
     detail_color: null,
-    pattern: "orbitas",
+    pattern: "arco",
     pattern_seed: 42,
     typeface: "clasica",
     avatar_path: null,

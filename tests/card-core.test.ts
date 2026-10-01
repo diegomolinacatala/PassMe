@@ -62,7 +62,7 @@ const validInput = {
   bio: "Línea 1\r\n\r\n\r\n\r\nLínea 2",
   accentColor: "#FF4A1C",
   detailColor: null,
-  pattern: "orbitas",
+  pattern: "arco",
   patternSeed: 42,
   typeface: "clasica",
   avatarPath: null,

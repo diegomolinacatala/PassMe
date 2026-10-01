@@ -10,24 +10,32 @@
  * Pure and dependency-free on purpose: imported by client and server code.
  */
 
-export const PATTERN_KINDS = ["orbitas", "relieve", "halo", "trama", "cinta", "rayos", "monograma", "liso"] as const;
+export const PATTERN_KINDS = ["arco", "corriente", "persiana", "pliegue", "halo", "cinta", "monograma", "liso"] as const;
 export type PatternKind = (typeof PATTERN_KINDS)[number];
 
-export const DEFAULT_PATTERN: PatternKind = "orbitas";
+export const DEFAULT_PATTERN: PatternKind = "arco";
 
 export const PATTERN_LABELS: Record<PatternKind, { name: string; description: string }> = {
-  orbitas: { name: "Órbitas", description: "Anillos finos alrededor de tu foto, con un par de lunas." },
-  relieve: { name: "Relieve", description: "Curvas de nivel, como un mapa. Cada variación es un monte distinto." },
+  arco: { name: "Arco", description: "Un arco que enmarca tu foto, como un retrato en su hornacina." },
+  corriente: { name: "Corriente", description: "Líneas finas que se abren a tu paso, como el agua al pasar una piedra." },
+  persiana: { name: "Persiana", description: "La luz de la tarde entrando por una persiana." },
+  pliegue: { name: "Pliegue", description: "La tarjeta doblada como una carta, con la sombra suave del papel." },
   halo: { name: "Halo", description: "Círculos de color que se superponen detrás de tu foto." },
-  trama: { name: "Trama", description: "Puntos de imprenta que se desvanecen hacia tu nombre." },
   cinta: { name: "Cinta", description: "Una cinta de líneas que se retuerce detrás de tu foto." },
-  rayos: { name: "Rayos", description: "Un sol de líneas finas que sale de tu foto." },
   monograma: { name: "Monograma", description: "Tu inicial en cursiva, enorme, como un sello de papelería." },
   liso: { name: "Liso", description: "Solo color. Para los minimalistas." },
 };
 
-/** Motifs stored before the 2026-09 redesign, read as their closest successor. */
-const LEGACY_PATTERNS: Readonly<Record<string, PatternKind>> = { sello: "orbitas", senal: "orbitas", ondas: "cinta" };
+/** Retired motifs (2026-09 and 2026-10 redesigns), read as their closest successor. */
+const LEGACY_PATTERNS: Readonly<Record<string, PatternKind>> = {
+  sello: "arco",
+  senal: "arco",
+  ondas: "cinta",
+  orbitas: "arco",
+  relieve: "corriente",
+  trama: "halo",
+  rayos: "persiana",
+};
 
 export function isPatternKind(value: unknown): value is PatternKind {
   return typeof value === "string" && (PATTERN_KINDS as readonly string[]).includes(value);
@@ -38,9 +46,9 @@ export function hasVariations(kind: PatternKind): boolean {
   return kind !== "monograma" && kind !== "liso";
 }
 
-/** Line and dot motifs fade out under the name; a fade across flat tints reads as a smudge. */
+/** Line motifs fade out under the name; a fade across flat tints reads as a smudge. */
 export function fadesUnderText(kind: PatternKind): boolean {
-  return kind !== "halo";
+  return kind === "corriente" || kind === "cinta";
 }
 
 /** A stored motif (current or legacy) as a current kind; null when unknown. */
@@ -56,10 +64,6 @@ export interface PatternLayer {
   /** Stroke width in the same units as the box. Ignored for fills. */
   width: number;
   opacity: number;
-  /** Stroke dash array in box units (dotted orbits). */
-  dash?: string;
-  /** Round caps: with near-zero segments they draw dots (halftone). */
-  cap?: "round";
 }
 
 export interface PatternBox {
@@ -101,7 +105,6 @@ type Random = () => number;
 
 const between = (random: Random, min: number, max: number) => min + (max - min) * random();
 const intBetween = (random: Random, min: number, max: number) => Math.floor(between(random, min, max + 1));
-const pick = <T>(random: Random, options: ReadonlyArray<T>): T => options[intBetween(random, 0, options.length - 1)]!;
 
 // --- Geometry & compact path encoding ----------------------------------------
 
@@ -174,13 +177,6 @@ function reachOf(box: PatternBox, focus: PatternFocus): number {
   return Math.hypot(Math.max(focus.x, box.width - focus.x), Math.max(focus.y, box.height - focus.y));
 }
 
-/** A smooth closed wave around the circle, normalized to [-1, 1]. */
-function terrainWave(random: Random): (t: number) => number {
-  const parts = [2, 3, 4, 5].map((h) => ({ h, a: between(random, 0.35, 1) / h ** 0.7, p: between(random, 0, TAU) }));
-  const total = parts.reduce((sum, part) => sum + part.a, 0);
-  return (t) => parts.reduce((sum, part) => sum + part.a * Math.sin(part.h * t + part.p), 0) / total;
-}
-
 // --- Motifs ------------------------------------------------------------------
 
 interface MotifContext {
@@ -191,76 +187,176 @@ interface MotifContext {
   k: number;
 }
 
-/** Thin orbits around the avatar that open up as they go, with a few moons. */
-function orbitas({ box, focus, random, k }: MotifContext): PatternLayer[] {
-  const reach = reachOf(box, focus);
-  const growth = between(random, 1.3, 1.48);
-  let gap = between(random, 10, 13) * k;
-  const radii: number[] = [];
-  for (let r = focus.r + 12 * k; r < reach + gap; r += gap, gap *= growth) radii.push(r);
+/** PassArt draws the photo's hairline frame 4.5 pt out; lines keep off it. */
+const FRAME_CLEARANCE = 5;
+/** The name column stops 14 pt short of that frame: hairlines left of the photo stay out of it. */
+const NAME_CLEARANCE = 18.5;
 
-  const dotted = intBetween(random, 1, Math.min(2, radii.length - 1));
-  const layers: PatternLayer[] = radii.map((r, i) =>
-    i === dotted
-      ? { d: circle(focus.x, focus.y, r), mode: "stroke", width: 1.2 * k, opacity: 0.7, dash: `0.01 ${num(3.4 * k)}`, cap: "round" }
-      : { d: circle(focus.x, focus.y, r), mode: "stroke", width: (i === 0 ? 0.8 : 0.55) * k, opacity: Math.max(0.32, 0.85 - i * 0.1) },
-  );
+/** Closed arch: straight jambs from `bottom` up to the springing line, a half circle on top. */
+function archPath(cx: number, cy: number, half: number, bottom: number): string {
+  return `M${num(cx - half)} ${num(bottom)}V${num(cy)}a${num(half)} ${num(half)} 0 0 1 ${num(half * 2)} 0V${num(bottom)}z`;
+}
 
-  // Moons on the inner orbits, where they can be seen — never in the wedge
-  // left of the avatar, where the name sits.
-  const moons: string[] = [];
-  const taken = new Set<number>();
-  for (const size of [3.4, 2.1, 1.4]) {
-    for (let attempt = 0; attempt < 24; attempt += 1) {
-      const ring = intBetween(random, 0, Math.min(3, radii.length - 1));
-      const angle = between(random, -0.72, 0.72) * Math.PI;
-      const x = focus.x + radii[ring]! * Math.cos(angle);
-      const y = focus.y + radii[ring]! * Math.sin(angle);
-      const margin = (size + 5) * k;
-      if (taken.has(ring) || x < margin || x > box.width - margin || y < margin || y > box.height - margin) continue;
-      taken.add(ring);
-      moons.push(circle(x, y, size * k));
-      break;
-    }
+/** Open arch outline (no floor line). */
+function archLine(cx: number, cy: number, half: number, bottom: number): string {
+  return `M${num(cx - half)} ${num(bottom)}V${num(cy)}a${num(half)} ${num(half)} 0 0 1 ${num(half * 2)} 0V${num(bottom)}`;
+}
+
+/** An arched niche around the portrait, as in a Renaissance painting. */
+function arco({ box, focus, random, k }: MotifContext): PatternLayer[] {
+  // Mostly tinted niches; now and then just the outline.
+  const roll = random();
+  const style = roll < 0.45 ? "nicho" : roll < 0.85 ? "doble" : "linea";
+  const lift = focus.r * between(random, 0, 0.22);
+  const cy = focus.y - lift;
+  const half = focus.r + lift + between(random, 9, 15) * k;
+  const gap = between(random, 4, 6) * k;
+  const bottom = box.height + 4;
+  const layers: PatternLayer[] = [];
+  if (style === "doble") {
+    const outer = half * between(random, 1.45, 1.65);
+    layers.push({ d: archPath(focus.x, cy - (outer - half) * 0.15, outer, bottom), mode: "fill", width: 0, opacity: 0.12 });
   }
-  if (moons.length > 0) layers.push({ d: moons.join(""), mode: "fill", width: 0, opacity: 1 });
+  if (style !== "linea") layers.push({ d: archPath(focus.x, cy, half, bottom), mode: "fill", width: 0, opacity: 0.17 });
+
+  // A hairline just outside the niche, or a moulding inside it when outside would cut into the name.
+  const widest = focus.r + NAME_CLEARANCE;
+  const narrowest = focus.r + lift + FRAME_CLEARANCE + 2.5 * k;
+  let lines = style === "linea" ? [half, half + gap] : [half + gap];
+  if (lines.at(-1)! > widest) lines = style === "linea" ? lines.map((h) => h - (lines.at(-1)! - widest)) : [half - gap];
+  lines
+    .filter((h) => h >= narrowest)
+    .forEach((h, i) => layers.push({ d: archLine(focus.x, cy, h, bottom), mode: "stroke", width: 0.6 * k, opacity: 0.7 - i * 0.15 }));
   return layers;
 }
 
-/** Contour lines of a hill whose summit is the avatar: every seed is another hill. */
-function relieve({ box, focus, random, k }: MotifContext): PatternLayer[] {
-  const reach = reachOf(box, focus);
-  const spacing = between(random, 7.5, 9) * k;
-  const first = focus.r + 9 * k;
-  const drift = spacing * between(random, 0.12, 0.28);
-  const driftAngle = between(random, 0, TAU);
-  const wobble = spacing * 0.2;
-  const [near, far] = [terrainWave(random), terrainWave(random)];
-  const count = Math.ceil((reach + drift * 40 - first) / spacing);
-
-  const thin: string[] = [];
-  const index: string[] = [];
-  for (let i = 0; i < count; i += 1) {
-    const base = first + i * spacing;
-    const cx = focus.x + Math.cos(driftAngle) * drift * i;
-    const cy = focus.y + Math.sin(driftAngle) * drift * i;
-    const blend = i / count;
-    const steps = Math.min(720, Math.max(72, Math.ceil((TAU * base) / 3.5)));
-    const points: Point[] = [];
-    for (let s = 0; s < steps; s += 1) {
-      const t = (s / steps) * TAU;
-      const r = base + wobble * i * ((1 - blend) * near(t) + blend * far(t));
-      points.push([cx + r * Math.cos(t), cy + r * Math.sin(t)]);
-    }
-    const path = visiblePath(points, box, true);
-    if (!path) continue;
-    // Every fifth line is an "index contour", slightly bolder, like on a real map.
-    (i % 5 === 4 ? index : thin).push(path);
+/** Stream function of a uniform flow past a cylinder of radius `a`. */
+function streamY(x: number, c: number, a: number): number {
+  const sign = c < 0 ? -1 : 1;
+  const target = Math.abs(c);
+  let lo = x * x < a * a ? Math.sqrt(a * a - x * x) : 0;
+  let hi = target + a;
+  for (let i = 0; i < 32; i += 1) {
+    const y = (lo + hi) / 2;
+    const psi = y * (1 - (a * a) / (x * x + y * y || 1e-9));
+    if (psi < target) lo = y;
+    else hi = y;
   }
-  return [
-    { d: thin.join(""), mode: "stroke", width: 0.5 * k, opacity: 0.6 },
-    { d: index.join(""), mode: "stroke", width: 0.95 * k, opacity: 0.75 },
-  ].filter((layer) => layer.d.length > 0) as PatternLayer[];
+  return sign * (lo + hi) / 2;
+}
+
+/** Fine lines that flow in from the edge and part around the portrait, like water past a stone. */
+function corriente({ box, focus, random, k }: MotifContext): PatternLayer[] {
+  const a = focus.r + FRAME_CLEARANCE + between(random, 2, 4) * k;
+  const tilt = between(random, -0.2, 0.2);
+  const spacing = between(random, 5, 6.2) * k;
+  const lanes = intBetween(random, 4, 6);
+  const swell = between(random, 0, 3) * k;
+  const wavelength = between(random, 140, 220) * k;
+  const phase = between(random, 0, TAU);
+  const reach = reachOf(box, focus) + 10;
+  const [cos, sin] = [Math.cos(tilt), Math.sin(tilt)];
+  const paths: string[] = [];
+  for (let j = -lanes; j <= lanes; j += 1) {
+    if (j === 0) continue;
+    const c = (j - Math.sign(j) * 0.5) * spacing;
+    const points: Point[] = [];
+    for (let x = -reach; x <= reach; x += 3) {
+      // The swell dies out near the stone, so it never pushes a line onto the frame.
+      const calm = Math.min(1, Math.max(0, Math.abs(x) / a - 1.5) / 1.5);
+      const y = streamY(x, c, a) + swell * Math.sin((x / wavelength) * TAU + phase) * calm;
+      points.push([focus.x + x * cos - y * sin, focus.y + x * sin + y * cos]);
+    }
+    paths.push(visiblePath(points, box, false, 4));
+  }
+  return [{ d: paths.join(""), mode: "stroke", width: 0.5 * k, opacity: 0.75 }];
+}
+
+/**
+ * Points on a line through `origin` at `angle`: `along` the line, `across`
+ * it (positive to its right). Long fills can then be drawn as plain quads.
+ */
+function lineFrame(origin: Point, angle: number): (along: number, across: number) => Point {
+  const [dx, dy] = [Math.cos(angle), Math.sin(angle)];
+  return (along, across) => [origin[0] + dx * along + dy * across, origin[1] + dy * along - dx * across];
+}
+
+/**
+ * The card folded like a letter: the main crease runs right behind the
+ * portrait, now and then a second one near the edge, and the paper shades
+ * softly away from each fold. No crease ever crosses the name.
+ */
+function pliegue({ box, focus, random, k }: MotifContext): PatternLayer[] {
+  const angle = between(random, 0.36, 0.44) * Math.PI;
+  const sine = Math.sin(angle);
+  // Across-distances are measured along the crease normal (to its right), from the main crease.
+  const origin: Point = [focus.x + focus.r * between(random, -0.3, 0.3), focus.y];
+  const at = lineFrame(origin, angle);
+  const length = reachOf(box, focus) * 2;
+  const band = (from: number, to: number) => polyline([at(-length, from), at(length, from), at(length, to), at(-length, to)], true);
+  const creases = [0];
+  // The second crease clears the photo's frame wherever the main one sits behind it.
+  if (random() < 0.5) creases.push(focus.r * 1.3 + between(random, 10, 16) * k);
+  // Shade towards the name (most cards) or towards the edge.
+  const side = random() < 0.7 ? -1 : 1;
+  const far = (box.width + length) / sine;
+  const fadeOver = focus.r * 3;
+  const steps = 6;
+
+  const layers: PatternLayer[] = [];
+  const panels = side < 0 ? [{ from: 0, to: -far, peak: 0.16 }] : [];
+  creases.forEach((from, i) => {
+    if (side > 0 || i > 0) panels.push({ from, to: creases[i + 1] ?? far, peak: i === 0 ? 0.16 : 0.1 });
+  });
+  for (const { from, to, peak } of panels) {
+    const direction = Math.sign(to - from);
+    const ramp = Math.min(Math.abs(to - from), fadeOver);
+    // A few strips over the ramp (none overlap, so no pixel is blended twice), then one flat tail.
+    for (let i = 0; i < steps; i += 1) {
+      const shade = peak * (1 - 0.7 * (i / steps) ** 0.8);
+      layers.push({ d: band(from + (direction * ramp * i) / steps, from + (direction * ramp * (i + 1)) / steps), mode: "fill", width: 0, opacity: shade });
+    }
+    if (Math.abs(to - from) > ramp) layers.push({ d: band(from + direction * ramp, to), mode: "fill", width: 0, opacity: peak * 0.3 });
+  }
+  const lines = creases.map((across) => polyline([at(-length, across), at(length, across)], false));
+  layers.push({ d: lines.join(""), mode: "stroke", width: 0.55 * k, opacity: 0.5 });
+  return layers;
+}
+
+/**
+ * Late-afternoon light through a window blind: a few slanted slats of light
+ * falling across the portrait, widening with the perspective.
+ */
+function persiana({ box, focus, random, k }: MotifContext): PatternLayer[] {
+  const angle = -between(random, 0.15, 0.22) * Math.PI;
+  const slats = intBetween(random, 5, 7);
+  const slat = between(random, 8, 11) * k;
+  const gap = between(random, 5, 7) * k;
+  const spread = between(random, 0.06, 0.12);
+  const soft = 2 * k;
+  const scales = Array.from({ length: slats }, (_, i) => 1 + spread * (i - (slats - 1) / 2));
+  const total = scales.reduce((sum, scale, i) => sum + slat * scale + (i < slats - 1 ? gap * scale : 0), 0);
+  // The patch of light is centered on the portrait; its near end is slanted like a window jamb.
+  const center: Point = [focus.x + focus.r * between(random, -0.4, 0.2), focus.y + focus.r * between(random, -0.25, 0.25)];
+  const near = -focus.r * between(random, 2.8, 3.4);
+  const jamb = between(random, 0.5, 0.9);
+  const far = reachOf(box, focus) * 2;
+  // Across the slats runs down and to the right, away from the light.
+  const toRight = lineFrame(center, angle);
+  const at = (along: number, across: number) => toRight(along, -across);
+  const slatPath = (from: number, to: number, inset: number) =>
+    polyline([at(near + from * jamb + inset, from), at(far, from), at(far, to), at(near + to * jamb + inset, to)], true);
+
+  const layers: PatternLayer[] = [];
+  let offset = -total / 2;
+  for (const scale of scales) {
+    const width = slat * scale;
+    // Two nested slats: the outer one is the soft penumbra of the light.
+    layers.push({ d: slatPath(offset, offset + width, 0), mode: "fill", width: 0, opacity: 0.08 });
+    layers.push({ d: slatPath(offset + soft, offset + width - soft, soft), mode: "fill", width: 0, opacity: 0.1 });
+    offset += width + gap * scale;
+  }
+  return layers;
 }
 
 /**
@@ -281,41 +377,6 @@ function halo({ focus, random, k }: MotifContext): PatternLayer[] {
       opacity: 0.17,
     };
   });
-}
-
-/** Halftone dots, biggest around the avatar, fading out towards the name. */
-function trama({ box, focus, random, k }: MotifContext): PatternLayer[] {
-  const pitch = between(random, 5.2, 6.4) * k;
-  const angle = (pick(random, [0, 15, 30, 45]) * Math.PI) / 180;
-  const maxDot = pitch * 0.38;
-  // Dot centers stay out of the avatar, its frame and a little air around it.
-  const clear = focus.r + 7 * k + maxDot;
-  const falloff = reachOf(box, focus) * between(random, 0.45, 0.62);
-  const buckets = 9;
-  const dots: string[][] = Array.from({ length: buckets }, () => []);
-
-  const [ux, uy] = [Math.cos(angle), Math.sin(angle)];
-  const cx = box.width / 2;
-  const cy = box.height / 2;
-  const n = Math.ceil(Math.hypot(box.width, box.height) / 2 / pitch) + 1;
-  for (let i = -n; i <= n; i += 1) {
-    for (let j = -n; j <= n; j += 1) {
-      const x = cx + (i * ux - j * uy) * pitch;
-      const y = cy + (i * uy + j * ux) * pitch;
-      if (x < -pitch || x > box.width + pitch || y < -pitch || y > box.height + pitch) continue;
-      const distance = Math.hypot(x - focus.x, y - focus.y);
-      const t = 1 - (distance - clear) / falloff;
-      if (distance < clear || t <= 0) continue;
-      const size = t ** 1.4;
-      if (size * maxDot < 0.3 * k) continue;
-      dots[Math.min(buckets - 1, Math.floor(size * buckets))]!.push(`M${num(x)} ${num(y)}h.01`);
-    }
-  }
-  return dots.flatMap((group, b) =>
-    group.length === 0
-      ? []
-      : [{ d: group.join(""), mode: "stroke" as const, width: (2 * maxDot * (b + 1)) / buckets, opacity: 0.72, cap: "round" as const }],
-  );
 }
 
 /**
@@ -355,28 +416,6 @@ function cinta({ box, focus, random, k }: MotifContext): PatternLayer[] {
   return [{ d: paths.join(""), mode: "stroke", width: 0.45 * k, opacity: 0.75 }];
 }
 
-/** Fine rays leaving the avatar, long and short, like an engraved sun. */
-function rayos({ box, focus, random, k }: MotifContext): PatternLayer[] {
-  const count = pick(random, [48, 56, 64, 72]);
-  const rotation = between(random, 0, TAU / count);
-  const start = focus.r + 9 * k;
-  const reach = reachOf(box, focus) + 4;
-  const long: string[] = [];
-  const short: string[] = [];
-  for (let i = 0; i < count; i += 1) {
-    const a = rotation + (i / count) * TAU;
-    const inner = i % 2 === 0 ? start : start + 10 * k;
-    const [c, s] = [Math.cos(a), Math.sin(a)];
-    (i % 2 === 0 ? long : short).push(
-      `M${num(focus.x + c * inner)} ${num(focus.y + s * inner)}L${num(focus.x + c * reach)} ${num(focus.y + s * reach)}`,
-    );
-  }
-  return [
-    { d: long.join(""), mode: "stroke", width: 0.55 * k, opacity: 0.6 },
-    { d: short.join(""), mode: "stroke", width: 0.4 * k, opacity: 0.45 },
-  ];
-}
-
 /**
  * Motif for a card. `seed` is the card's stored pattern seed, so the artwork
  * stays put while the owner edits their name or links. The monogram is a
@@ -385,18 +424,18 @@ function rayos({ box, focus, random, k }: MotifContext): PatternLayer[] {
 export function patternLayers(kind: PatternKind, seed: number | string, box: PatternBox, focus: PatternFocus): PatternLayer[] {
   const context: MotifContext = { box, focus, random: rng(hashSeed(`${kind}:${seed}`)), k: Math.max(0.75, focus.r / 38) };
   switch (kind) {
-    case "orbitas":
-      return orbitas(context);
-    case "relieve":
-      return relieve(context);
+    case "arco":
+      return arco(context);
+    case "corriente":
+      return corriente(context);
+    case "persiana":
+      return persiana(context);
+    case "pliegue":
+      return pliegue(context);
     case "halo":
       return halo(context);
-    case "trama":
-      return trama(context);
     case "cinta":
       return cinta(context);
-    case "rayos":
-      return rayos(context);
     case "monograma":
     case "liso":
       return [];

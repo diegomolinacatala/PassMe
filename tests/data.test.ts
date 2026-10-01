@@ -41,7 +41,7 @@ function row(overrides: Partial<ProfileRow> = {}): ProfileRow {
     bio: "",
     accent_color: "#ff4a1c",
     detail_color: "#ffe3d1",
-    pattern: "relieve",
+    pattern: "corriente",
     pattern_seed: 123,
     typeface: "cursiva",
     avatar_path: null,
@@ -68,7 +68,7 @@ const input: ValidCardInput = {
   bio: "",
   accentColor: "#FF4A1C",
   detailColor: null,
-  pattern: "trama",
+  pattern: "persiana",
   patternSeed: 77,
   typeface: "moderna",
   avatarPath: null,
@@ -82,10 +82,10 @@ describe("row mapping", () => {
   it("normalizes colors, drops invalid links and hides hidden ones publicly", () => {
     const card = rowToOwnerCard(row({ accent_color: "nonsense" }));
     expect(card.accentColor).toBe("#EF7A4A");
-    expect(card).toMatchObject({ detailColor: "#FFE3D1", pattern: "relieve", patternSeed: 123, typeface: "cursiva" });
+    expect(card).toMatchObject({ detailColor: "#FFE3D1", pattern: "corriente", patternSeed: 123, typeface: "cursiva" });
 
     const odd = rowToOwnerCard(row({ detail_color: "lime", pattern: "tartan", pattern_seed: -4, typeface: "comic" }));
-    expect(odd).toMatchObject({ detailColor: null, pattern: "orbitas", patternSeed: 0, typeface: "clasica" });
+    expect(odd).toMatchObject({ detailColor: null, pattern: "arco", patternSeed: 0, typeface: "clasica" });
     expect(card.links.map((l) => l.id)).toEqual(["l-email-1", "l-phone-1"]);
     expect(toPublicCard(card).links.map((l) => l.id)).toEqual(["l-email-1"]);
   });
@@ -94,7 +94,8 @@ describe("row mapping", () => {
     const legacy = { ...row({ pattern: "ondas" }) } as Partial<ProfileRow>;
     delete legacy.typeface;
     expect(rowToOwnerCard(legacy as ProfileRow)).toMatchObject({ pattern: "cinta", typeface: "clasica" });
-    expect(rowToOwnerCard(row({ pattern: "sello" })).pattern).toBe("orbitas");
+    expect(rowToOwnerCard(row({ pattern: "sello" })).pattern).toBe("arco");
+    expect(rowToOwnerCard(row({ pattern: "rayos" })).pattern).toBe("persiana");
   });
 });
 
@@ -255,7 +256,7 @@ describe("saveOwnerCard", () => {
     // Saved, and the owner is told their new design didn't make it.
     expect(result).toMatchObject({ ok: true, designPending: true });
     const [withDesign, withoutDesign] = queries.filter((q) => first(q) === "update");
-    expect(withDesign!.calls[0]![1][0]).toHaveProperty("pattern", "trama");
+    expect(withDesign!.calls[0]![1][0]).toHaveProperty("pattern", "persiana");
     expect(withoutDesign!.calls[0]![1][0]).not.toHaveProperty("pattern");
     expect(withoutDesign!.calls[0]![1][0]).toHaveProperty("slug", "alex-new");
   });
@@ -275,9 +276,9 @@ describe("saveOwnerCard", () => {
     expect(await saveOwnerCard(client, USER, input)).toMatchObject({ ok: true, designPending: true });
     const payloads = queries.filter((q) => first(q) === "update").map((q) => q.calls[0]![1][0] as Record<string, unknown>);
     expect(payloads).toHaveLength(3);
-    expect(payloads[0]).toMatchObject({ pattern: "trama", typeface: "moderna" });
+    expect(payloads[0]).toMatchObject({ pattern: "persiana", typeface: "moderna" });
     expect(payloads[1]).not.toHaveProperty("typeface");
-    expect(payloads[1]).toHaveProperty("pattern", "trama");
+    expect(payloads[1]).toHaveProperty("pattern", "persiana");
     expect(payloads[2]).not.toHaveProperty("pattern");
     expect(payloads[2]).toMatchObject({ pattern_seed: 77, detail_color: null, slug: "alex-new" });
   });

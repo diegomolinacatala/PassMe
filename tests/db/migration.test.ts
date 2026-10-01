@@ -53,7 +53,7 @@ describe("profiles constraints", () => {
       `select accent_color, detail_color, pattern, pattern_seed, typeface from public.profiles where id = $1`,
       [BOB],
     );
-    expect(rows[0]).toMatchObject({ accent_color: "#EF7A4A", detail_color: null, pattern: "orbitas", typeface: "clasica" });
+    expect(rows[0]).toMatchObject({ accent_color: "#EF7A4A", detail_color: null, pattern: "arco", typeface: "clasica" });
     expect(rows[0]!.pattern_seed).toBeGreaterThanOrEqual(0);
     expect(rows[0]!.pattern_seed).toBeLessThanOrEqual(999999);
   });
@@ -72,7 +72,7 @@ describe("profiles constraints", () => {
       /profiles_typeface/,
     );
     const ok = await db.query(
-      `update public.profiles set detail_color = '#FFE3D1', pattern = 'relieve', pattern_seed = 48213, typeface = 'editorial' where id = $1`,
+      `update public.profiles set detail_color = '#FFE3D1', pattern = 'pliegue', pattern_seed = 48213, typeface = 'editorial' where id = $1`,
       [ALICE],
     );
     expect(ok.affectedRows).toBe(1);
@@ -281,6 +281,7 @@ describe("privileges", () => {
 describe("pass redesign migration", () => {
   it("moves retired motifs to their successors and keeps accepting them during the rollout", async () => {
     const REDESIGN = "20260928180000_pass_redesign.sql";
+    const NEXT = "20260929120000_launch_hardening.sql";
     const old = await createTestDatabase({ before: REDESIGN });
     const users = [ALICE, BOB, "33333333-3333-4333-8333-333333333333", "44444444-4444-4444-8444-444444444444"];
     const patterns = ["sello", "senal", "ondas", "liso"];
@@ -289,7 +290,7 @@ describe("pass redesign migration", () => {
       await old.query(`insert into public.profiles (id, slug, pattern) values ($1, $2, $3)`, [id, `user-${i}`, patterns[i]]);
     }
 
-    await applyMigrations(old, (file) => file >= REDESIGN);
+    await applyMigrations(old, (file) => file >= REDESIGN && file < NEXT);
 
     const { rows } = await old.query<{ slug: string; pattern: string; typeface: string }>(
       `select slug, pattern, typeface from public.profiles order by slug`,
@@ -299,6 +300,42 @@ describe("pass redesign migration", () => {
     // The previous app version still writes "sello" until it's redeployed.
     const legacy = await old.query(`update public.profiles set pattern = 'sello' where id = $1`, [ALICE]);
     expect(legacy.affectedRows).toBe(1);
+    await old.close();
+  }, 60_000);
+});
+
+describe("motif refresh migration", () => {
+  it("keeps cards on their motif, moves older retired ones and starts new cards on arco", async () => {
+    const REFRESH = "20261001120000_motif_refresh.sql";
+    const old = await createTestDatabase({ before: REFRESH });
+    const patterns = ["orbitas", "relieve", "trama", "rayos", "sello", "senal", "ondas", "cinta"];
+    const ids = patterns.map((_, i) => `${String(i + 1).repeat(8)}-0000-4000-8000-000000000000`);
+    for (const [i, pattern] of patterns.entries()) {
+      await old.query(`insert into auth.users (id) values ($1)`, [ids[i]]);
+      await old.query(`insert into public.profiles (id, slug, pattern) values ($1, $2, $3)`, [ids[i], `user-${i}`, pattern]);
+    }
+
+    await applyMigrations(old, (file) => file >= REFRESH);
+
+    const { rows } = await old.query<{ pattern: string }>(`select pattern from public.profiles order by slug`);
+    // The app reads the retired motifs as their successors; the older ones become values both versions know.
+    expect(rows.map((r) => r.pattern)).toEqual(["orbitas", "relieve", "trama", "rayos", "orbitas", "orbitas", "cinta", "cinta"]);
+
+    const fresh = "99999999-0000-4000-8000-000000000000";
+    await old.query(`insert into auth.users (id) values ($1)`, [fresh]);
+    const created = await old.query<{ pattern: string }>(
+      `insert into public.profiles (id, slug) values ($1, 'fresh') returning pattern`,
+      [fresh],
+    );
+    expect(created.rows[0]!.pattern).toBe("arco");
+
+    // New motifs are accepted; the previous app version can still write its own; nothing writes "sello" any more.
+    for (const pattern of ["arco", "corriente", "persiana", "pliegue", "orbitas", "relieve", "trama", "rayos"]) {
+      expect((await old.query(`update public.profiles set pattern = $1 where id = $2`, [pattern, ids[0]])).affectedRows).toBe(1);
+    }
+    await expect(old.query(`update public.profiles set pattern = 'sello' where id = $1`, [ids[0]])).rejects.toThrow(
+      /profiles_pattern_kind/,
+    );
     await old.close();
   }, 60_000);
 });
