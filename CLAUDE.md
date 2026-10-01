@@ -22,7 +22,12 @@
 
 Lo último (01/10/2026, rama `feat/new-motifs` fusionada directamente en `main` a petición de Diego): motivos nuevos. Órbitas, Relieve, Trama y Rayos (a Diego le parecían infantiles) se sustituyen por **Arco** (nuevo por defecto), **Corriente**, **Persiana** y **Pliegue**; Halo, Cinta, Monograma y Liso se quedan. La migración `20261001120000_motif_refresh.sql` ya está aplicada. Las tarjetas con un motivo retirado se leen como su sucesor (órbitas→arco, relieve→corriente, trama→halo, rayos→persiana) y pasan al valor nuevo cuando su dueño vuelve a guardar. Más adelante, una migración de limpieza puede convertirlas todas y quitar los valores retirados del `CHECK`.
 
-**Siguiente paso: «Agendar reunión».** Diego quiere rehacerlo bien. Hoy es solo un tipo de enlace (`booking` en `src/lib/card/links.ts`) a Calendly/Cal.com: una fila más en la página pública, el reverso del pase y la vCard, sin integración ni disponibilidad. Ya se le explicó lo que hay y está pendiente de que diga qué quiere hacer.
+**Siguiente paso: «Agendar reunión».** Diego quiere rehacerlo bien. Hoy es solo un tipo de enlace (`booking` en `src/lib/card/links.ts`) a Calendly/Cal.com: una fila más en la página pública, el reverso del pase y la vCard, sin integración ni disponibilidad. Calendly le parece lioso y con fricción. El 01/10 se le plantearon 5 opciones, y está pendiente de que elija:
+1. Borrador listo por WhatsApp o email que envía quien escanea.
+2. Invitación de calendario que crea quien escanea, con el dueño como invitado.
+3. PassMe de intermediario: quien escanea propone 1–3 horas y el dueño acepta con un toque desde el email, y se envía una invitación `.ics` a los dos (recomendada; reutiliza «Te dejo mi contacto», Resend y los límites).
+4. Huecos que marca el dueño en PassMe, sin conectar su calendario.
+5. Calendario de Google/Outlook conectado, con reserva al instante (necesita la verificación de Google).
 
 ## Pasos manuales para Diego (en orden)
 
