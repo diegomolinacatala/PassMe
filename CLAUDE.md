@@ -16,32 +16,18 @@
   - En esta máquina no hay CLI de `gh`, `vercel` ni `supabase`.
   - El modo automático puede bloquear acciones destructivas de git (p. ej. borrar ramas remotas): déjaselas a Diego.
 
-# Estado actual (29/09/2026, tarde)
+# Estado actual (01/10/2026)
 
-**MVP en producción y funcionando en https://getpassme.com.** Rama nueva sin fusionar: `feat/frictionless-exchange` (ver abajo).
+**MVP en producción en https://getpassme.com, con todo fusionado en `main`** (el último, PR #5: intercambio sin fricción). Ninguna rama tiene trabajo sin fusionar. La monetización está pensada pero **sin implementar** (ver «Monetización»).
 
-## Rama `feat/frictionless-exchange` (pendiente de fusionar)
+## Pasos manuales para Diego (en orden)
 
-Mínima fricción entre dos personas:
-
-- **Login arreglado**: la pantalla del código nunca aparecía (estado inicial mal puesto en el formulario), por eso solo servía el botón del email. Ahora: «¡Código enviado!», 8 casillas con autorrelleno (iOS lo sugiere desde Mail), envío automático al completar, cuenta atrás de 60 s para reenviar, «Cambiar» email, atajo «Abrir Gmail/Outlook…» y, si se entra por el botón del email en otra pestaña, la que esperaba continúa sola.
-- **`/crear`**: la tarjeta primero (vista previa del pase en vivo) y el email + código al final; la tarjeta se crea al verificar el código. El borrador se guarda 1 h en el navegador para que el botón del email o Google lo terminen. `/dashboard` sin tarjeta redirige aquí.
-- **Página pública**: botón «Crea la tuya gratis» arriba y bloque «¿Y tú?» abajo; tras «Te dejo mi contacto», «Crear la mía con estos datos» (prefill).
-- **Bienvenida** (`/dashboard?nueva=1`): tu QR grande para enseñarlo en el momento y el botón de cartera que toca según el móvil.
-- **Botón del email a prueba de antivirus**: `/auth/confirm` ya no inicia sesión al abrirse (Microsoft Defender y similares abren los enlaces y gastaban el código); lleva a `/auth/entrar`, que pide un toque.
-- **Bloqueo del código en dos capas**: 5 intentos por email y dispositivo/IP y 30 por email en total cada 15 min (antes, 5 por email: cualquiera podía bloquear a otra persona). Límites por IP subidos a 10 envíos y 20 comprobaciones cada 10 min, pensando en una sala con la misma Wi-Fi.
-- **Modo demo**: el login se simula (código `00000000`), así que todo el flujo tiene E2E.
-- Nueva plantilla de email (código primero, botón debajo).
-- Revisado con agentes de seguridad y de código; sus hallazgos están corregidos.
-- Tests: 247 unitarios y de base de datos, y 84 E2E.
-
-### Pasos manuales para Diego (en orden)
-
-1. Revisar y fusionar el PR de `feat/frictionless-exchange` (no hay migraciones).
-2. Supabase → *Authentication → Emails → Templates* → **Magic Link** y **Confirm signup**: pegar el HTML nuevo de `supabase/templates/magic-link.html` y poner de asunto `{{ .Token }} es tu código de PassMe`.
+1. Borrar las ramas ya fusionadas (el modo automático no deja hacerlo): en GitHub → *Branches*, borrar `feat/frictionless-exchange`, `feat/launch-ready`, `feat/mvp`, `feat/pass-design` y `feat/pass-redesign`. En local: `git branch -d` con esos mismos nombres.
+2. Si no está hecho: Supabase → *Authentication → Emails → Templates* → **Magic Link** y **Confirm signup**: pegar el HTML de `supabase/templates/magic-link.html` y poner de asunto `{{ .Token }} es tu código de PassMe`.
 3. Probar en el iPhone: `getpassme.com/crear` → rellenar → email → código (debería sugerirse sobre el teclado) → bienvenida con el QR.
-4. (Recomendado) Activar «Continuar con Google» (`docs/SETUP.md` 1.6): el alta más rápida en Android y no gasta emails.
-5. Ojo con el volumen de emails: Supabase está limitado a 60 emails/hora y el plan gratuito de Resend a 100 al día. Un evento con muchas altas seguidas los agotaría; Google (paso 4) o subir de plan en Resend lo evitan.
+4. Google Wallet (paso 6 de `docs/SETUP.md`): probar «Añadir a Google Wallet» desde Android o Chrome con la cuenta de Diego (debe ser *test user* en la Wallet Console) y pulsar **Request publishing access** en la [Google Pay & Wallet Console](https://pay.google.com/business/console). Sin eso, otras personas no pueden guardar el pase en Android, y Google tarda unos días en revisarlo.
+5. (Recomendado) Activar «Continuar con Google» (`docs/SETUP.md` 1.6): el alta más rápida en Android y no gasta emails.
+6. Antes de cualquier evento: Supabase está limitado a 60 emails/hora y el plan gratuito de Resend a 100 al día. Una sala entera dándose de alta los agotaría; Google (paso 5) o subir de plan en Resend lo evitan.
 
 ## Configuración en producción
 
@@ -54,20 +40,25 @@ Mínima fricción entre dos personas:
   - Las 5 migraciones aplicadas (`npm run doctor` las comprueba).
   - Site URL y Redirect URLs apuntan a `https://getpassme.com`.
   - Código de acceso de 8 dígitos que caduca en 600 s.
-  - Plantillas *Magic Link* y *Confirm signup* con el HTML **anterior** (botón primero). La versión nueva, con el código primero, está en la rama (paso manual 2).
+  - Plantillas *Magic Link* y *Confirm signup*: la versión nueva (código primero) está en `supabase/templates/magic-link.html`; pegarla si no se ha hecho (paso manual 2).
   - SMTP propio vía Resend con remitente `PassMe <hola@getpassme.com>` y límite de 60 emails/hora.
 - **Resend**:
   - Dominio `getpassme.com` verificado (DKIM, SPF y MX en `send.`, más DMARC `p=none`; región eu-west-1).
   - Los emails de acceso llegan a la bandeja principal de Gmail.
 - **Apple Wallet**: probado en el iPhone de Diego. Añadir el pase, actualización automática por push y QR hacia `getpassme.com/u/<slug>` funcionan.
-- **Código**:
-  - `main` incluye el rediseño del pase, el endurecimiento de seguridad (límites de peticiones en Postgres, bloqueo del código de acceso atómico, historial de enlaces, métricas validadas, tope de 10 dispositivos por pase, CAPTCHA opcional…), «Te dejo mi contacto» con el panel «Contactos recibidos», y las páginas `/aviso-legal`, `/terminos` y `/privacidad`.
-  - Tests: 202 unitarios y de base de datos, y 70 E2E.
+- **Código en `main`**:
+  - Rediseño del pase, endurecimiento de seguridad (límites de peticiones en Postgres, bloqueo del código de acceso atómico, historial de enlaces, métricas validadas, tope de 10 dispositivos por pase, CAPTCHA opcional…), «Te dejo mi contacto» con el panel «Contactos recibidos», y las páginas `/aviso-legal`, `/terminos` y `/privacidad`.
+  - Intercambio sin fricción (PR #5): `/crear` con la tarjeta primero y el email + código al final; login con 8 casillas, autorrelleno y reenvío a los 60 s; «Crea la tuya gratis» y «Crear la mía con estos datos» en la página pública; bienvenida con el QR grande (`/dashboard?nueva=1`); botón del email a prueba de antivirus (`/auth/confirm` → `/auth/entrar`); bloqueo del código en dos capas (5 intentos por email y dispositivo/IP, 30 por email cada 15 min); login simulado en modo demo (código `00000000`).
+  - Tests: 247 unitarios y de base de datos, y 84 E2E.
 
-## Después de fusionar: Google Wallet (paso 6 de `docs/SETUP.md`)
+## Monetización (decidida como hipótesis, nada implementado)
 
-1. Probar «Añadir a Google Wallet» desde Android o Chrome con la cuenta de Google de Diego, que debe ser *test user* en la Wallet Console.
-2. En la [Google Pay & Wallet Console](https://pay.google.com/business/console), pulsar **Request publishing access**. Sin eso, otras personas no pueden guardar el pase en Android. Google tarda unos días en revisarlo.
+No empezar nada de esto hasta que Diego lo pida.
+
+- **Precios**: tarjeta y pase gratis para siempre (pase, QR, «Guardar contacto», «Te dejo mi contacto»: son el boca a boca). Pro a **4,99 €/mes o 39 €/año**, IVA incluido, con el anual preseleccionado: varias tarjetas, modo evento, analítica completa, exportar contactos recibidos, motivos extra. Más adelante, equipos por asiento. Base: informe de negocio local en `reports/` (fuera del repo).
+- **Pasarela**: Stripe. Si la cuenta tiene acceso, *Managed Payments* (Stripe es el vendedor y gestiona IVA y facturas por un 3,5% extra); si no, Stripe normal con gestoría. Plan técnico: Checkout alojado por Stripe, Customer Portal, webhook que marca el plan en Supabase (migración nueva), comprobación de Pro en el servidor y pagos desactivados en modo demo.
+- **Antes del primer cobro real (Diego)**: gestoría → alta en Hacienda (036, con ROI) y en autónomos (RETA, tarifa plana); añadir a la web las condiciones de contratación (renovación automática, cancelación, desistimiento de 14 días). NIF y dirección solo en las variables `NEXT_PUBLIC_LEGAL_*`, nunca en el repo.
+- **Lanzamiento**: embajadores que vayan a muchos eventos, con Pro gratis y un motivo exclusivo «Fundadores». Idea de producto: atribuir cada alta a la tarjeta desde la que llegó, para saber quién trae gente.
 
 ## Después
 
@@ -77,13 +68,12 @@ Mínima fricción entre dos personas:
   - CAPTCHA con Cloudflare Turnstile (`docs/SETUP.md` 1.7): primero las variables en Vercel y después activarlo en Supabase.
   - Reenvío de `hola@getpassme.com` a Gmail (p. ej. ImprovMX, con un MX en el dominio raíz sin tocar el de `send.`) y luego cambiar `NEXT_PUBLIC_CONTACT_EMAIL` a esa dirección.
   - Añadir la dirección de facturación en Vercel (aviso «Action Required»).
-  - Borrar las ramas ya fusionadas: `feat/mvp`, `feat/pass-design`, `feat/pass-redesign` y `feat/launch-ready`.
 - Backlog de producto, sin empezar:
+  - pagos y plan Pro (ver «Monetización»),
+  - atribución de altas por tarjeta (embajadores),
   - plan de equipos (B2B),
   - modo evento (pase en la pantalla de bloqueo por fecha/lugar),
   - varias tarjetas por persona,
   - inglés,
   - que despublicar desactive los pases,
   - cuota de subidas de fotos por usuario.
-
-  Para monetizar, la hipótesis es tarjeta gratis + Pro barato + equipos por asiento (informe de negocio local, fuera del repo).
