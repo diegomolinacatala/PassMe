@@ -18,16 +18,15 @@
 
 # Estado actual (01/10/2026)
 
-**MVP en producción en https://getpassme.com.** Lo último fusionado en `main` es el PR #5 (intercambio sin fricción). La monetización está pensada pero **sin implementar** (ver «Monetización»).
+**MVP en producción en https://getpassme.com, con todo fusionado en `main`.** Ninguna rama tiene trabajo sin fusionar. La monetización está pensada pero **sin implementar** (ver «Monetización»).
 
-**En curso: rama `feat/new-motifs`, pendiente de PR.** Sustituye Órbitas, Relieve, Trama y Rayos (a Diego le parecían infantiles) por **Arco** (nuevo por defecto), **Corriente**, **Persiana** y **Pliegue**; Halo, Cinta, Monograma y Liso se quedan. Trae la migración `20261001120000_motif_refresh.sql`, que pasa las tarjetas existentes al sucesor más parecido (órbitas→arco, relieve→corriente, trama→halo, rayos→persiana). Siguiente paso exacto: que Diego vea los motivos y, si le convencen, ejecute la migración en Supabase, abra el PR (`https://github.com/diegomolinacatala/PassMe/compare/main...feat/new-motifs?expand=1`) y lo fusione. Sin la migración el código funciona, pero los motivos nuevos no se guardan (el editor lo avisa). La migración no toca las tarjetas existentes: se leen como su sucesor y pasan al valor nuevo cuando su dueño vuelve a guardar.
+Lo último (01/10/2026, rama `feat/new-motifs` fusionada directamente en `main` a petición de Diego): motivos nuevos. Órbitas, Relieve, Trama y Rayos (a Diego le parecían infantiles) se sustituyen por **Arco** (nuevo por defecto), **Corriente**, **Persiana** y **Pliegue**; Halo, Cinta, Monograma y Liso se quedan. La migración `20261001120000_motif_refresh.sql` ya está aplicada. Las tarjetas con un motivo retirado se leen como su sucesor (órbitas→arco, relieve→corriente, trama→halo, rayos→persiana) y pasan al valor nuevo cuando su dueño vuelve a guardar. Más adelante, una migración de limpieza puede convertirlas todas y quitar los valores retirados del `CHECK`.
 
-Además, Diego quiere rehacer bien «Agendar reunión». Hoy es solo un tipo de enlace (`booking` en `src/lib/card/links.ts`) a Calendly/Cal.com, sin integración. Está pendiente de que diga qué quiere hacer.
+**Siguiente paso: «Agendar reunión».** Diego quiere rehacerlo bien. Hoy es solo un tipo de enlace (`booking` en `src/lib/card/links.ts`) a Calendly/Cal.com: una fila más en la página pública, el reverso del pase y la vCard, sin integración ni disponibilidad. Ya se le explicó lo que hay y está pendiente de que diga qué quiere hacer.
 
 ## Pasos manuales para Diego (en orden)
 
-0. Revisar los motivos nuevos en el editor y, si le gustan, ejecutar `supabase/migrations/20261001120000_motif_refresh.sql` en el SQL Editor de Supabase **antes** de fusionar `feat/new-motifs`. Después, volver a guardar su tarjeta (sigue en Cinta, no cambia).
-1. Borrar las ramas ya fusionadas (el modo automático no deja hacerlo): en GitHub → *Branches*, borrar `feat/frictionless-exchange`, `feat/launch-ready`, `feat/mvp`, `feat/pass-design` y `feat/pass-redesign`. En local: `git branch -d` con esos mismos nombres.
+1. Borrar las ramas ya fusionadas (el modo automático no deja hacerlo): en GitHub → *Branches*, borrar `feat/frictionless-exchange`, `feat/launch-ready`, `feat/mvp`, `feat/pass-design`, `feat/pass-redesign` y `feat/new-motifs`. En local: `git branch -d` con esos mismos nombres.
 2. Si no está hecho: Supabase → *Authentication → Emails → Templates* → **Magic Link** y **Confirm signup**: pegar el HTML de `supabase/templates/magic-link.html` y poner de asunto `{{ .Token }} es tu código de PassMe`.
 3. Probar en el iPhone: `getpassme.com/crear` → rellenar → email → código (debería sugerirse sobre el teclado) → bienvenida con el QR.
 4. Google Wallet (paso 6 de `docs/SETUP.md`): probar «Añadir a Google Wallet» desde Android o Chrome con la cuenta de Diego (debe ser *test user* en la Wallet Console) y pulsar **Request publishing access** en la [Google Pay & Wallet Console](https://pay.google.com/business/console). Sin eso, otras personas no pueden guardar el pase en Android, y Google tarda unos días en revisarlo.
@@ -42,7 +41,7 @@ Además, Diego quiere rehacer bien «Agendar reunión». Hoy es solo un tipo de 
   - Variables de producción configuradas: Supabase, Apple, Google, `PASSME_SIGNING_SECRET`, `NEXT_PUBLIC_SITE_URL=https://getpassme.com`, `CRON_SECRET`, `NEXT_PUBLIC_LEGAL_*`, `NEXT_PUBLIC_CONTACT_EMAIL` (`diegomolinacatala+passme@gmail.com`), `RESEND_API_KEY` (clave propia `passme-vercel`) y `PASSME_EMAIL_FROM=PassMe <hola@getpassme.com>`.
   - El cron diario `/api/cron/cleanup` está activo.
 - **Supabase**:
-  - Las 5 primeras migraciones aplicadas (`npm run doctor` las comprueba); la 6.ª, `20261001120000_motif_refresh.sql`, va con `feat/new-motifs`.
+  - Las 6 migraciones aplicadas. `npm run doctor` comprueba las 5 primeras; la 6.ª (`20261001120000_motif_refresh.sql`, solo un `CHECK`) no se puede comprobar desde fuera.
   - Site URL y Redirect URLs apuntan a `https://getpassme.com`.
   - Código de acceso de 8 dígitos que caduca en 600 s.
   - Plantillas *Magic Link* y *Confirm signup*: la versión nueva (código primero) está en `supabase/templates/magic-link.html`; pegarla si no se ha hecho (paso manual 2).
@@ -54,7 +53,8 @@ Además, Diego quiere rehacer bien «Agendar reunión». Hoy es solo un tipo de 
 - **Código en `main`**:
   - Rediseño del pase, endurecimiento de seguridad (límites de peticiones en Postgres, bloqueo del código de acceso atómico, historial de enlaces, métricas validadas, tope de 10 dispositivos por pase, CAPTCHA opcional…), «Te dejo mi contacto» con el panel «Contactos recibidos», y las páginas `/aviso-legal`, `/terminos` y `/privacidad`.
   - Intercambio sin fricción (PR #5): `/crear` con la tarjeta primero y el email + código al final; login con 8 casillas, autorrelleno y reenvío a los 60 s; «Crea la tuya gratis» y «Crear la mía con estos datos» en la página pública; bienvenida con el QR grande (`/dashboard?nueva=1`); botón del email a prueba de antivirus (`/auth/confirm` → `/auth/entrar`); bloqueo del código en dos capas (5 intentos por email y dispositivo/IP, 30 por email cada 15 min); login simulado en modo demo (código `00000000`).
-  - Tests: 247 unitarios y de base de datos, y 84 E2E (250 en `feat/new-motifs`).
+  - Motivos del pase (01/10/2026): Arco, Corriente, Persiana, Pliegue, Halo, Cinta, Monograma y Liso.
+  - Tests: 250 unitarios y de base de datos, y 84 E2E.
 
 ## Monetización (decidida como hipótesis, nada implementado)
 
