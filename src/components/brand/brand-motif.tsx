@@ -20,7 +20,7 @@ interface BrandMotifProps {
  * Decorative brand motif — the same generator as the passes, used as texture
  * behind hero objects and CTAs. Purely presentational.
  */
-export function BrandMotif({ color = BRAND.signal, pattern = "orbitas", seed = 7, size, height = size, className, style }: BrandMotifProps) {
+export function BrandMotif({ color = BRAND.signal, pattern = "corriente", seed = 7, size, height = size, className, style }: BrandMotifProps) {
   const design = resolveDesign({ accentColor: BRAND.paper, detailColor: color, pattern, patternSeed: seed, typeface: DEFAULT_TYPEFACE });
   // Force the chosen ink even when it's close to paper (e.g. on dark sections).
   const ink = { ...design, detail: color };

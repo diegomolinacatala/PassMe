@@ -49,8 +49,6 @@ export function PatternSvg({ design, box, focus, fade, width, height, style, lay
           stroke={layer.mode === "stroke" ? design.detail : "none"}
           strokeWidth={layer.width}
           strokeLinejoin="round"
-          strokeLinecap={layer.cap}
-          strokeDasharray={layer.dash}
           opacity={layer.opacity}
         />
       ))}

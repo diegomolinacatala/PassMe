@@ -2,19 +2,20 @@ import { ImageResponse } from "next/og";
 import { PatternSvg } from "@/components/card/pattern-svg";
 import { BRAND, markSvg } from "@/lib/brand";
 import { DEFAULT_TYPEFACE, resolveDesign } from "@/lib/card/design";
+import { fadesUnderText } from "@/lib/card/pattern";
 import { loadOgFonts, OG_MONO, OG_SIZE, SERIF } from "@/lib/og";
 
 export const alt = "PassMe — tu tarjeta de visita en la cartera del móvil";
 export const size = OG_SIZE;
 export const contentType = "image/png";
 
-/** Site link preview: warm paper, Naranja orbits and the promise. */
+/** Site link preview: warm paper, a Naranja arch and the promise. */
 export default async function Image() {
   const mark = `data:image/svg+xml;base64,${Buffer.from(
     markSvg({ foreground: BRAND.ink, cutout: BRAND.paper, echo: BRAND.signal, size: 96 }),
   ).toString("base64")}`;
   const seal = {
-    ...resolveDesign({ accentColor: BRAND.paper, detailColor: BRAND.signal, pattern: "orbitas", patternSeed: 2026, typeface: DEFAULT_TYPEFACE }),
+    ...resolveDesign({ accentColor: BRAND.paper, detailColor: BRAND.signal, pattern: "arco", patternSeed: 2026, typeface: DEFAULT_TYPEFACE }),
     detail: BRAND.signal,
   };
 
@@ -37,8 +38,8 @@ export default async function Image() {
         <PatternSvg
           design={seal}
           box={{ width: 1200, height: 630 }}
-          focus={{ x: 1010, y: 300, r: 120 }}
-          fade={{ from: 420, to: 940 }}
+          focus={{ x: 1030, y: 300, r: 120 }}
+          fade={fadesUnderText(seal.pattern) ? { from: 420, to: 940 } : undefined}
           width={1200}
           height={630}
           style={{ position: "absolute", left: 0, top: 0 }}

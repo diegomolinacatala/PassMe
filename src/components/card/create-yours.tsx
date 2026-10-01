@@ -40,7 +40,7 @@ export function CreateYoursCta({ slug, ownerName }: { slug: string; ownerName: s
     >
       <BrandMotif
         color={BRAND.glow}
-        pattern="orbitas"
+        pattern="halo"
         size={460}
         seed={20_714}
         className="pointer-events-none absolute -top-44 -right-40 -z-10 opacity-30"

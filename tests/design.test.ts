@@ -1,6 +1,6 @@
 import sharp from "sharp";
 import { describe, expect, it, vi } from "vitest";
-import { editorialLines, monogram } from "@/components/card/pass-art";
+import { editorialLines, HERO_BOX, monogram } from "@/components/card/pass-art";
 import { contrastRatio, parseHex } from "@/lib/card/colors";
 import { DEMO_CARD } from "@/lib/card/demo";
 import {
@@ -30,16 +30,20 @@ import { artVersion, heroImage, stripImages } from "@/lib/pass/art";
 
 const BOX = { width: 375, height: 144 };
 const FOCUS = { x: 301, y: 72, r: 38 };
+const HERO_FOCUS = { x: 187.5, y: 61, r: 21 };
+/** Gap between the photo and its hairline frame in PassArt. */
+const FRAME_GAP = 4.5;
 
-/** Absolute vertices of the path commands the generator emits (M, L, l, h, a, z). */
+/** Absolute vertices of the path commands the generator emits (M, L, V, l, h, a, z). */
 function vertices(d: string): Array<[number, number]> {
   const points: Array<[number, number]> = [];
   let x = 0;
   let y = 0;
-  for (const [, command, args] of d.matchAll(/([MLlhaz])([^MLlhaz]*)/g)) {
+  for (const [, command, args] of d.matchAll(/([MLVlhaz])([^MLVlhaz]*)/g)) {
     const n = (args!.match(/-?(?:\d+\.?\d*|\.\d+)/g) ?? []).map(Number);
     if (command === "M" || command === "L") [x, y] = [n[0]!, n[1]!];
     if (command === "h") x += n[0]!;
+    if (command === "V") y = n[0]!;
     if (command === "a") [x, y] = [x + n[5]!, y + n[6]!];
     if (command === "l") {
       for (let i = 0; i + 1 < n.length; i += 2) {
@@ -86,21 +90,64 @@ describe("patternLayers", () => {
     }
   });
 
-  it("keeps the avatar clear (the ribbon passes behind it on purpose)", () => {
-    for (const kind of ["orbitas", "relieve", "trama", "rayos"] as const) {
-      for (const seed of [1, 2, 3, 48213]) {
-        const nearest = Math.min(
-          ...patternLayers(kind, seed, BOX, FOCUS).flatMap((layer: PatternLayer) =>
-            vertices(layer.d).map(([x, y]) => Math.hypot(x - FOCUS.x, y - FOCUS.y)),
-          ),
-        );
-        expect(nearest, `${kind} #${seed}`).toBeGreaterThan(FOCUS.r);
+  it("keeps lines off the photo's frame (tints and the ribbon pass behind it on purpose)", () => {
+    for (const [box, focus] of [
+      [BOX, FOCUS],
+      [HERO_BOX, HERO_FOCUS],
+    ] as const) {
+      for (const kind of ["arco", "corriente"] as const) {
+        for (let seed = 0; seed < 60; seed += 1) {
+          const nearest = Math.min(
+            ...patternLayers(kind, seed, box, focus)
+              .filter((layer: PatternLayer) => layer.mode === "stroke")
+              .flatMap((layer) => vertices(layer.d).map(([x, y]) => Math.hypot(x - focus.x, y - focus.y))),
+          );
+          expect(nearest, `${kind} #${seed} (r=${focus.r})`).toBeGreaterThan(focus.r + FRAME_GAP + 0.5);
+        }
+      }
+    }
+  });
+
+  it("never draws a hairline through the name", () => {
+    // The name column ends 14 pt short of the photo's frame (see PassArt); it spans y 14…130.
+    const nameEdge = FOCUS.x - FOCUS.r - FRAME_GAP - 14;
+    for (let seed = 0; seed < 60; seed += 1) {
+      for (const [x, y] of patternLayers("arco", seed, BOX, FOCUS)
+        .filter((layer) => layer.mode === "stroke")
+        .flatMap((layer) => vertices(layer.d))) {
+        expect(x, `arco #${seed} at y=${y}`).toBeGreaterThanOrEqual(nameEdge);
+      }
+      const [creases] = patternLayers("pliegue", seed, BOX, FOCUS).filter((layer) => layer.mode === "stroke");
+      const ends = vertices(creases!.d);
+      for (let i = 0; i + 1 < ends.length; i += 2) {
+        const [[x1, y1], [x2, y2]] = [ends[i]!, ends[i + 1]!];
+        for (const y of [14, 130]) {
+          const x = x1 + ((x2 - x1) * (y - y1)) / (y2 - y1);
+          expect(x, `pliegue #${seed} at y=${y}`).toBeGreaterThan(nameEdge);
+        }
+        // Each crease runs right behind the photo or clears its frame.
+        const distance = Math.abs((x2 - x1) * (y1 - FOCUS.y) - (x1 - FOCUS.x) * (y2 - y1)) / Math.hypot(x2 - x1, y2 - y1);
+        expect(distance < FOCUS.r * 0.6 || distance > FOCUS.r + FRAME_GAP + 4, `pliegue #${seed}: ${distance}`).toBe(true);
+      }
+    }
+  });
+
+  it("draws every motif in the Google hero and the large brand boxes", () => {
+    const boxes = [
+      [HERO_BOX, HERO_FOCUS],
+      [{ width: 1100, height: 760 }, { x: 550, y: 380, r: 106.4 }],
+    ] as const;
+    for (const [box, focus] of boxes) {
+      for (const kind of seeded) {
+        const layers = patternLayers(kind, 2026, box, focus);
+        expect(layers.length, kind).toBeGreaterThan(0);
+        for (const layer of layers) expect(layer.d, kind).not.toMatch(/NaN|Infinity/);
       }
     }
   });
 
   it("only draws what can be seen", () => {
-    for (const kind of ["relieve", "cinta"] as const) {
+    for (const kind of ["corriente", "cinta"] as const) {
       for (const [x, y] of patternLayers(kind, 11, BOX, FOCUS).flatMap((layer) => vertices(layer.d))) {
         expect(x, kind).toBeGreaterThan(-60);
         expect(x, kind).toBeLessThan(BOX.width + 60);
@@ -111,16 +158,21 @@ describe("patternLayers", () => {
   });
 
   it("validates kinds, maps retired ones and hashes seeds stably", () => {
-    expect(isPatternKind("orbitas")).toBe(true);
-    expect(isPatternKind("sello")).toBe(false);
-    expect(toPatternKind("relieve")).toBe("relieve");
-    expect(toPatternKind("sello")).toBe("orbitas");
-    expect(toPatternKind("senal")).toBe("orbitas");
+    expect(isPatternKind("arco")).toBe(true);
+    expect(isPatternKind("orbitas")).toBe(false);
+    expect(toPatternKind("corriente")).toBe("corriente");
+    expect(toPatternKind("orbitas")).toBe("arco");
+    expect(toPatternKind("relieve")).toBe("corriente");
+    expect(toPatternKind("trama")).toBe("halo");
+    expect(toPatternKind("rayos")).toBe("persiana");
+    expect(toPatternKind("sello")).toBe("arco");
+    expect(toPatternKind("senal")).toBe("arco");
     expect(toPatternKind("ondas")).toBe("cinta");
     expect(toPatternKind("tartan")).toBeNull();
     expect(toPatternKind(undefined)).toBeNull();
     expect(fadesUnderText("halo")).toBe(false);
-    expect(fadesUnderText("relieve")).toBe(true);
+    for (const kind of ["arco", "persiana", "pliegue", "halo"] as const) expect(fadesUnderText(kind), kind).toBe(false);
+    expect(fadesUnderText("corriente")).toBe(true);
     expect(hashSeed("abc")).toBe(hashSeed("abc"));
     expect(hashSeed("abc")).not.toBe(hashSeed("abd"));
   });
@@ -131,7 +183,7 @@ describe("design model", () => {
     const ids = new Set<string>();
     for (const theme of CARD_THEMES) {
       ids.add(theme.id);
-      const design = resolveDesign(themeDesign(theme.id, "orbitas", 1));
+      const design = resolveDesign(themeDesign(theme.id, "arco", 1));
       expect(design.detail, theme.name).toBe(theme.detail);
       // Soft, pastel pairs: visible (≥ 2:1) but never harsh.
       expect(contrastRatio(parseHex(theme.background)!, parseHex(theme.detail)!), theme.name).toBeGreaterThanOrEqual(2);
@@ -145,7 +197,7 @@ describe("design model", () => {
   });
 
   it("derives a tonal detail for custom backgrounds and replaces invisible picks", () => {
-    const base = themeDesign("naranja", "orbitas", 5);
+    const base = themeDesign("naranja", "arco", 5);
     const auto = resolveDesign({ ...base, accentColor: "#335577", detailColor: null });
     expect(contrastRatio(parseHex(auto.detail)!, parseHex("#335577")!)).toBeGreaterThanOrEqual(3);
 

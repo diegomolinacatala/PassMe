@@ -9,10 +9,10 @@ const base = toPublicCard(DEMO_CARD);
 
 /** Fictional people for the stack, back to front. */
 const STACK: PublicCard[] = [
-  { ...base, ...themeDesign("terracota", "rayos", 730_115, "moderna"), fullName: "Jon Etxeberria", company: "Kobalt", headline: "Sales Lead", location: "Bilbao", avatarUrl: null },
-  { ...base, ...themeDesign("salvia", "relieve", 104_882, "cursiva"), fullName: "Lucía Ferrer", company: "Ferrer Arquitectura", headline: "Arquitecta", location: "Madrid", avatarUrl: null },
+  { ...base, ...themeDesign("terracota", "persiana", 730_115, "moderna"), fullName: "Jon Etxeberria", company: "Kobalt", headline: "Sales Lead", location: "Bilbao", avatarUrl: null },
+  { ...base, ...themeDesign("salvia", "corriente", 104_882, "cursiva"), fullName: "Lucía Ferrer", company: "Ferrer Arquitectura", headline: "Arquitecta", location: "Madrid", avatarUrl: null },
   { ...base, ...themeDesign("cafe", "halo", 311_724, "editorial"), fullName: "Marta Gil", company: "Gil & Asociados", headline: "Abogada", location: "Sevilla", avatarUrl: null },
-  { ...base, ...themeDesign("naranja", "orbitas", 48_213) },
+  { ...base, ...themeDesign("naranja", "arco", 48_213) },
 ];
 
 const SPECS = [
@@ -35,7 +35,7 @@ export function DesignSection() {
             Ninguna tarjeta <em className="text-signal">se parece a la tuya.</em>
           </h2>
           <p className="mt-6 max-w-md text-lg leading-relaxed text-ink-soft">
-            Elige un motivo —órbitas, relieve, trama, tu monograma…—, las tintas y la letra de tu nombre. Cada motivo se
+            Elige un motivo —un arco, la luz de una persiana, tu monograma…—, las tintas y la letra de tu nombre. Cada motivo se
             dibuja solo para ti: tira los dados hasta dar con tu variación.
           </p>
 

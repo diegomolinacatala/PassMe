@@ -7,7 +7,7 @@ import type { PublicCard } from "@/lib/card/types";
  * and the side button that you double-press to bring the wallet up.
  */
 export function PhoneShowcase({ card }: { card: PublicCard }) {
-  const backCard: PublicCard = { ...card, ...themeDesign("cafe", "relieve", 311_724) };
+  const backCard: PublicCard = { ...card, ...themeDesign("cafe", "pliegue", 311_724) };
 
   return (
     <div className="relative mx-auto w-[300px] sm:w-[330px]" aria-label="Ejemplo de tarjeta PassMe en la cartera del móvil">

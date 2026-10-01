@@ -12,7 +12,7 @@
 | --- | --- |
 | **Nombre** | *PassMe* se lee «pásame»: lo que dices cuando alguien te pide el contacto. |
 | **Promesa** | Tu tarjeta de visita, en la cartera del móvil. Siempre al día, tú decides qué se ve. |
-| **Recurso gráfico** | El **motivo**: órbitas, curvas de nivel, rayos… dibujados alrededor de tu foto a partir de una semilla que no se ve. «Otra variación» dibuja otro; nadie más tiene el tuyo. |
+| **Recurso gráfico** | El **motivo**: un arco, líneas que fluyen, la luz de una persiana… dibujados alrededor de tu foto a partir de una semilla que no se ve. «Otra variación» dibuja otro; nadie más tiene el tuyo. |
 | **Personalidad** | Sencilla y cercana, con el cuidado de la buena papelería. Editorial, nunca corporativa. |
 
 ## 2. Paleta
@@ -79,7 +79,7 @@ En Google Wallet el arte va en la imagen *hero* (1032×336 px) **sin el nombre**
 | Ajuste | Opciones | Dónde vive |
 | --- | --- | --- |
 | **Tema** | 10 combinaciones suaves: Naranja, Melocotón, Papel, Arena, Caramelo, Terracota, Café, Tinta, Salvia, Mostaza | `CARD_THEMES` en `src/lib/card/design.ts` |
-| **Motivo** | Órbitas, Relieve, Halo, Trama, Cinta, Rayos, Monograma, Liso | `pattern` · `src/lib/card/pattern.ts` |
+| **Motivo** | Arco, Corriente, Persiana, Pliegue, Halo, Cinta, Monograma, Liso | `pattern` · `src/lib/card/pattern.ts` |
 | **Variación** | «Otra variación» vuelve a dibujar el motivo; «Anterior» lo deshace. La semilla nunca se muestra | `pattern_seed` |
 | **Letra** | Clásica, Cursiva, Editorial (nombre recto y apellidos en cursiva), Moderna (Geist) | `typeface` · `src/lib/card/design.ts` |
 | **Tintas** | Fondo y detalle libres (selector de color), detalle «Auto» | `accent_color`, `detail_color` |
@@ -88,19 +88,20 @@ En Google Wallet el arte va en la imagen *hero* (1032×336 px) **sin el nombre**
 
 | Motivo | Qué dibuja |
 | --- | --- |
-| **Órbitas** | Anillos finos que se abren alrededor de la foto, uno punteado y dos o tres lunas. El motivo por defecto. |
-| **Relieve** | Curvas de nivel de un monte cuya cima es la foto; una de cada cinco, más marcada, como en un mapa. |
+| **Arco** | Un arco de medio punto que enmarca la foto, como un retrato en su hornacina: relleno tono sobre tono, doble o solo de línea. El motivo por defecto. |
+| **Corriente** | Líneas finas que llegan desde el nombre y se abren alrededor de la foto, como el agua al pasar una piedra. |
+| **Persiana** | La luz de la tarde entrando por una persiana: unas lamas inclinadas, con su penumbra, que cruzan detrás de la foto. |
+| **Pliegue** | La tarjeta doblada como una carta: uno o dos pliegues y el papel que se oscurece suavemente junto a cada uno. |
 | **Halo** | Tres discos tintados, descentrados como un eclipse: tono sobre tono. |
-| **Trama** | Puntos de semitono, grandes junto a la foto, que se desvanecen hacia el nombre. |
 | **Cinta** | Una cinta de hilos que pasa bajo el nombre, se retuerce y sube por detrás de la foto. |
-| **Rayos** | Un sol de líneas finas, largas y cortas, que sale de la foto. |
 | **Monograma** | La inicial en cursiva, enorme y cortada por los bordes, como un sello de papelería. |
 | **Liso** | Solo color y el aro de la foto. |
 
 **Reglas del motivo**
 
 - Siempre en la tinta de detalle, con trazos finos (0,4–1 pt) y aire alrededor de la foto; el aro fino de la foto es común a todos.
-- Nunca compite con el nombre: los de líneas y puntos se desvanecen hacia la izquierda; los de tinta plana (Halo, Monograma) son tono sobre tono.
+- Un solo gesto, no un estampado: un arco, una corriente, una luz. Nada que llene la tarjeta de dibujitos.
+- Nunca compite con el nombre: los de líneas (Corriente, Cinta) se desvanecen hacia la izquierda; los de tinta plana (Arco, Persiana, Pliegue, Halo, Monograma) son tono sobre tono.
 - Sin texto decorativo: ni números de serie ni microtexto. Todo lo que se lee en el pase es información.
 
 **Garantías automáticas**: el texto se pone blanco o Café según el fondo (≥ 4,5:1; en los tonos medios en que el Café no llega, negro); las etiquetas usan la tinta de detalle solo si llega a 4,5:1; si el detalle elegido apenas se ve (< 1,6:1) se sustituye por uno tonal automático.
