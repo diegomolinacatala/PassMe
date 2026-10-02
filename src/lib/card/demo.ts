@@ -25,13 +25,13 @@ export const DEMO_CARD: OwnerCard = {
   avatarPath: null,
   isPublished: true,
   acceptsContactRequests: true,
+  acceptsMeetingRequests: true,
   updatedAt: "2026-09-27T00:00:00.000Z",
   links: [
     { id: "demo-email", kind: "email", value: "alex@example.com", visible: true },
     { id: "demo-linkedin", kind: "linkedin", value: "https://www.linkedin.com/in/alex-rivera-demo", visible: true },
     { id: "demo-web", kind: "website", value: "https://example.com", label: "Portfolio", visible: true },
     { id: "demo-instagram", kind: "instagram", value: "estudio.norte", visible: true },
-    { id: "demo-booking", kind: "booking", value: "https://cal.com/alex-demo", visible: true },
     { id: "demo-phone", kind: "phone", value: "+34 600 000 000", visible: false },
   ],
 };

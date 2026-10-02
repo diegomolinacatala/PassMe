@@ -16,6 +16,7 @@ import { ContactsPanel } from "./contacts-panel";
 import { DesignField } from "./design-field";
 import { Section, Switch, TextField } from "./fields";
 import { LinksEditor } from "./links-editor";
+import { MeetingsPanel, type MeetingItem } from "./meetings-panel";
 import { PreviewPanel } from "./preview-panel";
 import { SlugField } from "./slug-field";
 import { StatsPanel } from "./stats-panel";
@@ -33,6 +34,7 @@ interface CardEditorProps {
   initialCard: OwnerCard;
   stats: CardStats;
   contacts: { available: boolean; requests: ContactRequest[] };
+  meetings: { available: boolean; items: MeetingItem[] };
   wallet: WalletAvailability;
   siteUrl: string;
   email: string | null;
@@ -49,7 +51,7 @@ type SaveStatus =
   | { kind: "error"; message: string }
   | { kind: "demo" };
 
-export function CardEditor({ initialCard, stats, contacts, wallet, siteUrl, email, demo, welcome }: CardEditorProps) {
+export function CardEditor({ initialCard, stats, contacts, meetings, wallet, siteUrl, email, demo, welcome }: CardEditorProps) {
   const initialDraft = useMemo(() => draftFromCard(initialCard), [initialCard]);
   const editor = useCardDraft(initialDraft);
   const { draft, dirty } = editor;
@@ -65,6 +67,7 @@ export function CardEditor({ initialCard, stats, contacts, wallet, siteUrl, emai
   const [savedPublished, setSavedPublished] = useState(initialCard.isPublished);
   const [savedName, setSavedName] = useState(initialCard.fullName);
   const [savedAcceptsContacts, setSavedAcceptsContacts] = useState(initialCard.acceptsContactRequests);
+  const [savedAcceptsMeetings, setSavedAcceptsMeetings] = useState(initialCard.acceptsMeetingRequests);
   const [touched, setTouched] = useState<ReadonlySet<string>>(new Set());
   const [submitted, setSubmitted] = useState(false);
   // Server errors belong to the exact draft that was submitted; any edit clears them.
@@ -100,6 +103,7 @@ export function CardEditor({ initialCard, stats, contacts, wallet, siteUrl, emai
         setSavedPublished(result.card.isPublished);
         setSavedName(result.card.fullName);
         setSavedAcceptsContacts(result.card.acceptsContactRequests);
+        setSavedAcceptsMeetings(result.card.acceptsMeetingRequests);
         setServerResult(null);
         setSubmitted(false);
         setStatus(result.designPending ? { kind: "partial" } : { kind: "saved", at: Date.now() });
@@ -272,6 +276,20 @@ export function CardEditor({ initialCard, stats, contacts, wallet, siteUrl, emai
             />
             <div className="mt-6 flex items-start justify-between gap-4 border-t hairline pt-5">
               <div>
+                <p className="text-sm font-medium text-ink-soft">Deja que te propongan reuniones</p>
+                <p className="mt-1 max-w-md text-sm text-muted">
+                  Tu página muestra «Agendar reunión»: quien te escanee propone día y hora, y a ti te llega un email para confirmarla
+                  con un toque. Os enviamos la invitación a los dos.
+                </p>
+              </div>
+              <Switch
+                checked={draft.acceptsMeetingRequests}
+                onChange={editor.setAcceptsMeetingRequests}
+                label="Agendar reunión en tu página"
+              />
+            </div>
+            <div className="mt-5 flex items-start justify-between gap-4 border-t hairline pt-5">
+              <div>
                 <p className="text-sm font-medium text-ink-soft">Deja que te dejen su contacto</p>
                 <p className="mt-1 max-w-md text-sm text-muted">
                   Tu página muestra un formulario para que quien te escanee te deje su nombre, email o teléfono. Lo verás en
@@ -307,6 +325,13 @@ export function CardEditor({ initialCard, stats, contacts, wallet, siteUrl, emai
           </Section>
           <Section
             number="06"
+            title="Reuniones"
+            description={meetings.items.length > 0 ? `${meetings.items.length} en total` : undefined}
+          >
+            <MeetingsPanel items={meetings.items} available={meetings.available} enabled={savedAcceptsMeetings} demo={demo} />
+          </Section>
+          <Section
+            number="07"
             title="Contactos recibidos"
             description={contacts.requests.length > 0 ? `${contacts.requests.length} en total` : undefined}
           >
@@ -317,10 +342,10 @@ export function CardEditor({ initialCard, stats, contacts, wallet, siteUrl, emai
               demo={demo}
             />
           </Section>
-          <Section number="07" title="Actividad">
+          <Section number="08" title="Actividad">
             <StatsPanel stats={stats} links={draft.links} demo={demo} />
           </Section>
-          <Section number="08" title="Cuenta">
+          <Section number="09" title="Cuenta">
             <AccountPanel email={email} demo={demo} />
           </Section>
         </aside>

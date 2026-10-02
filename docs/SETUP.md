@@ -51,6 +51,7 @@ Sin tocar nada, `npm run dev` ya funciona en **modo demo**: landing, tarjeta de 
    4. [`supabase/migrations/20260929120000_launch_hardening.sql`](../supabase/migrations/20260929120000_launch_hardening.sql) — seguridad para el lanzamiento: historial de enlaces (los QR antiguos siguen funcionando y nadie puede quedarse tu enlace viejo), límites de peticiones compartidos, métricas validadas, tope de dispositivos por pase y limpieza de datos caducados.
    5. [`supabase/migrations/20260929130000_contact_requests.sql`](../supabase/migrations/20260929130000_contact_requests.sql) — «Te dejo mi contacto»: quien ve tu tarjeta puede dejarte sus datos.
    6. [`supabase/migrations/20261001120000_motif_refresh.sql`](../supabase/migrations/20261001120000_motif_refresh.sql) — motivos Arco, Corriente, Persiana y Pliegue. `npm run doctor` no puede comprobar esta: si falta, el editor avisa al guardar de que el motivo nuevo no se ha guardado.
+   7. [`supabase/migrations/20261002120000_meeting_requests.sql`](../supabase/migrations/20261002120000_meeting_requests.sql) — «Agendar reunión»: quien ve tu tarjeta te propone horas y tú confirmas desde el email.
 
    Cada una debe terminar con *Success. No rows returned*. Si ya aplicaste las anteriores, ejecuta solo las que falten. Mientras falte alguna la app sigue funcionando con lo que la base de datos ya conoce (lo avisa en los logs, y `npm run doctor` te dice cuál falta).
    - Alternativa con CLI: `npx supabase login && npx supabase init && npx supabase link --project-ref <ref> && npx supabase db push`.
@@ -115,7 +116,7 @@ Sin tocar nada, `npm run dev` ya funciona en **modo demo**: landing, tarjeta de 
    - Host `smtp.resend.com`, puerto `465`, usuario `resend`, contraseña = la API key.
    - Remitente: `PassMe <hola@tu-dominio.com>`.
 4. *Authentication → Rate Limits*: sube el límite de emails por hora (p. ej. 60).
-5. **Avisos de «Te dejo mi contacto»** (opcional): con la misma API key, pon en Vercel `RESEND_API_KEY` y `PASSME_EMAIL_FROM=PassMe <hola@tu-dominio.com>`. Cuando alguien deje su contacto en una tarjeta, su dueño recibe un email.
+5. **Avisos de «Te dejo mi contacto» y «Agendar reunión»**: con la misma API key, pon en Vercel `RESEND_API_KEY` y `PASSME_EMAIL_FROM=PassMe <hola@tu-dominio.com>`. Cuando alguien deje su contacto en una tarjeta, su dueño recibe un email. Las reuniones lo necesitan, y también `PASSME_SIGNING_SECRET`: son los emails con los botones para confirmar y las invitaciones de calendario. Sin cualquiera de las dos, «Agendar reunión» no aparece en las tarjetas. Los emails de reuniones tienen un tope diario propio (`MEETING_EMAIL_DAILY_BUDGET`, 60 por defecto) para que nunca se queden sin cupo los códigos de acceso; si subes de plan en Resend, súbelo también. Con las reuniones activas conviene activar el CAPTCHA (1.7) para frenar a los bots.
 
 ---
 
@@ -180,6 +181,7 @@ Necesitas el **Apple Developer Program** (99 $/año). Si te das de alta como emp
 - [ ] Google Wallet: añadir pase como usuario de prueba
 - [ ] Compartir `/u/<slug>` en WhatsApp muestra la vista previa con tu nombre
 - [ ] Activar «Deja que te dejen su contacto», dejarte uno desde otro móvil y verlo en *Contactos recibidos* (y el email, si configuraste Resend)
+- [ ] Activar «Deja que te propongan reuniones», proponerte dos horas desde otro móvil, confirmar una desde el email y comprobar que a los dos os llega la invitación (Gmail, Apple Calendar u Outlook)
 - [ ] Cambiar tu enlace y comprobar que el antiguo redirige al nuevo
 - [ ] Añadir el pase en el móvil de **otra persona** (Apple: cualquier iPhone; Google: exige *publishing access* aprobado)
 
@@ -200,3 +202,5 @@ Necesitas el **Apple Developer Program** (99 $/año). Si te das de alta como emp
 | La foto no se sube | Migración sin el bucket o políticas | Re-ejecuta la migración; `npm run doctor` |
 | «Completa la verificación anti-spam» al pedir el email | CAPTCHA activo en Supabase pero falta `NEXT_PUBLIC_TURNSTILE_SITE_KEY` en el despliegue | Añade la variable y redespliega, o desactiva el CAPTCHA en Supabase |
 | No aparece «Contactos recibidos» o avisa de un paso pendiente | Falta la migración 20260929130000 | Paso 1.3 |
+| «Reuniones» avisa de un paso pendiente, o el interruptor no se guarda | Falta la migración 20261002120000 | Paso 1.3 |
+| «Agendar reunión» no aparece en la tarjeta | Falta `PASSME_SIGNING_SECRET`, o el interruptor está apagado | Variables en Vercel; editor › Publicación |

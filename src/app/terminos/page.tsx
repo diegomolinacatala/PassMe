@@ -46,6 +46,7 @@ export default function TermsPage() {
       title: "Contactos que recibes",
       body: [
         "Si activas «Te dejo mi contacto», las personas que te dejan sus datos te los confían a ti. Úsalos solo para lo que aceptaron (ponerte en contacto con ellas) y bórralos si te lo piden. Respecto a esos datos, tú eres el responsable y PassMe los guarda en tu nombre.",
+        "Lo mismo con «Agendar reunión»: los datos de quien te propone una reunión son para organizarla. PassMe solo hace de intermediario por email; lo que acordéis y la reunión en sí son cosa vuestra.",
       ],
     },
     {

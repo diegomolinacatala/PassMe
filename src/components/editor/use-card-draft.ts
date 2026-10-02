@@ -23,6 +23,7 @@ export interface CardDraft {
   avatarUrl: string | null;
   isPublished: boolean;
   acceptsContactRequests: boolean;
+  acceptsMeetingRequests: boolean;
   links: CardLink[];
 }
 
@@ -46,6 +47,7 @@ export function draftFromCard(card: OwnerCard): CardDraft {
     avatarUrl: card.avatarUrl,
     isPublished: card.isPublished,
     acceptsContactRequests: card.acceptsContactRequests,
+    acceptsMeetingRequests: card.acceptsMeetingRequests,
     links: card.links,
   };
 }
@@ -68,6 +70,7 @@ export function draftToInput(draft: CardDraft) {
     avatarPath: draft.avatarPath,
     isPublished: draft.isPublished,
     acceptsContactRequests: draft.acceptsContactRequests,
+    acceptsMeetingRequests: draft.acceptsMeetingRequests,
     links: draft.links,
   };
 }
@@ -89,6 +92,7 @@ export function draftToPublicCard(draft: CardDraft): PublicCard {
     avatarUrl: draft.avatarUrl,
     links: draft.links.filter((l) => l.visible && l.value.trim()),
     acceptsContactRequests: draft.acceptsContactRequests,
+    acceptsMeetingRequests: draft.acceptsMeetingRequests,
   };
 }
 
@@ -105,6 +109,7 @@ type Action =
   | { type: "design"; patch: Partial<DesignFields> }
   | { type: "published"; value: boolean }
   | { type: "contactRequests"; value: boolean }
+  | { type: "meetingRequests"; value: boolean }
   | { type: "avatar"; path: string | null; url: string | null }
   | { type: "addLink"; kind: LinkKind; id: string }
   | { type: "updateLink"; id: string; patch: Partial<Omit<CardLink, "id">> }
@@ -128,6 +133,8 @@ function reducer(state: State, action: Action): State {
       return { ...state, draft: { ...draft, isPublished: action.value } };
     case "contactRequests":
       return { ...state, draft: { ...draft, acceptsContactRequests: action.value } };
+    case "meetingRequests":
+      return { ...state, draft: { ...draft, acceptsMeetingRequests: action.value } };
     case "avatar":
       return { ...state, draft: { ...draft, avatarPath: action.path, avatarUrl: action.url } };
     case "addLink":
@@ -172,6 +179,7 @@ export function useCardDraft(initial: CardDraft) {
       setDesign: (patch: Partial<DesignFields>) => dispatch({ type: "design", patch }),
       setPublished: (value: boolean) => dispatch({ type: "published", value }),
       setAcceptsContactRequests: (value: boolean) => dispatch({ type: "contactRequests", value }),
+      setAcceptsMeetingRequests: (value: boolean) => dispatch({ type: "meetingRequests", value }),
       setAvatar: (path: string | null, url: string | null) => dispatch({ type: "avatar", path, url }),
       addLink: (kind: LinkKind) => {
         const id = newLinkId();

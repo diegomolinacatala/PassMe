@@ -159,6 +159,7 @@ export function quickDraftToPublicCard(draft: QuickCardDraft): PublicCard {
     avatarUrl: null,
     links,
     acceptsContactRequests: false,
+    acceptsMeetingRequests: false,
   };
 }
 

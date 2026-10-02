@@ -27,7 +27,7 @@ const MISSING_COLUMN_CODES = new Set(["PGRST204", "42703"]);
 
 type DesignWrite = Pick<
   Database["public"]["Tables"]["profiles"]["Update"],
-  "detail_color" | "pattern" | "pattern_seed" | "typeface" | "accepts_contact_requests"
+  "detail_color" | "pattern" | "pattern_seed" | "typeface" | "accepts_contact_requests" | "accepts_meeting_requests"
 >;
 type DbError = { code?: string; message?: string } | null;
 
@@ -37,12 +37,14 @@ type DbError = { code?: string; message?: string } | null;
  *   20260928180000_pass_redesign.sql    → typeface and the new motifs
  *   20260929130000_contact_requests.sql → accepts_contact_requests
  *   20261001120000_motif_refresh.sql    → the 2026-10 motifs (arco, corriente, persiana, pliegue)
+ *   20261002120000_meeting_requests.sql → accepts_meeting_requests
  */
 function unsupportedDesignFields(error: DbError): ReadonlyArray<keyof DesignWrite> {
   if (!error?.code) return [];
   const message = error.message ?? "";
   if (MISSING_COLUMN_CODES.has(error.code)) {
     if (/accepts_contact_requests/.test(message)) return ["accepts_contact_requests"];
+    if (/accepts_meeting_requests/.test(message)) return ["accepts_meeting_requests"];
     if (/detail_color|pattern/.test(message)) return ["detail_color", "pattern", "pattern_seed", "typeface"];
     if (/typeface/.test(message)) return ["typeface"];
   }
@@ -98,6 +100,7 @@ export function toPublicCard(card: OwnerCard | PublicCard): PublicCard {
     avatarUrl: card.avatarUrl,
     links: card.links.filter((l) => l.visible),
     acceptsContactRequests: card.acceptsContactRequests,
+    acceptsMeetingRequests: card.acceptsMeetingRequests,
   };
 }
 
@@ -139,6 +142,8 @@ export function rowToOwnerCard(row: ProfileRow): OwnerCard {
     links: sanitizeStoredLinks(row.links),
     // Undefined until migration 20260929130000 adds the column.
     acceptsContactRequests: row.accepts_contact_requests === true,
+    // Undefined until migration 20261002120000 adds the column.
+    acceptsMeetingRequests: row.accepts_meeting_requests === true,
     isPublished: row.is_published,
     updatedAt: row.updated_at,
   };
@@ -154,6 +159,7 @@ interface PublicCardJson extends DesignColumns {
   bio?: string;
   avatar_path?: string | null;
   accepts_contact_requests?: boolean;
+  accepts_meeting_requests?: boolean;
   links?: Json;
 }
 
@@ -172,6 +178,7 @@ function jsonToPublicCard(json: PublicCardJson): PublicCard | null {
     // The RPC already strips hidden links; re-validate anyway (defense in depth).
     links: sanitizeStoredLinks(json.links).filter((l) => l.visible),
     acceptsContactRequests: json.accepts_contact_requests === true,
+    acceptsMeetingRequests: json.accepts_meeting_requests === true,
   };
 }
 
@@ -325,6 +332,7 @@ function designColumns(input: ValidCardInput): DesignWrite {
     pattern_seed: input.patternSeed,
     typeface: input.typeface,
     ...(input.acceptsContactRequests === undefined ? {} : { accepts_contact_requests: input.acceptsContactRequests }),
+    ...(input.acceptsMeetingRequests === undefined ? {} : { accepts_meeting_requests: input.acceptsMeetingRequests }),
   };
 }
 

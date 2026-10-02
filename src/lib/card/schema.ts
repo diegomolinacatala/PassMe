@@ -19,7 +19,9 @@ export const LIMITS = {
 } as const;
 
 const LINK_ID_RE = /^[A-Za-z0-9_-]{6,40}$/;
-const CONTROL_CHARS_RE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
+// Control characters, plus the invisible and bidirectional ones that can disguise text
+// (zero-width space, LRM/RLM, embeddings and isolates, BOM). ZWJ/ZWNJ stay: emoji and scripts use them.
+const CONTROL_CHARS_RE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u200B\u200E\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g;
 
 const tooLong = (max: number) => `Máximo ${max} caracteres.`;
 
@@ -70,6 +72,7 @@ export const cardInputSchema = z
     isPublished: z.boolean(),
     // Optional so an editor tab opened before this field existed can still save.
     acceptsContactRequests: z.boolean().optional(),
+    acceptsMeetingRequests: z.boolean().optional(),
     links: z.array(linkSchema).max(MAX_LINKS, `Máximo ${MAX_LINKS} enlaces.`),
   })
   .superRefine((card, ctx) => {

@@ -13,6 +13,11 @@ import type { OwnerCard } from "@/lib/card/types";
 import { getAppleWalletConfig, getConfigStatus, getGoogleWalletConfig } from "@/lib/config.server";
 import { EMPTY_STATS, findOwnerCard, getOwnStats, getPublicCard } from "@/lib/data/cards";
 import { listOwnContactRequests } from "@/lib/data/contact-requests";
+import { listOwnMeetings } from "@/lib/data/meetings";
+import type { MeetingItem } from "@/components/editor/meetings-panel";
+import { meetingPath } from "@/lib/meetings/links";
+import type { Meeting } from "@/lib/meetings/model";
+import { demoOwnerMeetings, toMeetingView } from "@/lib/meetings/view";
 import { getSiteUrl, profileUrl } from "@/lib/env";
 import { detectPlatform } from "@/lib/platform";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
@@ -71,6 +76,16 @@ async function welcomeFor(
   );
 }
 
+function meetingItems(meetings: Meeting[], card: OwnerCard, demo: boolean): MeetingItem[] {
+  const now = new Date();
+  const owner = { id: card.id, name: card.fullName, slug: card.slug, email: null };
+  return meetings.map((meeting) => ({
+    view: toMeetingView(meeting, owner, "owner", now),
+    // The demo's sample proposal has its own page; the others only exist in the panel.
+    href: demo ? (meeting.id === "demo" ? "/reunion/demo/anfitrion" : null) : meetingPath(meeting.id, "owner"),
+  }));
+}
+
 export default async function DashboardPage({ searchParams }: PageProps<"/dashboard">) {
   const query = await searchParams;
   const supabase = await createServerSupabase();
@@ -86,6 +101,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
           initialCard={DEMO_CARD}
           stats={EMPTY_STATS}
           contacts={{ available: true, requests: DEMO_CONTACT_REQUESTS }}
+          meetings={{ available: true, items: meetingItems(demoOwnerMeetings(new Date()), DEMO_CARD, true) }}
           wallet={wallet}
           siteUrl={getSiteUrl()}
           email={null}
@@ -103,7 +119,11 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
   const card = await findOwnerCard(supabase, user.id);
   if (!card?.fullName) redirect("/crear");
 
-  const [stats, contacts] = await Promise.all([getOwnStats(supabase), listOwnContactRequests(supabase)]);
+  const [stats, contacts, meetings] = await Promise.all([
+    getOwnStats(supabase),
+    listOwnContactRequests(supabase),
+    listOwnMeetings(supabase),
+  ]);
   const status = getConfigStatus();
   const wallet = {
     apple: status.appleWallet && status.supabaseSecretKey,
@@ -119,6 +139,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
         initialCard={card}
         stats={stats}
         contacts={contacts}
+        meetings={{ available: meetings.available, items: meetingItems(meetings.meetings, card, false) }}
         wallet={wallet}
         siteUrl={getSiteUrl()}
         email={user.email}

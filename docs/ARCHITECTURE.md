@@ -19,6 +19,11 @@ sequenceDiagram
     Contacto->>Web: Escanea → /u/slug?src=qr
     Web->>DB: get_public_card(slug) — solo enlaces visibles
     Web-->>Contacto: Tarjeta + "Guardar contacto" (vCard)
+    Contacto->>Web: "Agendar reunión" (opcional): 1–3 horas
+    Web->>DB: submit_meeting_request
+    Web-->>Dueño: Email con un botón por hora (enlace firmado)
+    Dueño->>Web: /reunion/id/firma → confirma con un toque
+    Web-->>Contacto: Invitación .ics + Google Calendar (y al dueño)
     Contacto->>Web: "Te dejo mi contacto" (opcional)
     Web->>DB: submit_contact_request → lo ve solo el dueño
     Contacto->>Web: "Crea la tuya" → /crear?de=slug
@@ -55,6 +60,7 @@ erDiagram
     profiles ||--o| wallet_pass_secrets : "token Apple"
     profiles ||--o{ apple_pass_registrations : "dispositivos (máx. 10)"
     profiles ||--o{ contact_requests : "contactos recibidos"
+    profiles ||--o{ meeting_requests : "reuniones"
     profiles ||--o{ profile_slug_history : "enlaces antiguos"
 
     profiles {
@@ -83,6 +89,20 @@ erDiagram
 
 Además: `auth_otp_attempts` (HMAC de los emails que intentan un código, para bloquear fuerza bruta), `rate_limit_buckets` (contadores de límites por hash, tabla *unlogged*) y el bucket público `avatars`.
 
+**Reuniones** (`meeting_requests`). Quien escanea propone 1–3 horas (`slots`, en UTC, más la zona horaria en la que las eligió). La fila guarda de quién es la propuesta vigente (`proposed_by`): responde siempre la otra parte (confirmar una hora, proponer otras o decir que no) y, una vez confirmada, cualquiera puede cancelar. Cada cambio sube `sequence`, que hace a la vez de versión (el `update` solo gana si nadie cambió la reunión entretanto) y de `SEQUENCE` de iCalendar. La lógica es pura (`src/lib/meetings/state.ts`) y está probada sin base de datos. Se borran 90 días después de la última hora propuesta.
+
+```mermaid
+stateDiagram-v2
+    [*] --> pendiente: propone el visitante
+    pendiente --> pendiente: la otra parte propone otras horas
+    pendiente --> confirmada: la otra parte elige una hora
+    pendiente --> rechazada: la otra parte dice que no
+    pendiente --> cancelada: quien propuso la retira
+    confirmada --> cancelada: cualquiera cancela
+    pendiente --> caducada: pasan todas las horas
+    confirmada --> pasada: termina la reunión
+```
+
 **Enlaces antiguos.** Al cambiar el slug, un *trigger* guarda el anterior en `profile_slug_history`: redirige a la tarjeta actual (los QR impresos siguen valiendo) y nadie más puede reclamarlo. Si se borra la cuenta, sus enlaces quedan en cuarentena 90 días. Máximo 10 enlaces antiguos por tarjeta.
 
 **¿Por qué los enlaces son JSONB?** Guardar la tarjeta es una única operación atómica, el orden va implícito y la lectura pública es una fila. La validación estricta vive en la app (`schema.ts`) y la base de datos pone límites de forma (array, ≤ 20).
@@ -97,6 +117,20 @@ Además: `auth_otp_attempts` (HMAC de los emails que intentan un código, para b
 - **Login**: límites por IP, **bloqueo del código persistido** en dos capas: 5 intentos por email y dispositivo (IP) y 30 por email en total cada 15 min, así nadie puede bloquear a otra persona con cuatro códigos falsos (el intento se registra *antes* de comprobar el código, así que no hay carrera) y CAPTCHA opcional (Turnstile). La API de verificación de Supabase también es pública: por eso el código es de 8 dígitos y caduca en 10 min (docs/SETUP.md). Redirecciones `next` limitadas a rutas relativas.
 - **Límites de peticiones** compartidos por todas las instancias (`rate_limit_hit` en Postgres, claves con hash) con respaldo en memoria si la base de datos no responde.
 - **Contactos recibidos**: formulario público con *honeypot*, límites por IP y por tarjeta y CAPTCHA opcional; se inserta con `submit_contact_request` (solo el servidor) y RLS limita la lectura y el borrado al dueño. Exportación CSV con fórmulas neutralizadas.
+- **Reuniones**:
+  - El formulario público tiene las mismas defensas que «Te dejo mi contacto» y se inserta con `submit_meeting_request` (solo el servidor). Cada tarjeta admite como mucho 30 propuestas vigentes sin responder; las caducadas no cuentan y el dueño puede quitarlas.
+  - Cada parte entra con un enlace firmado `/reunion/<id>/<firma>`: un HMAC del id y del lado con `PASSME_SIGNING_SECRET`. No se guarda nada, el dashboard lo regenera y rotar el secreto los anula todos. El enlace no va dentro de las invitaciones de calendario (los calendarios se comparten).
+  - Abrir el enlace no cambia nada; los cambios van por POST (los antivirus de correo abren los enlaces). La página no envía `Referer`.
+  - Cualquiera puede crear una tarjeta y responderse a sí mismo, así que ningún lado es de fiar con la bandeja de otro:
+    - Al email del visitante, que nadie ha verificado, solo llega texto fijo de PassMe con las horas, el formato y un lugar o enlace de vídeo validados. Las notas y el tema se quedan en la página firmada.
+    - Los enlaces de vídeo solo valen de Meet, Zoom, Teams, Whereby, Jitsi o Webex.
+    - Nombres, empresas, lugares y temas no admiten enlaces, dominios ni teléfonos, y se limpian de caracteres invisibles y de control de dirección.
+    - El nombre de una tarjeta que parezca un enlace no llega a esa bandeja.
+  - Límites de envío:
+    - Como mucho 5 correos al día a una misma dirección de visitante y 40 al día a visitantes por dueño.
+    - Un tope diario global (`MEETING_EMAIL_DAILY_BUDGET`, 60 por defecto) para no agotar el plan de Resend, que comparten los códigos de acceso.
+  - El primer email al dueño, el único que un anónimo puede provocar, solo lleva las horas, el formato, el nombre y la empresa. Las notas del visitante le llegan cuando ya ha respondido.
+  - El email del dueño no se revela hasta que confirma. Hay límites por reunión y por conexión, y como mucho 10 rondas de contrapropuestas.
 - **Cabeceras**: CSP con nonce + `strict-dynamic` (todas las páginas se renderizan por petición para poder llevar nonce), HSTS, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`.
 - **Privacidad**: métricas sin IPs ni cookies (una visita por sesión del navegador); los clics solo cuentan si el enlace existe y es visible; los bots/previsualizadores no cuentan; las tarjetas llevan `noindex`. Retención: `cleanup_expired_data()` a diario (Vercel Cron).
 
@@ -156,6 +190,7 @@ Las imágenes se memorizan por versión del arte (colores, motivo, semilla, letr
 | Modo demo sin variables | Se puede enseñar y desarrollar sin credenciales; los tests E2E corren sin secretos. |
 | Rate limit en Postgres | Sin otro proveedor que mantener: una llamada `rate_limit_hit` por petición limitada, compartida entre instancias. Si falla, cae a memoria. |
 | Contactos recibidos opt-in | Privacidad por defecto: el dueño decide si su página muestra el formulario; el visitante da su consentimiento explícito. |
+| Reuniones sin conectar calendarios | El que escanea propone horas concretas (los dos acaban de verse) y el dueño elige con un toque desde el email: sin OAuth ni verificación de Google, y sin la configuración que pide Calendly. La invitación va como `.ics` PUBLISH a los dos (una REQUEST enviada desde una dirección distinta a la del organizador se marca como sospechosa, y algunos calendarios la añadirían sin preguntar) más un enlace a Google Calendar. Conectar Google o Outlook queda para un plan Pro. |
 
 ## Ideas para después del MVP
 

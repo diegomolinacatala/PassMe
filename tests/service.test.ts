@@ -51,6 +51,7 @@ function profile(overrides: Partial<ProfileRow> = {}): ProfileRow {
     links: [{ id: "l-email-1", kind: "email", value: "alex@example.com", visible: true }],
     is_published: true,
     accepts_contact_requests: false,
+    accepts_meeting_requests: false,
     created_at: "2026-09-01T00:00:00Z",
     updated_at: "2026-09-02T00:00:00Z",
     ...overrides,

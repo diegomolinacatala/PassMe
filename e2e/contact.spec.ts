@@ -32,7 +32,7 @@ test.describe("contact exchange", () => {
   test("the owner sees received contacts and the switch in the editor", async ({ page }) => {
     await page.goto("/dashboard");
     await expect(page.getByRole("heading", { name: "Contactos recibidos" })).toBeVisible();
-    await expect(page.getByText("Lucía Martín")).toBeVisible();
+    await expect(page.locator("#contactos").getByText("Lucía Martín")).toBeVisible();
     await expect(page.getByRole("link", { name: "lucia@example.com" })).toHaveAttribute("href", "mailto:lucia@example.com");
     await expect(page.getByRole("switch", { name: "Formulario de contacto en tu página" })).toHaveAttribute("aria-checked", "true");
   });
