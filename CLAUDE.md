@@ -16,7 +16,7 @@
   - En esta máquina no hay CLI de `gh`, `vercel` ni `supabase`.
   - El modo automático puede bloquear acciones destructivas de git (p. ej. borrar ramas remotas): déjaselas a Diego.
 
-# Estado actual (01/10/2026)
+# Estado actual (02/10/2026)
 
 **MVP en producción en https://getpassme.com, con todo fusionado en `main`.** Ninguna rama tiene trabajo sin fusionar. La monetización está pensada pero **sin implementar** (ver «Monetización»).
 
@@ -34,7 +34,7 @@ Lo último (01/10/2026, rama `feat/new-motifs` fusionada directamente en `main` 
 1. Borrar las ramas ya fusionadas (el modo automático no deja hacerlo): en GitHub → *Branches*, borrar `feat/frictionless-exchange`, `feat/launch-ready`, `feat/mvp`, `feat/pass-design`, `feat/pass-redesign` y `feat/new-motifs`. En local: `git branch -d` con esos mismos nombres.
 2. Si no está hecho: Supabase → *Authentication → Emails → Templates* → **Magic Link** y **Confirm signup**: pegar el HTML de `supabase/templates/magic-link.html` y poner de asunto `{{ .Token }} es tu código de PassMe`.
 3. Probar en el iPhone: `getpassme.com/crear` → rellenar → email → código (debería sugerirse sobre el teclado) → bienvenida con el QR.
-4. Google Wallet (paso 6 de `docs/SETUP.md`): probar «Añadir a Google Wallet» desde Android o Chrome con la cuenta de Diego (debe ser *test user* en la Wallet Console) y pulsar **Request publishing access** en la [Google Pay & Wallet Console](https://pay.google.com/business/console). Sin eso, otras personas no pueden guardar el pase en Android, y Google tarda unos días en revisarlo.
+4. Google Wallet: **acceso de publicación solicitado el 02/10/2026** (respuesta en 2–3 días hábiles, por email a `passmecorreo@gmail.com`). El emisor bueno es `3388000000023206663` (negocio `BCR2DN6D5LEJNFCZ`, creado con `passmecorreo@gmail.com`; el otro «PassMe», `…LEPFQCA`/`…23213462`, no lo usa la web). Hasta ahora **nadie ha podido guardar nunca un pase**: «Se ha producido un error. Vuelve a intentarlo.» en Chrome y en Android, tanto con la cuenta de Diego (*test user*) como con la administradora, incluso con un pase mínimo creado antes por la API. La API acepta la clase y el objeto completo de Diego, y la clave de firma es válida, pero `POST /walletobjects/v1/jwt` devuelve `INVALID_ARGUMENT` genérico para cualquier JWT del emisor. Cuando Google apruebe: volver a probar. Si sigue fallando, escribir a soporte desde *Contactar con el equipo* con el ID del emisor y este diagnóstico.
 5. (Recomendado) Activar «Continuar con Google» (`docs/SETUP.md` 1.6): el alta más rápida en Android y no gasta emails.
 6. Antes de cualquier evento: Supabase está limitado a 60 emails/hora y el plan gratuito de Resend a 100 al día. Una sala entera dándose de alta los agotaría; Google (paso 5) o subir de plan en Resend lo evitan.
 
