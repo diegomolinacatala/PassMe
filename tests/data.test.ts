@@ -52,6 +52,7 @@ function row(overrides: Partial<ProfileRow> = {}): ProfileRow {
     ],
     is_published: true,
     accepts_contact_requests: false,
+    accepts_meeting_requests: false,
     created_at: "2026-09-01T00:00:00Z",
     updated_at: "2026-09-02T00:00:00Z",
     ...overrides,
@@ -315,6 +316,22 @@ describe("saveOwnerCard", () => {
     const old = fakeSupabase((q) => (first(q) === "update" ? { data: row() } : { data: row() }));
     await saveOwnerCard(old.client, USER, input);
     expect(old.queries.find((q) => first(q) === "update")!.calls[0]![1][0]).not.toHaveProperty("accepts_contact_requests");
+  });
+
+  it("saves the meeting switch, and drops only it while its migration is pending", async () => {
+    const missing = { message: "Could not find the 'accepts_meeting_requests' column of 'profiles' in the schema cache", code: "PGRST204" };
+    let updates = 0;
+    const { client, queries } = fakeSupabase((q) => {
+      if (first(q) !== "update") return { data: row() };
+      updates += 1;
+      return updates === 1 ? { error: missing } : { data: row() };
+    });
+    const result = await saveOwnerCard(client, USER, { ...input, acceptsContactRequests: true, acceptsMeetingRequests: true });
+    expect(result).toMatchObject({ ok: true, designPending: true });
+    const payloads = queries.filter((q) => first(q) === "update").map((q) => q.calls[0]![1][0] as Record<string, unknown>);
+    expect(payloads[0]).toMatchObject({ accepts_meeting_requests: true, accepts_contact_requests: true });
+    expect(payloads[1]).not.toHaveProperty("accepts_meeting_requests");
+    expect(payloads[1]).toHaveProperty("accepts_contact_requests", true);
   });
 
   it("tells callers whether anything changed", async () => {

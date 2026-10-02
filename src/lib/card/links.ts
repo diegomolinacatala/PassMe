@@ -367,7 +367,8 @@ const DEFS: Record<LinkKind, LinkKindDef> = {
   },
   booking: {
     kind: "booking",
-    label: "Agendar reunión",
+    // "Agendar reunión" is PassMe's own feature now; this is a link to an external booking page.
+    label: "Reservar cita",
     group: "web",
     placeholder: "calendly.com/tu-usuario",
     inputMode: "url",

@@ -87,7 +87,7 @@ export function HowItWorks() {
 const PRIVACY_ROWS: Array<{ kind: LinkKind; label: string; value: string; visible: boolean }> = [
   { kind: "email", label: "Email", value: "alex@estudionorte.com", visible: true },
   { kind: "linkedin", label: "LinkedIn", value: "in/alex-rivera", visible: true },
-  { kind: "booking", label: "Agendar reunión", value: "cal.com/alex", visible: true },
+  { kind: "booking", label: "Reservar cita", value: "cal.com/alex", visible: true },
   { kind: "phone", label: "Teléfono", value: "+34 600 ·· ·· ··", visible: false },
   { kind: "whatsapp", label: "WhatsApp", value: "+34 600 ·· ·· ··", visible: false },
 ];

@@ -37,6 +37,8 @@ export interface CardData {
   links: CardLink[];
   /** Shows the "leave your contact" form on the public card. */
   acceptsContactRequests: boolean;
+  /** Shows "Agendar reunión" on the public card. */
+  acceptsMeetingRequests: boolean;
 }
 
 /** What anonymous visitors receive: only visible links, no internal ids. */

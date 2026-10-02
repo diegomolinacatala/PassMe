@@ -9,6 +9,7 @@ import { parseCardInput, type FieldErrors } from "@/lib/card/schema";
 import type { OwnerCard } from "@/lib/card/types";
 import { isSlugAvailable, saveOwnerCard } from "@/lib/data/cards";
 import { deleteContactRequest } from "@/lib/data/contact-requests";
+import { deleteOwnMeeting } from "@/lib/data/meetings";
 import { createSharedRateLimiter } from "@/lib/data/rate-limits";
 import { log } from "@/lib/log";
 import { HANDOFF_TTL_SECONDS, signHandoffToken } from "@/lib/pass/handoff";
@@ -118,14 +119,29 @@ export async function createHandoffLinkAction(): Promise<HandoffResult> {
   };
 }
 
-export type DeleteContactResult = { ok: true } | { ok: false; error: string };
+export type DeleteResult = { ok: true } | { ok: false; error: string };
 
 /** Removes one contact request (RLS: only the card owner can delete it). */
-export async function deleteContactRequestAction(id: string): Promise<DeleteContactResult> {
+export async function deleteContactRequestAction(id: string): Promise<DeleteResult> {
   const session = await requireUser();
   if (!session) return { ok: false, error: "Tu sesión ha caducado." };
   const deleted = await deleteContactRequest(session.supabase, String(id));
   return deleted ? { ok: true } : { ok: false, error: "No hemos podido borrarlo. Inténtalo de nuevo." };
+}
+
+/** Removes a meeting from the owner's list (RLS: only the card owner can delete it). */
+export async function deleteMeetingAction(id: string): Promise<DeleteResult> {
+  const session = await requireUser();
+  if (!session) return { ok: false, error: "Tu sesión ha caducado." };
+  const result = await deleteOwnMeeting(session.supabase, String(id));
+  if (result.ok) return { ok: true };
+  return {
+    ok: false,
+    error:
+      result.reason === "upcoming"
+        ? "Esta reunión sigue en pie: cancélala desde su página para que la otra persona se entere."
+        : "No hemos podido quitarla. Inténtalo de nuevo.",
+  };
 }
 
 export type DeleteAccountResult = { ok: false; error: string };

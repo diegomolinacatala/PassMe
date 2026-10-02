@@ -19,6 +19,7 @@ cartera, junto a tus tarjetas y billetes.
 - **Pases de cartera**: `.pkpass` firmado para Apple Wallet y pase genérico de Google Wallet, con tu foto, nombre, cargo, empresa y un QR.
 - **Un pase que no se parece a ningún otro**: eliges tema, motivo generativo (arco, corriente, persiana, tu monograma…), su variación y la letra de tu nombre; el editor te enseña tu propia tarjeta en cada opción. El arte se renderiza en el servidor y la vista previa es idéntica al pase real.
 - **Página al escanear** (`/u/tu-nombre`): tarjeta con tus contactos, botón **Guardar contacto** (vCard con foto) y compartir.
+- **Agendar reunión** (opcional): quien escanea tu QR te propone hasta tres horas; te llega un email y confirmas una con un toque (o propones otras, o dices que no). Los dos recibís la invitación de calendario. Sin Calendly ni calendarios conectados.
 - **Te dejo mi contacto** (opcional): quien escanea tu QR puede dejarte su nombre, email o teléfono. Lo ves en el editor, lo exportas a CSV o a Contactos, y te avisamos por email.
 - **Crea la tuya** (`/crear`): quien escanea una tarjeta puede hacerse la suya en un minuto, viendo su pase mientras escribe; el email se pide al final y al terminar tiene su QR listo para enseñarlo.
 - **Enlaces que no se rompen**: si cambias tu enlace, el antiguo sigue llevando a tu tarjeta y nadie puede quedárselo.

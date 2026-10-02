@@ -100,6 +100,10 @@ if (!sbUrl || !sbKey) {
     if (contacts?.ok) ok("Migración 20260929130000 aplicada (contactos recibidos).");
     else fail("Falta la migración 20260929130000_contact_requests.sql.");
 
+    const meetings = await http(`${sbUrl}/rest/v1/meeting_requests?select=id&limit=1`, { headers: adminHeaders });
+    if (meetings?.ok) ok("Migración 20261002120000 aplicada (Agendar reunión).");
+    else fail("Falta la migración 20261002120000_meeting_requests.sql.");
+
     const bucket = await http(`${sbUrl}/storage/v1/bucket/avatars`, { headers: adminHeaders });
     if (bucket?.ok) {
       const info = (await bucket.json()) as { public?: boolean };

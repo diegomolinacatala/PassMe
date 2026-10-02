@@ -6,9 +6,11 @@ import { ContactForm } from "@/components/card/contact-form";
 import { CreateYoursBar, CreateYoursCta } from "@/components/card/create-yours";
 import { ProfileCard } from "@/components/card/profile-card";
 import { ViewTracker } from "@/components/card/profile-actions";
+import { MeetingRequest } from "@/components/meetings/meeting-request";
 import { resolveDesign } from "@/lib/card/design";
 import { getPublicCard, resolveSlugRedirect } from "@/lib/data/cards";
 import { getTurnstileSiteKey } from "@/lib/env";
+import { meetingsAvailable } from "@/lib/meetings/service";
 import { parseVisitSource } from "@/lib/request";
 
 export async function generateMetadata({ params }: PageProps<"/u/[slug]">): Promise<Metadata> {
@@ -40,6 +42,8 @@ export default async function PublicCardPage({ params, searchParams }: PageProps
   }
 
   const { background } = resolveDesign(card);
+  const captchaSiteKey = getTurnstileSiteKey();
+  const takesMeetings = card.acceptsMeetingRequests && meetingsAvailable();
 
   return (
     <main
@@ -51,9 +55,14 @@ export default async function PublicCardPage({ params, searchParams }: PageProps
         <CreateYoursBar slug={card.slug} />
         <ProfileCard card={card} />
 
-        {card.acceptsContactRequests ? (
-          <div className="mt-5">
-            <ContactForm slug={card.slug} ownerName={card.fullName} source={source} captchaSiteKey={getTurnstileSiteKey()} />
+        {takesMeetings || card.acceptsContactRequests ? (
+          <div className="mt-5 space-y-3">
+            {takesMeetings ? (
+              <MeetingRequest slug={card.slug} ownerName={card.fullName} source={source} captchaSiteKey={captchaSiteKey} />
+            ) : null}
+            {card.acceptsContactRequests ? (
+              <ContactForm slug={card.slug} ownerName={card.fullName} source={source} captchaSiteKey={captchaSiteKey} />
+            ) : null}
           </div>
         ) : null}
 

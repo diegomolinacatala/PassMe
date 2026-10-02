@@ -31,6 +31,7 @@ export type Database = {
           links: Json;
           is_published: boolean;
           accepts_contact_requests: boolean;
+          accepts_meeting_requests: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -52,6 +53,7 @@ export type Database = {
           links?: Json;
           is_published?: boolean;
           accepts_contact_requests?: boolean;
+          accepts_meeting_requests?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -73,6 +75,7 @@ export type Database = {
           links?: Json;
           is_published?: boolean;
           accepts_contact_requests?: boolean;
+          accepts_meeting_requests?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -165,6 +168,44 @@ export type Database = {
         };
         Relationships: [];
       };
+      meeting_requests: {
+        Row: {
+          id: string;
+          profile_id: string;
+          status: "pending" | "confirmed" | "declined" | "cancelled";
+          proposed_by: "guest" | "owner";
+          slots: string[];
+          confirmed_start: string | null;
+          duration_minutes: number;
+          format: "in_person" | "video" | "phone";
+          location: string;
+          time_zone: string;
+          topic: string;
+          guest_name: string;
+          guest_email: string;
+          guest_phone: string | null;
+          guest_company: string;
+          response_note: string;
+          closed_by: "guest" | "owner" | null;
+          sequence: number;
+          source: ProfileEventSource;
+          created_at: string;
+          updated_at: string;
+        };
+        // Rows are created by submit_meeting_request() only.
+        Insert: { id?: never };
+        Update: {
+          status?: "pending" | "confirmed" | "declined" | "cancelled";
+          proposed_by?: "guest" | "owner";
+          slots?: string[];
+          confirmed_start?: string | null;
+          location?: string;
+          response_note?: string;
+          closed_by?: "guest" | "owner" | null;
+          sequence?: number;
+        };
+        Relationships: [];
+      };
       apple_pass_registrations: {
         Row: {
           device_library_id: string;
@@ -219,6 +260,23 @@ export type Database = {
         };
         Returns: string | null;
       };
+      submit_meeting_request: {
+        Args: {
+          p_slug: string;
+          p_guest_name: string;
+          p_guest_email: string;
+          p_guest_phone: string | null;
+          p_guest_company: string;
+          p_topic: string;
+          p_format: string;
+          p_location: string;
+          p_duration_minutes: number;
+          p_time_zone: string;
+          p_slots: string[];
+          p_source?: string;
+        };
+        Returns: Json;
+      };
       cleanup_expired_data: { Args: Record<string, never>; Returns: Json };
     };
     Enums: { [_ in never]: never };
@@ -228,3 +286,4 @@ export type Database = {
 
 export type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 export type ContactRequestRow = Database["public"]["Tables"]["contact_requests"]["Row"];
+export type MeetingRequestRow = Database["public"]["Tables"]["meeting_requests"]["Row"];

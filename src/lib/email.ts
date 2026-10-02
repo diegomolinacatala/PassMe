@@ -10,12 +10,21 @@ import { log } from "@/lib/log";
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 const SEND_TIMEOUT_MS = 8_000;
 
+export interface EmailAttachment {
+  filename: string;
+  /** Text content (e.g. an .ics file); sent base64-encoded. */
+  content: string;
+  contentType: string;
+}
+
 export interface EmailMessage {
   to: string;
   subject: string;
-  /** Plain text only: user-provided content never becomes HTML. */
   text: string;
+  /** Built only by src/lib/email-layout.ts, which escapes every value. */
+  html?: string;
   replyTo?: string | null;
+  attachments?: ReadonlyArray<EmailAttachment>;
 }
 
 export function isEmailConfigured(): boolean {
@@ -41,7 +50,17 @@ export async function sendEmail(message: EmailMessage): Promise<boolean> {
         to: [message.to],
         subject: headerSafe(message.subject),
         text: message.text,
+        ...(message.html ? { html: message.html } : {}),
         ...(message.replyTo ? { reply_to: headerSafe(message.replyTo) } : {}),
+        ...(message.attachments?.length
+          ? {
+              attachments: message.attachments.map((a) => ({
+                filename: headerSafe(a.filename),
+                content: Buffer.from(a.content, "utf8").toString("base64"),
+                content_type: headerSafe(a.contentType),
+              })),
+            }
+          : {}),
       }),
       signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
     });
