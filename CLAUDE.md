@@ -18,22 +18,22 @@
 
 # Estado actual (02/10/2026)
 
-**MVP en producción en https://getpassme.com.** La monetización está pensada pero **sin implementar** (ver «Monetización»).
+**MVP en producción en https://getpassme.com, con todo fusionado en `main`.** Ninguna rama tiene trabajo sin fusionar. La monetización está pensada pero **sin implementar** (ver «Monetización»).
 
-**En curso: rama `feat/meetings`, «Agendar reunión» terminado y pendiente de PR.** Es la opción 3 que eligió Diego: PassMe hace de intermediario por email.
+**Lo último (02/10/2026, PR #6 fusionado y en producción): «Agendar reunión».** Es la opción 3 que eligió Diego: PassMe hace de intermediario por email.
 - Quien escanea pulsa «Agendar reunión» en la tarjeta y propone hasta 3 horas en dos pasos (cuándo y cómo, y luego sus datos).
 - Al dueño le llega un email con un botón por hora. Desde un enlace firmado, sin login, confirma con un toque, propone otras horas o dice que no.
 - Los dos reciben la invitación de calendario (`.ics` y enlace a Google Calendar). Cualquiera puede cancelar.
 - En el editor hay un interruptor «Deja que te propongan reuniones» en Publicación y un panel «Reuniones».
 - Se actualizaron la privacidad (`/privacidad#reuniones`) y los términos. El enlace tipo Calendly (`booking`) pasa a llamarse «Reservar cita».
-- Trae la migración `20261002120000_meeting_requests.sql`. Sin ella, el código funciona y el interruptor no se guarda (el editor lo avisa).
+- La migración `20261002120000_meeting_requests.sql` ya está aplicada (`npm run doctor` la comprueba).
 - Pasó revisión de código y de seguridad. Como cualquiera puede crear una tarjeta y responderse a sí mismo:
   - Los emails al visitante (cuya dirección nadie verifica) solo llevan texto fijo.
   - Los enlaces de vídeo solo valen de Meet, Zoom, Teams, Whereby, Jitsi o Webex.
   - Hay topes de 5 correos al día por dirección, 40 por dueño y uno global (`MEETING_EMAIL_DAILY_BUDGET`, 60 por defecto) para no agotar el cupo de Resend que usan los códigos de acceso.
 - Tests: 303 unitarios y de base de datos, y 106 E2E.
 
-Siguiente paso exacto: Diego ejecuta esa migración en Supabase, abre el PR (`https://github.com/diegomolinacatala/PassMe/compare/main...feat/meetings?expand=1`) y lo fusiona. Después activa el interruptor y lo prueba desde otro móvil (checklist en `docs/SETUP.md`).
+**Siguiente paso exacto:** Diego activa «Deja que te propongan reuniones» en su editor (Publicación → interruptor → Guardar). Luego lo prueba desde otro móvil: proponerse dos horas en `getpassme.com/u/<su-slug>`, confirmar una desde el email y comprobar que les llega la invitación a los dos.
 
 Pendiente de valorar más adelante:
 - Un pase de Wallet para cada reunión, que salga en la pantalla de bloqueo ese día.
@@ -43,8 +43,8 @@ Lo último (01/10/2026, rama `feat/new-motifs` fusionada directamente en `main` 
 
 ## Pasos manuales para Diego (en orden)
 
-0. «Agendar reunión»: ejecutar `supabase/migrations/20261002120000_meeting_requests.sql` en el SQL Editor de Supabase, fusionar el PR de `feat/meetings` y activar «Deja que te propongan reuniones» en el editor. Los emails van por Resend: el plan gratuito (100 al día) se comparte con los códigos de acceso, y por eso las reuniones tienen su propio tope diario. Recomendado: activar el CAPTCHA (`docs/SETUP.md` 1.7) para frenar bots.
-1. Borrar las ramas ya fusionadas (el modo automático no deja hacerlo): en GitHub → *Branches*, borrar `feat/frictionless-exchange`, `feat/launch-ready`, `feat/mvp`, `feat/pass-design`, `feat/pass-redesign` y `feat/new-motifs`. En local: `git branch -d` con esos mismos nombres.
+0. «Agendar reunión»: activar «Deja que te propongan reuniones» en el editor y probarlo desde otro móvil. Los emails van por Resend: el plan gratuito (100 al día) se comparte con los códigos de acceso, y por eso las reuniones tienen su propio tope diario. Recomendado: activar el CAPTCHA (`docs/SETUP.md` 1.7) para frenar bots.
+1. Borrar las ramas ya fusionadas (el modo automático no deja hacerlo): en GitHub → *Branches*, borrar `feat/frictionless-exchange`, `feat/launch-ready`, `feat/mvp`, `feat/pass-design`, `feat/pass-redesign`, `feat/new-motifs` y `feat/meetings`. En local: `git branch -d` con esos mismos nombres.
 2. Si no está hecho: Supabase → *Authentication → Emails → Templates* → **Magic Link** y **Confirm signup**: pegar el HTML de `supabase/templates/magic-link.html` y poner de asunto `{{ .Token }} es tu código de PassMe`.
 3. Probar en el iPhone: `getpassme.com/crear` → rellenar → email → código (debería sugerirse sobre el teclado) → bienvenida con el QR.
 4. Google Wallet: **acceso de publicación solicitado el 02/10/2026** (respuesta en 2–3 días hábiles, por email a `passmecorreo@gmail.com`). El emisor bueno es `3388000000023206663` (negocio `BCR2DN6D5LEJNFCZ`, creado con `passmecorreo@gmail.com`; el otro «PassMe», `…LEPFQCA`/`…23213462`, no lo usa la web). Hasta ahora **nadie ha podido guardar nunca un pase**: «Se ha producido un error. Vuelve a intentarlo.» en Chrome y en Android, tanto con la cuenta de Diego (*test user*) como con la administradora, incluso con un pase mínimo creado antes por la API. La API acepta la clase y el objeto completo de Diego, y la clave de firma es válida, pero `POST /walletobjects/v1/jwt` devuelve `INVALID_ARGUMENT` genérico para cualquier JWT del emisor. Cuando Google apruebe: volver a probar. Si sigue fallando, escribir a soporte desde *Contactar con el equipo* con el ID del emisor y este diagnóstico.
@@ -59,7 +59,7 @@ Lo último (01/10/2026, rama `feat/new-motifs` fusionada directamente en `main` 
   - Variables de producción configuradas: Supabase, Apple, Google, `PASSME_SIGNING_SECRET`, `NEXT_PUBLIC_SITE_URL=https://getpassme.com`, `CRON_SECRET`, `NEXT_PUBLIC_LEGAL_*`, `NEXT_PUBLIC_CONTACT_EMAIL` (`diegomolinacatala+passme@gmail.com`), `RESEND_API_KEY` (clave propia `passme-vercel`) y `PASSME_EMAIL_FROM=PassMe <hola@getpassme.com>`.
   - El cron diario `/api/cron/cleanup` está activo.
 - **Supabase**:
-  - Las 6 primeras migraciones aplicadas. `npm run doctor` comprueba las 5 primeras; la 6.ª (`20261001120000_motif_refresh.sql`, solo un `CHECK`) no se puede comprobar desde fuera. La 7.ª (`20261002120000_meeting_requests.sql`) va con `feat/meetings`.
+  - Las 7 migraciones aplicadas. `npm run doctor` las comprueba todas menos la 6.ª (`20261001120000_motif_refresh.sql`, solo un `CHECK`), que no se puede comprobar desde fuera.
   - Site URL y Redirect URLs apuntan a `https://getpassme.com`.
   - Código de acceso de 8 dígitos que caduca en 600 s.
   - Plantillas *Magic Link* y *Confirm signup*: la versión nueva (código primero) está en `supabase/templates/magic-link.html`; pegarla si no se ha hecho (paso manual 2).
@@ -72,7 +72,8 @@ Lo último (01/10/2026, rama `feat/new-motifs` fusionada directamente en `main` 
   - Rediseño del pase, endurecimiento de seguridad (límites de peticiones en Postgres, bloqueo del código de acceso atómico, historial de enlaces, métricas validadas, tope de 10 dispositivos por pase, CAPTCHA opcional…), «Te dejo mi contacto» con el panel «Contactos recibidos», y las páginas `/aviso-legal`, `/terminos` y `/privacidad`.
   - Intercambio sin fricción (PR #5): `/crear` con la tarjeta primero y el email + código al final; login con 8 casillas, autorrelleno y reenvío a los 60 s; «Crea la tuya gratis» y «Crear la mía con estos datos» en la página pública; bienvenida con el QR grande (`/dashboard?nueva=1`); botón del email a prueba de antivirus (`/auth/confirm` → `/auth/entrar`); bloqueo del código en dos capas (5 intentos por email y dispositivo/IP, 30 por email cada 15 min); login simulado en modo demo (código `00000000`).
   - Motivos del pase (01/10/2026): Arco, Corriente, Persiana, Pliegue, Halo, Cinta, Monograma y Liso.
-  - Tests: 250 unitarios y de base de datos, y 84 E2E (303 y 106 en `feat/meetings`).
+  - «Agendar reunión» (PR #6): ver arriba.
+  - Tests: 303 unitarios y de base de datos, y 106 E2E.
 
 ## Monetización (decidida como hipótesis, nada implementado)
 
