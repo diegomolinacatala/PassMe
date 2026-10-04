@@ -80,7 +80,12 @@ Lo último (01/10/2026, rama `feat/new-motifs` fusionada directamente en `main` 
 No empezar nada de esto hasta que Diego lo pida.
 
 - **Precios**: tarjeta y pase gratis para siempre (pase, QR, «Guardar contacto», «Te dejo mi contacto»: son el boca a boca). Pro a **4,99 €/mes o 39 €/año**, IVA incluido, con el anual preseleccionado: varias tarjetas, modo evento, analítica completa, exportar contactos recibidos, motivos extra. Más adelante, equipos por asiento. Base: informe de negocio local en `reports/` (fuera del repo).
-- **Pasarela**: Stripe. Si la cuenta tiene acceso, *Managed Payments* (Stripe es el vendedor y gestiona IVA y facturas por un 3,5% extra); si no, Stripe normal con gestoría. Plan técnico: Checkout alojado por Stripe, Customer Portal, webhook que marca el plan en Supabase (migración nueva), comprobación de Pro en el servidor y pagos desactivados en modo demo.
+- **Pasarela**: Stripe *Managed Payments*. Comprobado el 04/10/2026: está disponible para negocios en España. Stripe (vía Link) es el vendedor y se encarga del IVA, las facturas, el fraude y las disputas. Cuesta un 3,5% más, sumado al 1,5% + 0,25 € por tarjeta y al 0,7% de Billing. Neto aproximado por suscriptor español, quitando IVA y comisiones: 3,59 €/mes o 29,76 €/año. Solo funciona con Checkout alojado o Payment Links (sin Elements ni dominio propio en el pago). Plan técnico: Checkout, Customer Portal, webhook que marca el plan en Supabase (migración nueva), comprobación de Pro en el servidor y pagos desactivados en modo demo.
+- **Forma jurídica** (recomendación del 04/10/2026, pendiente de que Diego decida):
+  - Autónomo persona física, no SL. La SL compensa a partir de unos 40–50 k€ de beneficio al año, o si hay socios o inversores.
+  - Darse de alta solo cuando haya demanda validada. La tarifa plana (80 €/mes) solo se puede usar una vez cada 3 años. Además, el Supremo (febrero de 2026) aclaró que ganar menos del SMI no exime del RETA.
+  - Primer año: unos 1.400–1.700 € entre cuota y gestoría, lo que se cubre con unos 40–50 suscriptores Pro.
+  - Una sola alta en RETA cubre todas las actividades de una persona.
 - **Antes del primer cobro real (Diego)**: gestoría → alta en Hacienda (036, con ROI) y en autónomos (RETA, tarifa plana); añadir a la web las condiciones de contratación (renovación automática, cancelación, desistimiento de 14 días). NIF y dirección solo en las variables `NEXT_PUBLIC_LEGAL_*`, nunca en el repo.
 - **Lanzamiento**: embajadores que vayan a muchos eventos, con Pro gratis y un motivo exclusivo «Fundadores». Idea de producto: atribuir cada alta a la tarjeta desde la que llegó, para saber quién trae gente.
 
