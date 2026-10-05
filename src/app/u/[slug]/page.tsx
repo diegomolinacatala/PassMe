@@ -3,15 +3,31 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Mark } from "@/components/brand/logo";
 import { ContactForm } from "@/components/card/contact-form";
-import { CreateYoursBar, CreateYoursCta } from "@/components/card/create-yours";
+import { CreateYoursBar, CreateYoursCta, OwnCardNote } from "@/components/card/create-yours";
 import { ProfileCard } from "@/components/card/profile-card";
 import { ViewTracker } from "@/components/card/profile-actions";
 import { MeetingRequest } from "@/components/meetings/meeting-request";
 import { resolveDesign } from "@/lib/card/design";
-import { getPublicCard, resolveSlugRedirect } from "@/lib/data/cards";
+import { findOwnerCard, getPublicCard, resolveSlugRedirect } from "@/lib/data/cards";
 import { getTurnstileSiteKey } from "@/lib/env";
 import { meetingsAvailable } from "@/lib/meetings/service";
 import { parseVisitSource } from "@/lib/request";
+import { createServerSupabase, getSessionUser, hasSessionCookie } from "@/lib/supabase/server";
+
+type Viewer = "owner" | "signed-in" | "anonymous";
+
+/**
+ * Who's looking: the card's owner gets "Editar" instead of "Crear la mía".
+ * Only checked when there's a session cookie, so visitors cost nothing extra.
+ */
+async function viewerOf(slug: string): Promise<Viewer> {
+  if (!(await hasSessionCookie())) return "anonymous";
+  const supabase = await createServerSupabase();
+  const user = supabase ? await getSessionUser(supabase) : null;
+  if (!supabase || !user) return "anonymous";
+  const own = await findOwnerCard(supabase, user.id);
+  return own?.slug === slug ? "owner" : "signed-in";
+}
 
 export async function generateMetadata({ params }: PageProps<"/u/[slug]">): Promise<Metadata> {
   const { slug } = await params;
@@ -44,6 +60,7 @@ export default async function PublicCardPage({ params, searchParams }: PageProps
   const { background } = resolveDesign(card);
   const captchaSiteKey = getTurnstileSiteKey();
   const takesMeetings = card.acceptsMeetingRequests && meetingsAvailable();
+  const viewer = await viewerOf(card.slug);
 
   return (
     <main
@@ -52,7 +69,7 @@ export default async function PublicCardPage({ params, searchParams }: PageProps
       style={{ backgroundImage: `radial-gradient(60rem 28rem at 50% -6rem, ${background}33, transparent 70%)` }}
     >
       <div className="mx-auto w-full max-w-[440px] animate-rise">
-        <CreateYoursBar slug={card.slug} />
+        <CreateYoursBar slug={card.slug} via={source} isOwner={viewer === "owner"} />
         <ProfileCard card={card} source={source} />
 
         {takesMeetings || card.acceptsContactRequests ? (
@@ -66,9 +83,9 @@ export default async function PublicCardPage({ params, searchParams }: PageProps
           </div>
         ) : null}
 
-        <CreateYoursCta slug={card.slug} ownerName={card.fullName} />
+        {viewer === "owner" ? <OwnCardNote /> : <CreateYoursCta slug={card.slug} via={source} ownerName={card.fullName} />}
 
-        <footer className="mt-8 flex justify-center">
+        <footer className="mt-8 flex flex-col items-center gap-1">
           <Link
             href="/"
             className="group inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm text-muted transition-colors hover:text-ink"
@@ -78,6 +95,14 @@ export default async function PublicCardPage({ params, searchParams }: PageProps
               Hecho con <span className="font-display text-base text-ink italic">PassMe</span>
             </span>
           </Link>
+          {viewer === "anonymous" ? (
+            <p className="text-sm text-muted">
+              ¿Es tu tarjeta?{" "}
+              <Link href="/login?next=/dashboard" className="inline-flex min-h-11 items-center font-medium text-ink underline underline-offset-4 hover:text-signal-deep">
+                Entrar
+              </Link>
+            </p>
+          ) : null}
         </footer>
       </div>
       <ViewTracker slug={card.slug} source={source} />

@@ -28,7 +28,7 @@ export function AccountPanel({ email, demo, hasContacts }: AccountPanelProps) {
   }
 
   return (
-    <div className="space-y-4 text-sm">
+    <div id="cuenta" className="scroll-mt-6 space-y-4 text-sm">
       {email ? (
         <p className="text-muted">
           Sesión iniciada como <span className="font-medium text-ink">{email}</span>
@@ -36,11 +36,20 @@ export function AccountPanel({ email, demo, hasContacts }: AccountPanelProps) {
       ) : null}
 
       {!demo ? (
-        <form action="/auth/signout" method="post">
-          <Button type="submit" variant="outline" size="sm">
-            <LogOut className="size-4" aria-hidden /> Cerrar sesión
-          </Button>
-        </form>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <form action="/auth/signout" method="post">
+            <Button type="submit" variant="outline" size="sm" className="h-11 px-4">
+              <LogOut className="size-4" aria-hidden /> Cerrar sesión
+            </Button>
+          </form>
+          {/* Lost phone, shared computer: every session ends, not only this one. */}
+          <form action="/auth/signout" method="post">
+            <input type="hidden" name="scope" value="global" />
+            <button type="submit" className="min-h-11 text-ink-soft underline underline-offset-4 hover:text-ink">
+              Cerrar sesión en todos mis dispositivos
+            </button>
+          </form>
+        </div>
       ) : null}
 
       <div className="rounded-2xl border border-danger/25 p-4">

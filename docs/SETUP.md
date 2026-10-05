@@ -160,7 +160,8 @@ Necesitas el **Apple Developer Program** (99 $/año). Si te das de alta como emp
 6. `npm run doctor` → *Google Wallet* en ✔ (hace un intercambio de token real con Google).
 7. **Modo prueba**: hasta que Google apruebe tu cuenta de emisor solo pueden guardar pases los usuarios de prueba. En la Wallet Console añade tu cuenta de Google como *test user*. Prueba con `https://TU-URL/api/pass/google?demo=1` desde Android o Chrome.
 8. **Publicar** (imprescindible para que otras personas puedan guardar el pase): cuando todo funcione, *Request publishing access* en la Wallet Console. Google revisa el diseño de la clase y tarda unos días; hasta entonces solo funciona con los *test users*.
-9. **Imagen del pase**: el arte de cada tarjeta (el motivo alrededor de la marca) se sirve desde `/u/<slug>/hero`, así que `NEXT_PUBLIC_SITE_URL` debe ser una URL pública para que Google pueda descargarla. Si algún día cambias las filas de la plantilla de la clase (`buildGenericClass`), sube la versión en `GOOGLE_WALLET_CLASS_SUFFIX` (`passme_card_v2`…): Google no actualiza una clase ya creada desde el JWT.
+9. **Mostrar el botón** (`GOOGLE_WALLET_LIVE`): mientras Google no apruebe el emisor, el botón «Añadir a Google Wallet» está oculto en toda la web (editor, bienvenida, `/wallet` y landing) y en Android se ofrece «Guardar mi QR en el móvil». La ruta `/api/pass/google` sigue funcionando para que puedas probarla a mano. Cuando un pase se guarde bien en un móvil Android real, pon `GOOGLE_WALLET_LIVE=true` en Vercel (*Settings → Environment Variables*, Production) y redespliega. `npm run doctor` dice si está encendido.
+10. **Imagen del pase**: el arte de cada tarjeta (el motivo alrededor de la marca) se sirve desde `/u/<slug>/hero`, así que `NEXT_PUBLIC_SITE_URL` debe ser una URL pública para que Google pueda descargarla. Si algún día cambias las filas de la plantilla de la clase (`buildGenericClass`), sube la versión en `GOOGLE_WALLET_CLASS_SUFFIX` (`passme_card_v2`…): Google no actualiza una clase ya creada desde el JWT.
 
 ---
 
@@ -178,7 +179,7 @@ Necesitas el **Apple Developer Program** (99 $/año). Si te das de alta como emp
 - [ ] Guardar tarjeta, subir foto, ocultar un contacto → no aparece en `/u/<slug>`
 - [ ] *Guardar contacto* abre la ficha nativa en iPhone y Android
 - [ ] Apple Wallet: añadir pase, editar el cargo, ver que se actualiza
-- [ ] Google Wallet: añadir pase como usuario de prueba
+- [ ] Google Wallet: añadir pase como usuario de prueba (`/api/pass/google`) y, cuando funcione, `GOOGLE_WALLET_LIVE=true`
 - [ ] Compartir `/u/<slug>` en WhatsApp muestra la vista previa con tu nombre
 - [ ] Activar «Deja que te dejen su contacto», dejarte uno desde otro móvil y verlo en *Contactos recibidos* (y el email, si configuraste Resend)
 - [ ] Activar «Deja que te propongan reuniones», proponerte dos horas desde otro móvil, confirmar una desde el email y comprobar que a los dos os llega la invitación (Gmail, Apple Calendar u Outlook)

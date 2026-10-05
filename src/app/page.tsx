@@ -7,7 +7,9 @@ import { SiteFooter } from "@/components/landing/site-footer";
 import { SiteHeader } from "@/components/landing/site-header";
 import { LinkButton } from "@/components/ui/button";
 import { DEMO_CARD } from "@/lib/card/demo";
+import { isGoogleWalletLive } from "@/lib/config.server";
 import { toPublicCard } from "@/lib/data/cards";
+import { hasSessionCookie } from "@/lib/supabase/server";
 
 export default async function HomePage({ searchParams }: PageProps<"/">) {
   // The card first, the email at the end (demo mode simulates the code).
@@ -15,10 +17,14 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
   const demo = toPublicCard(DEMO_CARD);
   // deleteAccountAction lands here after erasing everything.
   const accountDeleted = (await searchParams).cuenta === "borrada";
+  // Google Wallet isn't promised until people can actually add the pass (GOOGLE_WALLET_LIVE).
+  const googleWallet = isGoogleWalletLive();
+  // A cookie check, no network call: enough to choose "Mi tarjeta" over "Entrar".
+  const signedIn = !accountDeleted && (await hasSessionCookie());
 
   return (
     <>
-      <SiteHeader ctaHref={ctaHref} />
+      <SiteHeader ctaHref={ctaHref} signedIn={signedIn} />
       <main>
         {accountDeleted ? (
           <div className="mx-auto max-w-[1240px] px-5 sm:px-8">
@@ -33,7 +39,7 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
             <div className="animate-rise lg:col-span-7">
               <p className="eyebrow flex items-center gap-2">
                 <span className="inline-block size-1.5 rounded-full bg-signal" aria-hidden="true" />
-                Pásame tu contacto · Apple Wallet &amp; Google Wallet
+                {googleWallet ? "Pásame tu contacto · Apple Wallet & Google Wallet" : "Pásame tu contacto · Apple Wallet y QR"}
               </p>
               <h1
                 id="hero-title"
@@ -78,19 +84,19 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
                 seed={48213}
                 className="pointer-events-none absolute top-1/2 left-1/2 -z-10 -translate-x-1/2 -translate-y-1/2 opacity-45"
               />
-              <PhoneShowcase card={demo} />
+              <PhoneShowcase card={demo} googleWallet={googleWallet} />
             </div>
           </div>
         </section>
 
         <ContactMarquee />
-        <HowItWorks />
+        <HowItWorks googleWallet={googleWallet} />
         <DesignSection />
         <PrivacySection />
-        <AlwaysUpdated card={demo} />
-        <FinalCta ctaHref={ctaHref} />
+        <AlwaysUpdated card={demo} googleWallet={googleWallet} />
+        <FinalCta ctaHref={ctaHref} googleWallet={googleWallet} />
       </main>
-      <SiteFooter />
+      <SiteFooter googleWallet={googleWallet} />
     </>
   );
 }

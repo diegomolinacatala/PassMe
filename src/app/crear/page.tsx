@@ -5,21 +5,27 @@ import { redirect } from "next/navigation";
 import { Logo } from "@/components/brand/logo";
 import { CreateFlow, type CreateMode, type Referrer } from "@/components/create/create-flow";
 import { randomPatternSeed } from "@/lib/card/design";
-import { parseFromSlug } from "@/lib/card/quick";
+import { parseFromSlug, parseVia } from "@/lib/card/quick";
+import { isGoogleWalletLive } from "@/lib/config.server";
 import { findOwnerCard, getPublicCard } from "@/lib/data/cards";
 import { getTurnstileSiteKey, isGoogleAuthEnabled } from "@/lib/env";
 import { detectPlatform } from "@/lib/platform";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
 
-export const metadata: Metadata = {
-  title: "Crea tu tarjeta",
-  description: "Tu tarjeta de visita en Apple Wallet y Google Wallet en un minuto. Gratis y sin instalar nada.",
-  alternates: { canonical: "/crear" },
-};
+export function generateMetadata(): Metadata {
+  return {
+    title: "Crea tu tarjeta",
+    description: isGoogleWalletLive()
+      ? "Tu tarjeta de visita en Apple Wallet y Google Wallet en un minuto. Gratis y sin instalar nada."
+      : "Tu tarjeta de visita en la cartera del móvil en un minuto. Gratis y sin instalar nada.",
+    alternates: { canonical: "/crear" },
+  };
+}
 
 export default async function CreateCardPage({ searchParams }: PageProps<"/crear">) {
   const query = await searchParams;
   const from = parseFromSlug(query.de);
+  const via = from ? parseVia(query.via) : "direct";
 
   const supabase = await createServerSupabase();
   const user = supabase ? await getSessionUser(supabase) : null;
@@ -58,6 +64,7 @@ export default async function CreateCardPage({ searchParams }: PageProps<"/crear
         <CreateFlow
           mode={mode}
           from={card ? card.slug : from}
+          via={via}
           referrer={referrer}
           initialSeed={randomPatternSeed()}
           accountEmail={user?.email ?? null}

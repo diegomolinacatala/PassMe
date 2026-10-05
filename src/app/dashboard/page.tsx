@@ -1,45 +1,29 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { SignedInBeacon } from "@/components/auth/session-sync";
-import { Logo } from "@/components/brand/logo";
+import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { CardEditor } from "@/components/editor/card-editor";
 import { WelcomePanel } from "@/components/editor/welcome-panel";
 import type { WalletAvailability } from "@/components/editor/wallet-panel";
 import { DEMO_CARD, DEMO_CONTACT_REQUESTS } from "@/lib/card/demo";
-import { parseFromSlug } from "@/lib/card/quick";
+import { parseFromSlug, parseVia } from "@/lib/card/quick";
+import { canSendCard, sendCardDetails, sentDetailsSentence } from "@/lib/card/send-card";
 import type { OwnerCard } from "@/lib/card/types";
-import { getAppleWalletConfig, getConfigStatus, getGoogleWalletConfig } from "@/lib/config.server";
+import { getAppleWalletConfig, getConfigStatus, getGoogleWalletConfig, isGoogleWalletLive } from "@/lib/config.server";
 import { EMPTY_STATS, findOwnerCard, getOwnStats, getPublicCard } from "@/lib/data/cards";
 import { listOwnContactRequests } from "@/lib/data/contact-requests";
 import { listOwnMeetings } from "@/lib/data/meetings";
 import type { MeetingItem } from "@/components/editor/meetings-panel";
 import { meetingPath } from "@/lib/meetings/links";
+import { CONTACTS_SEEN_COOKIE, parseSeenCookie } from "@/lib/pending";
 import type { Meeting } from "@/lib/meetings/model";
 import { demoOwnerMeetings, isDemoMeetingId, toMeetingView } from "@/lib/meetings/view";
 import { getSiteUrl, profileUrl } from "@/lib/env";
-import { detectPlatform } from "@/lib/platform";
+import { detectPlatform, type Platform } from "@/lib/platform";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Mi tarjeta", robots: { index: false } };
-
-function DashboardHeader({ slug }: { slug: string }) {
-  return (
-    <header className="border-b hairline">
-      <div className="mx-auto flex h-16 max-w-[1240px] items-center justify-between px-4 sm:px-8">
-        <Logo href="/dashboard" />
-        <Link
-          href={`/u/${slug}`}
-          target="_blank"
-          className="rounded-full px-3 py-1.5 font-mono text-[12px] tracking-wide text-muted transition-colors hover:bg-ink/[0.05] hover:text-ink"
-        >
-          /u/{slug} ↗
-        </Link>
-      </div>
-    </header>
-  );
-}
 
 /** What a failed pass download (/api/pass/…, followed as a link) comes back to say. */
 const PASS_NOTICES: Record<string, string> = {
@@ -48,16 +32,21 @@ const PASS_NOTICES: Record<string, string> = {
   pronto: "Esa cartera aún no está disponible. Mientras tanto, enseña tu QR desde aquí.",
 };
 
+interface WelcomeContext {
+  card: OwnerCard;
+  /** The signed-in account's email (null in demo mode). */
+  email: string | null;
+  wallet: WalletAvailability;
+  platform: Platform;
+  demo: boolean;
+}
+
 /**
- * The just-created card's welcome (?nueva=1), naming whose card led here (?de=…),
- * or a note for an account that went through /crear but already had a card (?existente=1).
+ * The just-created card's welcome (?nueva=1), naming whose card led here (?de=…)
+ * and adapting to how they got there (?via=…), or a note for an account that
+ * went through /crear but already had a card (?existente=1).
  */
-async function welcomeFor(
-  query: Record<string, string | string[] | undefined>,
-  card: OwnerCard,
-  wallet: WalletAvailability,
-  demo: boolean,
-) {
+async function welcomeFor(query: Record<string, string | string[] | undefined>, { card, email, wallet, platform, demo }: WelcomeContext) {
   const passNotice = typeof query.pase === "string" ? PASS_NOTICES[query.pase] : undefined;
   if (passNotice) {
     return (
@@ -75,15 +64,19 @@ async function welcomeFor(
   }
   if (query.nueva !== "1") return null;
   const from = parseFromSlug(query.de);
-  const referrer = from && from !== card.slug ? await getPublicCard(from) : null;
-  const platform = detectPlatform((await headers()).get("user-agent"));
+  // The demo account *is* the sample card, which is also where demo visitors come from.
+  const referrer = from && (demo || from !== card.slug) ? await getPublicCard(from) : null;
+  const details = sendCardDetails(card, email, profileUrl(card.slug));
+  const theirName = referrer ? referrer.fullName.split(/\s+/)[0] || referrer.fullName : "";
   return (
     <WelcomePanel
       slug={card.slug}
       fullName={card.fullName}
       qrUrl={profileUrl(card.slug, "qr")}
       shareUrl={profileUrl(card.slug, "share")}
-      referrerName={referrer?.fullName ?? null}
+      referrer={referrer ? { slug: referrer.slug, name: referrer.fullName, acceptsContacts: referrer.acceptsContactRequests } : null}
+      via={referrer ? parseVia(query.via) : "direct"}
+      sendSummary={referrer && canSendCard(details) ? sentDetailsSentence(theirName, details) : null}
       wallet={wallet}
       platform={platform}
       demo={demo}
@@ -104,24 +97,33 @@ function meetingItems(meetings: Meeting[], card: OwnerCard, demo: boolean): Meet
 export default async function DashboardPage({ searchParams }: PageProps<"/dashboard">) {
   const query = await searchParams;
   const supabase = await createServerSupabase();
+  const platform = detectPlatform((await headers()).get("user-agent"));
+  const contactsSeenAt = parseSeenCookie((await cookies()).get(CONTACTS_SEEN_COOKIE)?.value);
+  // Google Wallet only once Google has approved the issuer (D4: GOOGLE_WALLET_LIVE).
+  const googleLive = isGoogleWalletLive();
 
   // Demo mode: no Supabase yet → play with the sample card, nothing persists.
   if (!supabase) {
-    const wallet = { apple: getAppleWalletConfig() !== null, google: getGoogleWalletConfig() !== null, handoff: false };
+    const wallet = {
+      apple: getAppleWalletConfig() !== null,
+      google: googleLive && getGoogleWalletConfig() !== null,
+      handoff: false,
+    };
     return (
       <>
         <SignedInBeacon />
-        <DashboardHeader slug={DEMO_CARD.slug} />
+        <DashboardHeader slug={DEMO_CARD.slug} name={DEMO_CARD.fullName} shareUrl={profileUrl(DEMO_CARD.slug, "share")} />
         <CardEditor
           initialCard={DEMO_CARD}
           stats={EMPTY_STATS}
-          contacts={{ available: true, requests: DEMO_CONTACT_REQUESTS }}
+          contacts={{ available: true, requests: DEMO_CONTACT_REQUESTS, seenAt: contactsSeenAt }}
           meetings={{ available: true, items: meetingItems(demoOwnerMeetings(new Date()), DEMO_CARD, true) }}
           wallet={wallet}
+          platform={platform}
           siteUrl={getSiteUrl()}
           email={null}
           demo
-          welcome={await welcomeFor(query, DEMO_CARD, wallet, true)}
+          welcome={await welcomeFor(query, { card: DEMO_CARD, email: null, wallet, platform, demo: true })}
         />
       </>
     );
@@ -142,24 +144,25 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
   const status = getConfigStatus();
   const wallet = {
     apple: status.appleWallet && status.supabaseSecretKey,
-    google: status.googleWallet && status.supabaseSecretKey,
+    google: googleLive && status.googleWallet && status.supabaseSecretKey,
     handoff: status.signingSecret,
   };
 
   return (
     <>
       <SignedInBeacon />
-      <DashboardHeader slug={card.slug} />
+      <DashboardHeader slug={card.slug} name={card.fullName} shareUrl={profileUrl(card.slug, "share")} />
       <CardEditor
         initialCard={card}
         stats={stats}
-        contacts={contacts}
+        contacts={{ ...contacts, seenAt: contactsSeenAt }}
         meetings={{ available: meetings.available, items: meetingItems(meetings.meetings, card, false) }}
         wallet={wallet}
+        platform={platform}
         siteUrl={getSiteUrl()}
         email={user.email}
         demo={false}
-        welcome={await welcomeFor(query, card, wallet, false)}
+        welcome={await welcomeFor(query, { card, email: user.email, wallet, platform, demo: false })}
       />
     </>
   );

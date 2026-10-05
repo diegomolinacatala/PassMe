@@ -1,17 +1,24 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { AVATAR_BUCKET, getSiteUrl } from "@/lib/env";
+import { AVATAR_BUCKET, getSiteUrl, profileUrl } from "@/lib/env";
+import { parseContactRequest } from "@/lib/card/contact";
+import { DEMO_SLUG } from "@/lib/card/demo";
+import { parseFromSlug, parseVia } from "@/lib/card/quick";
+import { sendCardDetails } from "@/lib/card/send-card";
 import { checkSlug, SLUG_ERRORS } from "@/lib/card/slug";
 import { parseCardInput, type FieldErrors } from "@/lib/card/schema";
 import type { OwnerCard } from "@/lib/card/types";
-import { isSlugAvailable, saveOwnerCard } from "@/lib/data/cards";
+import { contactIpLimiter, deliverContactRequest, DELIVERY_ERRORS, GENERIC_DELIVERY_ERROR } from "@/lib/contact-delivery";
+import { findOwnerCard, isSlugAvailable, saveOwnerCard } from "@/lib/data/cards";
 import { deleteContactRequest } from "@/lib/data/contact-requests";
 import { deleteOwnMeeting } from "@/lib/data/meetings";
 import { createSharedRateLimiter } from "@/lib/data/rate-limits";
 import { log } from "@/lib/log";
+import { clientRateKey } from "@/lib/request";
 import { HANDOFF_TTL_SECONDS, signHandoffToken } from "@/lib/pass/handoff";
 import { notifyWalletsOfUpdate } from "@/lib/pass/service";
 import { createAdminSupabase } from "@/lib/supabase/admin";
@@ -117,6 +124,51 @@ export async function createHandoffLinkAction(): Promise<HandoffResult> {
     url: `${getSiteUrl()}/wallet?t=${encodeURIComponent(token)}`,
     expiresAt: new Date(Date.now() + HANDOFF_TTL_SECONDS * 1000).toISOString(),
   };
+}
+
+export type SendCardResult =
+  | { ok: true; /** Demo mode or the sample card: nothing was sent. */ demo?: boolean }
+  | { ok: false; error: string; /** It can't be sent this way (closed card, no email or phone): offer sharing the link. */ shareInstead?: boolean };
+
+// A welcome sends one card; a few retries are plenty.
+const sendCardLimiter = createSharedRateLimiter({ name: "send-card-user", limit: 5, windowMs: 60 * 60_000 });
+
+/**
+ * "Mandarle mi tarjeta a Alex", from the welcome of a card made from Alex's:
+ * leaves the signed-in owner's details in Alex's "Contactos recibidos". Only
+ * the target card and the visit source come from the browser (both
+ * validated); who sends it and what is sent are read from the sender's own
+ * saved card, never from the client.
+ */
+export async function sendMyCardAction(toSlug: string, via: string): Promise<SendCardResult> {
+  const target = parseFromSlug(toSlug);
+  if (!target) return { ok: false, error: GENERIC_DELIVERY_ERROR };
+
+  const supabase = await createServerSupabase();
+  // Demo mode, or the sample card: there's no one to send it to.
+  if (!supabase || target === DEMO_SLUG) return { ok: true, demo: true };
+
+  const user = await getSessionUser(supabase);
+  if (!user) return { ok: false, error: "Tu sesión ha caducado. Vuelve a entrar." };
+  if (!(await sendCardLimiter.check(user.id)).ok) {
+    return { ok: false, error: "Has mandado tu tarjeta varias veces seguidas. Prueba dentro de un rato." };
+  }
+
+  const card = await findOwnerCard(supabase, user.id);
+  if (!card?.fullName) return { ok: false, error: "Guarda tu tarjeta antes de mandarla." };
+  if (card.slug === target) return { ok: false, error: "Esa es tu propia tarjeta." };
+
+  const parsed = parseContactRequest({ ...sendCardDetails(card, user.email, profileUrl(card.slug)), consent: true });
+  if (!parsed.ok) {
+    return { ok: false, error: "Tu tarjeta necesita un email o un teléfono visibles para poder mandarla.", shareInstead: true };
+  }
+  if (!(await contactIpLimiter.check(clientRateKey(await headers()))).ok) {
+    return { ok: false, error: "Has enviado varios contactos seguidos. Prueba dentro de un rato." };
+  }
+
+  const delivery = await deliverContactRequest(target, parsed.data, parseVia(via));
+  if (!delivery.ok) return { ok: false, error: DELIVERY_ERRORS[delivery.reason], shareInstead: delivery.reason === "closed" };
+  return { ok: true };
 }
 
 export type DeleteResult = { ok: true } | { ok: false; error: string };

@@ -2,6 +2,7 @@ import "server-only";
 import { createServerClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { hasSupabaseAuthCookie } from "@/lib/auth/session-cookie";
 import { getSupabasePublicConfig } from "@/lib/env";
 import type { Database } from "./database.types";
 
@@ -31,6 +32,16 @@ export async function createServerSupabase(): Promise<TypedSupabaseClient | null
       },
     },
   });
+}
+
+/**
+ * Whether this browser carries a Supabase session cookie (no network call).
+ * A hint for what to show; use getSessionUser() for anything that matters.
+ */
+export async function hasSessionCookie(): Promise<boolean> {
+  if (!getSupabasePublicConfig()) return false;
+  const cookieStore = await cookies();
+  return hasSupabaseAuthCookie(cookieStore.getAll().map((cookie) => cookie.name));
 }
 
 export interface SessionUser {

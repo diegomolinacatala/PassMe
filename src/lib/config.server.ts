@@ -106,6 +106,15 @@ export function getGoogleWalletConfig(): GoogleWalletConfig | null {
   };
 }
 
+/**
+ * Whether people are offered "Añadir a Google Wallet". Off until Google approves
+ * the issuer (GOOGLE_WALLET_LIVE=true in Vercel): meanwhile Android gets "Mi QR"
+ * and no screen links to /api/pass/google, which still works for testing.
+ */
+export function isGoogleWalletLive(): boolean {
+  return process.env.GOOGLE_WALLET_LIVE === "true";
+}
+
 export interface ConfigStatus {
   siteUrl: string;
   supabase: boolean;

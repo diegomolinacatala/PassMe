@@ -11,6 +11,7 @@ import type { ContactRequest } from "@/lib/card/contact";
 import { isPlaceholderSlug, suggestSlug } from "@/lib/card/slug";
 import type { CardStats } from "@/lib/data/cards";
 import { cn } from "@/lib/cn";
+import type { Platform } from "@/lib/platform";
 import { AccountPanel } from "./account-panel";
 import { AvatarField } from "./avatar-field";
 import { ContactsPanel } from "./contacts-panel";
@@ -18,7 +19,9 @@ import { DesignField } from "./design-field";
 import { Section, SwitchRow, TextField } from "./fields";
 import { LinksEditor } from "./links-editor";
 import { MeetingsPanel, type MeetingItem } from "./meetings-panel";
+import { PendingNotices } from "./pending-notices";
 import { PreviewPanel } from "./preview-panel";
+import { QuickActions } from "./quick-actions";
 import { SlugField } from "./slug-field";
 import { StatsPanel } from "./stats-panel";
 import {
@@ -34,9 +37,11 @@ import { WalletPanel, type WalletAvailability } from "./wallet-panel";
 interface CardEditorProps {
   initialCard: OwnerCard;
   stats: CardStats;
-  contacts: { available: boolean; requests: ContactRequest[] };
+  contacts: { available: boolean; requests: ContactRequest[]; /** Last "Ver" on the contacts notice (cookie). */ seenAt: string | null };
   meetings: { available: boolean; items: MeetingItem[] };
   wallet: WalletAvailability;
+  /** This device (from the User-Agent): which wallet button to offer. */
+  platform: Platform;
   siteUrl: string;
   email: string | null;
   demo: boolean;
@@ -66,7 +71,7 @@ function focusInvalid(root: HTMLElement | null, after?: Element | null) {
   target.focus({ preventScroll: true });
 }
 
-export function CardEditor({ initialCard, stats, contacts, meetings, wallet, siteUrl, email, demo, welcome }: CardEditorProps) {
+export function CardEditor({ initialCard, stats, contacts, meetings, wallet, platform, siteUrl, email, demo, welcome }: CardEditorProps) {
   const initialDraft = useMemo(() => draftFromCard(initialCard), [initialCard]);
   const editor = useCardDraft(initialDraft);
   const { draft, dirty } = editor;
@@ -94,6 +99,8 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, sit
   const [errorJump, setErrorJump] = useState(0);
 
   const siteHost = siteUrl.replace(/^https?:\/\//, "");
+  // Built from the saved slug: links and QRs never point at an unsaved one.
+  const publicUrl = (source: "qr" | "share") => `${siteUrl}/u/${encodeURIComponent(savedSlug)}?src=${source}`;
   const preview = useMemo(() => draftToPublicCard(draft), [draft]);
   const errorCount = Object.keys(errors).length;
   const serverErrors: FieldErrors = serverResult && serverResult.draft === draft ? serverResult.errors : {};
@@ -203,6 +210,18 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, sit
           {savedPublished && savedName ? "Publicada" : "Sin publicar"}
         </span>
       </div>
+
+      <QuickActions
+        slug={savedSlug}
+        fullName={savedName}
+        shareUrl={publicUrl("share")}
+        platform={platform}
+        availability={wallet}
+        demo={demo}
+        blocked={!demo && blockedReason !== null}
+        dirty={dirty}
+      />
+      <PendingNotices meetings={meetings.items} contacts={contacts.requests} contactsSeenAt={contacts.seenAt} />
 
       {demo ? (
         <div className="mb-8 flex items-start gap-3 rounded-2xl border border-dashed border-signal/50 bg-signal-wash/60 px-4 py-3 text-sm text-signal-deep">
@@ -332,11 +351,17 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, sit
           <div className="hidden lg:block">
             <PreviewPanel card={preview} />
           </div>
-          <Section number="05" title="A la cartera">
+          <Section
+            number="05"
+            title="A la cartera"
+            description="Tu tarjeta como un pase más, junto a tus tarjetas y billetes: se abre sin conexión y sin buscarla, y se actualiza sola cuando cambias algo."
+          >
             <WalletPanel
               slug={savedSlug}
-              profileUrl={`${siteUrl}/u/${savedSlug}`}
+              shareUrl={publicUrl("share")}
+              qrUrl={publicUrl("qr")}
               availability={wallet}
+              platform={platform}
               demo={demo}
               blockedReason={demo ? null : blockedReason}
               isPublished={savedPublished}

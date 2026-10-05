@@ -1,7 +1,8 @@
 import "server-only";
-import { createPath, parseQuickDraft, welcomePath } from "@/lib/card/quick";
+import { createPath, parseFromSlug, parseQuickDraft, parseVia, welcomePath } from "@/lib/card/quick";
 import type { FieldErrors } from "@/lib/card/schema";
 import { createCardFromDraft } from "@/lib/data/cards";
+import type { VisitSource } from "@/lib/env";
 import { log } from "@/lib/log";
 import type { TypedSupabaseClient } from "@/lib/supabase/server";
 
@@ -26,6 +27,18 @@ export function parseDraftJson(raw: unknown): unknown {
   }
 }
 
+/** Whose card led to /crear and how the newcomer reached it (scan, shared link…). */
+export interface CardOrigin {
+  from: string | null;
+  via: VisitSource;
+}
+
+/** Origin as it travels in form fields or action arguments: validated, never trusted. */
+export function parseOrigin(from: unknown, via: unknown): CardOrigin {
+  const slug = parseFromSlug(from);
+  return { from: slug, via: slug ? parseVia(via) : "direct" };
+}
+
 export type QuickCardOutcome = { ok: true; redirectTo: string } | { ok: false; error: string; errors?: FieldErrors };
 
 const UNEXPECTED = "No hemos podido crear tu tarjeta. Inténtalo de nuevo.";
@@ -40,7 +53,7 @@ export async function createQuickCard(
   supabase: TypedSupabaseClient,
   userId: string,
   draftInput: unknown,
-  from: string | null,
+  origin: CardOrigin,
   now: number = Date.now(),
 ): Promise<QuickCardOutcome> {
   const parsed = parseQuickDraft(draftInput);
@@ -49,7 +62,7 @@ export async function createQuickCard(
     const result = await createCardFromDraft(supabase, userId, parsed.data);
     if (!result.ok) return { ok: false, error: result.error };
     const justCreated = result.created || now - Date.parse(result.card.updatedAt) < JUST_CREATED_MS;
-    return { ok: true, redirectTo: justCreated ? welcomePath(from) : EXISTING_CARD_PATH };
+    return { ok: true, redirectTo: justCreated ? welcomePath(origin.from, origin.via) : EXISTING_CARD_PATH };
   } catch (error) {
     log.error("createQuickCard failed", { userId }, error);
     return { ok: false, error: UNEXPECTED };
@@ -57,6 +70,6 @@ export async function createQuickCard(
 }
 
 /** Where to send someone whose draft couldn't be used: back to the form, which still has it. */
-export function draftFallbackPath(from: string | null): string {
-  return createPath(from);
+export function draftFallbackPath(origin: CardOrigin): string {
+  return createPath(origin.from, origin.via);
 }

@@ -3,6 +3,7 @@
 import { Check, Share } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { buttonClasses } from "@/components/ui/button";
+import { announce } from "@/lib/announce";
 
 type TrackKind = "view" | "link_click";
 
@@ -78,6 +79,7 @@ export function ShareButton({ name, slug, disabled }: { name: string; slug: stri
       }
       await navigator.clipboard.writeText(url);
       setCopied(true);
+      announce("Enlace copiado");
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
       // User dismissed the share sheet — nothing to do.

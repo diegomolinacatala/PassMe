@@ -251,33 +251,33 @@ Cambios pequeños, de bajo riesgo, sin rediseño. Ninguno necesita migración.
 
 La prioridad nº 1 del proyecto. Origen: ONB-02, ONB-04, ONB-08, EDIT-01, EDIT-14, EDIT-15, LIFE-01–04, LIFE-07, LIFE-10, LIFE-12, LIFE-20, ONB-03, LIFE-06, COH-09, COH-10, COH-11.
 
-**P2.1 · Pantalla «Mi QR» a pantalla completa** [A]
+**✅ P2.1 · Pantalla «Mi QR» a pantalla completa** [A]
 - Ruta nueva `/dashboard/qr` (con sesión; sin sesión → `/login?next=/dashboard/qr`; en demo, la tarjeta demo).
 - Contenido: fondo blanco puro, QR del **slug guardado** (nunca el del borrador) al 82 vw con máximo 420 px, el nombre encima en `font-display`, y debajo «Sube el brillo para que se lea a la primera». Sin barra de guardar ni cabecera del sitio. Botón «Compartir» (Web Share; sin ella, «Copiar enlace») por si el otro no puede escanear, y «Cerrar» (vuelve a `/dashboard`). En horizontal, el QR se centra y nada lo tapa.
 - `navigator.wakeLock.request("screen")` al montar, renovarlo en `visibilitychange`, liberarlo al salir. Sin soporte, no pasa nada (sin avisos).
 - QR reutilizando `src/components/card/qr-code.tsx`, con `?src=qr`.
 - ✔ La pantalla no se apaga en 2 min sin tocarla (Diego lo verifica en iPhone, 3.3); nada tapa el QR en vertical ni en horizontal; con cambios sin guardar en el slug, el QR apunta al guardado. Test E2E (contenido, slug guardado, enlace de cierre).
 
-**P2.2 · Acciones arriba del editor** [A]
+**✅ P2.2 · Acciones arriba del editor** [A]
 - `src/app/dashboard/page.tsx` (cabecera) y `card-editor.tsx`.
 - Cabecera: sustituir el enlace técnico «/u/<slug> ↗» por un botón **«Mi QR»** (icono `QrCode` + texto, siempre visible arriba a la derecha) que abre `/dashboard/qr`, y un **menú de cuenta** (P2.8).
 - Bajo el título del editor, en móvil, una fila de acciones antes de «01»: **«Compartir»** (Web Share / «Copiar enlace»), **un solo botón de cartera según la plataforma** (P2.3) y «Ver mi tarjeta». Con cambios sin guardar en el slug o la tarjeta, «Ver mi tarjeta» se acompaña de «(sin tus cambios)» · EDIT-18.
 - ✔ En el iPhone, desde `/dashboard` sin parámetros, 1 toque muestra un QR escaneable ≥ 280 px; el botón de cartera está visible sin scroll (y < 659) en iPhone 15 y Pixel 7.
 
-**P2.3 · Cartera según la plataforma, en todas partes** [M] · EDIT-14, LIFE-04, COH-09
+**✅ P2.3 · Cartera según la plataforma, en todas partes** [M] · EDIT-14, LIFE-04, COH-09
 - Componente único `<AddToWalletButton platform>` usado en `welcome-panel.tsx`, `wallet-panel.tsx` y `/wallet` (hoy hay tres estilos). Respetar las guías de marca (Apple pide su insignia «Añadir a Apple Wallet» en negro).
 - `WalletPanel` recibe `platform` (de `src/lib/platform.ts` → `detectPlatform`): iOS → solo Apple; Android → solo Google (o la alternativa de P2.4); ordenador → primero el bloque «Escanéalo con tu móvil para añadir el pase» (el *handoff* actual) y los dos botones quedan como enlace pequeño «Descargar el archivo del pase». En móvil, enlace pequeño «¿Otro móvil?» que muestra ambos. El bloque «¿Estás en el ordenador?» solo en ordenador.
 - Una línea bajo el título de la sección: «Tu tarjeta como un pase más, junto a tus tarjetas y billetes: se abre sin conexión y sin buscarla, y se actualiza sola cuando cambias algo.» · LIFE-18
 - ✔ El iPhone ve un único botón de cartera; el escritorio ve primero el QR para pasarlo al móvil.
 
-**P2.4 · Google Wallet tras una variable** ⚖️ D4 [A] · LIFE-01
+**✅ P2.4 · Google Wallet tras una variable** ⚖️ D4 [A] · LIFE-01
 - Variable de servidor `GOOGLE_WALLET_LIVE` (por defecto `false`; documentarla en `docs/SETUP.md` y en `npm run doctor`).
 - Apagada: ninguna pantalla enlaza a `/api/pass/google`. En Android, el lugar del botón lo ocupa **«Guardar mi QR en el móvil»**, que abre `/dashboard/qr` y explica en una línea cómo anclarlo a la pantalla de inicio (P2.6). Fila no clicable «Google Wallet · muy pronto».
 - Landing (`src/app/page.tsx`, `src/components/landing/sections.tsx`) mientras esté apagada: no prometer «Google Wallet» ni «actualización automática en Apple y Google Wallet»; en el bloque final, «Funciona en cualquier móvil con cámara» en vez de «iPhone y Android».
 - ✔ Con `GOOGLE_WALLET_LIVE=false`, `rg "/api/pass/google"` solo aparece detrás de la comprobación; un Android que acaba de crear su tarjeta ve una acción que funciona. Tests con la variable a `true` y a `false`.
 - **Paso manual para Diego** (díselo en el PR): cuando Google apruebe el emisor y funcione, poner `GOOGLE_WALLET_LIVE=true` en Vercel.
 
-**P2.5 · Bienvenida: QR primero, ampliable y adaptada al origen** [A] · ONB-04, ONB-08, COH-10
+**✅ P2.5 · Bienvenida: QR primero, ampliable y adaptada al origen** [A] · ONB-04, ONB-08, COH-10
 - `welcome-panel.tsx`.
 - Orden en móvil: titular corto («Ya tienes tu tarjeta, Lucía.»), QR y, justo debajo, el botón de cartera. El párrafo explicativo, después. Una sola forma de cerrarla: el texto «Personalizar mi tarjeta» (quitar la X duplicada).
 - Tocar el QR abre `/dashboard/qr` (pista «Toca para ampliar»).
@@ -288,31 +288,31 @@ La prioridad nº 1 del proyecto. Origen: ONB-02, ONB-04, ONB-08, EDIT-01, EDIT-1
   - En demo, simulado como el resto.
 - ✔ En 393×659 el QR y el botón de cartera se ven sin scroll; abrir `/u/demo` sin `src`, crear la tarjeta → la bienvenida muestra «Mandarle mi tarjeta a Alex» y al pulsarlo aparece «Alex ya tiene tu tarjeta»; con `?src=qr` se mantiene el diseño actual. Tests E2E de las dos variantes.
 
-**P2.6 · Manifest: «Añadir a pantalla de inicio» lleva a mi QR** [M] · LIFE-12, ONB-02
+**✅ P2.6 · Manifest: «Añadir a pantalla de inicio» lleva a mi QR** [M] · LIFE-12, ONB-02
 - `src/app/manifest.ts`: `name: "PassMe"`, `short_name: "PassMe"`, `start_url: "/dashboard/qr"`, `display: "standalone"`, `background_color` y `theme_color` = `paper` (`#f3efe6`, comprobar el token), iconos 192 y 512 (también `maskable`) generados desde `src/app/icon.svg` (ampliar `npm run brand` si hace falta). Añadir `favicon.ico`.
 - En `/dashboard/qr`, en Android y sin Google Wallet, una pista que se puede cerrar: «Añádela a tu pantalla de inicio: ⋮ → Añadir a pantalla de inicio». En iOS: «Compartir → Añadir a pantalla de inicio».
 - ✔ `/manifest.webmanifest` y `/favicon.ico` responden 200; Lighthouse la marca como instalable.
 
-**P2.7 · Aviso de pendientes arriba del editor** [A] · MEET-16, EDIT-04
+**✅ P2.7 · Aviso de pendientes arriba del editor** [A] · MEET-16, EDIT-04
 - `card-editor.tsx`: si hay reuniones en «Te toca responder» o contactos recibidos sin ver, un aviso arriba (antes de «01»): «**Lucía Martín** te ha propuesto una reunión · Responder» (varias: «Tienes 2 propuestas de reunión · Ver»), que lleva a `#reuniones` o directamente a la página firmada. Lo mismo para «Javier te ha dejado su contacto · Ver».
 - ✔ En `/dashboard` (demo, 393 px), sin hacer scroll se ve el aviso con el nombre y un botón que lleva a la respuesta.
 
-**P2.8 · Menú de cuenta y cerrar sesión solo en este dispositivo** [M] · LIFE-10, EDIT-04
+**✅ P2.8 · Menú de cuenta y cerrar sesión solo en este dispositivo** [M] · LIFE-10, EDIT-04
 - Cabecera del editor: iniciales/avatar con un menú (`<details>` o `popover` accesible, sin JS inline): «Ver mi tarjeta», «Compartir», «Cerrar sesión», «Cuenta y privacidad» (salta a la sección Cuenta).
 - `src/app/auth/signout/route.ts`: `signOut({ scope: "local" })`. En la sección Cuenta, enlace secundario «Cerrar sesión en todos mis dispositivos» (`scope: "global"`).
 - ✔ «Cerrar sesión» a ≤ 2 toques desde arriba; cerrar sesión en un navegador no la cierra en otro.
 
-**P2.9 · El dueño se reconoce en su propia tarjeta y en el reverso de su pase** [M] · LIFE-07
+**✅ P2.9 · El dueño se reconoce en su propia tarjeta y en el reverso de su pase** [M] · LIFE-07
 - `src/components/card/create-yours.tsx` + `src/app/u/[slug]/page.tsx`: si hay sesión y la tarjeta es suya, la barra superior dice «Editar mi tarjeta» → `/dashboard`, y en lugar del bloque de crear: «Así la ven los demás · Editar · Mi QR». Sin sesión, al pie: «¿Es tu tarjeta? Entrar».
 - `src/lib/pass/apple.ts`: el campo del reverso «Hecho con PassMe · Crea tu tarjeta gratis» → etiqueta «Tu tarjeta», valor `${site}/dashboard`, texto «Editar mi tarjeta» (el reverso solo lo ve el dueño). Revisar el equivalente en Google.
 - ✔ Con sesión, en `/u/<mi-slug>` no aparece «Crear»; el reverso del pase enlaza a `/dashboard`.
 
-**P2.10 · Cabecera de la landing: «Entrar» siempre visible y «Mi tarjeta» con sesión** [A] · LIFE-06, ONB-03, LIFE-20
+**✅ P2.10 · Cabecera de la landing: «Entrar» siempre visible y «Mi tarjeta» con sesión** [A] · LIFE-06, ONB-03, LIFE-20
 - `src/components/landing/site-header.tsx`: quitar `hidden … min-[400px]:inline-flex` de «Entrar»; por debajo de 400 px, el botón de crear dice «Crear». Con sesión (cookie de Supabase leída en el servidor): un único botón «Mi tarjeta» → `/dashboard` y sin «Entrar» ni «Crear».
 - El ancla «Privacidad» de la cabecera (`#privacidad`) se llama «Tus datos» para no chocar con el enlace «Privacidad» del pie, que va a `/privacidad` · LIFE-19.
 - ✔ A 320, 360 y 375 px se ven «Entrar» y «Crear» sin desbordar; con sesión solo «Mi tarjeta».
 
-**P2.11 · Compartir nativo y QR para imprimir con opciones** [M] · EDIT-15, COH-11
+**✅ P2.11 · Compartir nativo y QR para imprimir con opciones** [M] · EDIT-15, COH-11
 - `wallet-panel.tsx`: «Copiar enlace» → «Compartir» (Web Share; sin ella, «Copiar enlace»), con el mismo componente que la bienvenida y `/dashboard/qr`. Confirmación «Enlace copiado» anunciada en una región viva global (P3.4).
 - «QR para imprimir» abre una hoja con vista previa y «Descargar SVG» / «Descargar PNG (1024 px)». Ampliar `src/app/u/[slug]/qr/route.ts` con `?format=png` (con `sharp`, ya es dependencia). Nombre de archivo actual (`passme-<slug>-qr.*`).
 - ✔ Desde el editor en el iPhone, 1 toque abre la hoja de compartir; se puede descargar PNG y SVG.

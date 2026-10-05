@@ -5,6 +5,7 @@
  * the card.
  */
 import { z } from "zod";
+import type { VisitSource } from "@/lib/env";
 import { CARD_THEMES, DEFAULT_THEME, DEFAULT_TYPEFACE, isPatternSeed, PATTERN_SEED_MAX, themeDesign } from "./design";
 import { normalizeLinkValue, type LinkKind } from "./links";
 import { DEFAULT_PATTERN } from "./pattern";
@@ -170,12 +171,25 @@ export function parseFromSlug(value: unknown): string | null {
   return slug === DEMO_SLUG || checkSlug(slug).ok ? slug : null;
 }
 
-/** "Crea la tuya" link, remembering whose card it came from. */
-export function createPath(from: string | null): string {
-  return from ? `/crear?de=${encodeURIComponent(from)}` : "/crear";
+/**
+ * How the newcomer reached that card (?via=…): scanned in person ("qr"), sent a
+ * link ("share") or anything else ("direct"). The welcome adapts to it.
+ */
+export function parseVia(value: unknown): VisitSource {
+  return value === "qr" || value === "share" ? value : "direct";
+}
+
+/** "&via=qr" — only when it says something (and only alongside a card). */
+function viaParam(from: string | null, via: VisitSource): string {
+  return from && via !== "direct" ? `&via=${via}` : "";
+}
+
+/** "Crear mi tarjeta" link, remembering whose card it came from and how they got there. */
+export function createPath(from: string | null, via: VisitSource = "direct"): string {
+  return from ? `/crear?de=${encodeURIComponent(from)}${viaParam(from, via)}` : "/crear";
 }
 
 /** Where a brand-new card lands: the editor's welcome, still remembering whose card led here. */
-export function welcomePath(from: string | null): string {
-  return `/dashboard?nueva=1${from ? `&de=${encodeURIComponent(from)}` : ""}`;
+export function welcomePath(from: string | null, via: VisitSource = "direct"): string {
+  return `/dashboard?nueva=1${from ? `&de=${encodeURIComponent(from)}` : ""}${viaParam(from, via)}`;
 }

@@ -18,6 +18,7 @@ import {
   type QuickTextField,
 } from "@/lib/card/quick";
 import type { FieldErrors } from "@/lib/card/schema";
+import type { VisitSource } from "@/lib/env";
 import { cn } from "@/lib/cn";
 import { QuickCardForm } from "./quick-card-form";
 
@@ -33,6 +34,8 @@ export interface Referrer {
 interface CreateFlowProps {
   mode: CreateMode;
   from: string | null;
+  /** How they reached the referrer's card (/crear?via=…): the welcome adapts to it. */
+  via: VisitSource;
   referrer: Referrer | null;
   /** Motif variation for a fresh draft (picked on the server so the preview hydrates as rendered). */
   initialSeed: number;
@@ -48,9 +51,10 @@ const EMAIL_LIKE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
  * "Crea la tuya": the card first — it takes shape on the pass while you type —
  * and the email only at the end, to keep it. Signed-in people skip that step.
  */
-export function CreateFlow({ mode, from, referrer, initialSeed, accountEmail, previewStyle, googleEnabled, captchaSiteKey }: CreateFlowProps) {
+export function CreateFlow({ mode, from, via, referrer, initialSeed, accountEmail, previewStyle, googleEnabled, captchaSiteKey }: CreateFlowProps) {
   const [draft, setDraft] = useState<QuickCardDraft>({ ...EMPTY_QUICK_DRAFT, patternSeed: initialSeed, email: accountEmail ?? "" });
   const [origin, setOrigin] = useState(from);
+  const [originVia, setOriginVia] = useState(via);
   const [step, setStep] = useState<"form" | "auth">("form");
   const [touched, setTouched] = useState<ReadonlySet<string>>(new Set());
   const [submitted, setSubmitted] = useState(false);
@@ -73,6 +77,7 @@ export function CreateFlow({ mode, from, referrer, initialSeed, accountEmail, pr
         patternSeed: stored.draft.patternSeed || initialSeed,
       });
       setOrigin(from ?? stored.from);
+      if (!from) setOriginVia(stored.via);
       // Unattended only for the account the code went to (or Google, which PKCE ties to this
       // browser): a login link from someone else must not walk off with this draft.
       const sameAccount = stored.viaGoogle || stored.authEmail === accountEmail?.toLowerCase();
@@ -87,12 +92,13 @@ export function CreateFlow({ mode, from, referrer, initialSeed, accountEmail, pr
   }, [restored, step, autoCreate]);
 
   const rememberAuthEmail = useCallback(
-    (email: string) => writeStoredDraft({ draft, pending: true, from: origin, authEmail: email.toLowerCase(), viaGoogle: false }),
-    [draft, origin],
+    (email: string) =>
+      writeStoredDraft({ draft, pending: true, from: origin, via: originVia, authEmail: email.toLowerCase(), viaGoogle: false }),
+    [draft, origin, originVia],
   );
   const rememberGoogle = useCallback(
-    () => writeStoredDraft({ draft, pending: true, from: origin, authEmail: null, viaGoogle: true }),
-    [draft, origin],
+    () => writeStoredDraft({ draft, pending: true, from: origin, via: originVia, authEmail: null, viaGoogle: true }),
+    [draft, origin, originVia],
   );
 
   // Moving between the form and the email step: tell screen readers where they are.
@@ -117,11 +123,11 @@ export function CreateFlow({ mode, from, referrer, initialSeed, accountEmail, pr
     (value: QuickCardDraft) => {
       startCreating(async () => {
         // Success redirects to the welcome screen; only failures come back.
-        const result = await createMyCardAction(JSON.stringify(value), origin);
+        const result = await createMyCardAction(JSON.stringify(value), origin, originVia);
         if (result && !result.ok) setServer({ error: result.error, errors: result.errors ?? {}, draft: value });
       });
     },
-    [origin],
+    [origin, originVia],
   );
 
   // Back from Google or the email's button with a card ready to go: create it.
@@ -140,7 +146,7 @@ export function CreateFlow({ mode, from, referrer, initialSeed, accountEmail, pr
       return;
     }
     // Kept for the email's button or Google, which may finish in another tab.
-    writeStoredDraft({ draft, pending: true, from: origin, authEmail: null, viaGoogle: false });
+    writeStoredDraft({ draft, pending: true, from: origin, via: originVia, authEmail: null, viaGoogle: false });
     setStep("auth");
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
@@ -260,9 +266,10 @@ export function CreateFlow({ mode, from, referrer, initialSeed, accountEmail, pr
             ) : null}
             <EmailCodeAuth
               next="/dashboard"
-              continueTo={createPath(origin)}
+              continueTo={createPath(origin, originVia)}
               draft={JSON.stringify(draft)}
               from={origin}
+              via={originVia}
               initialEmail={EMAIL_LIKE.test(draft.email.trim()) ? draft.email.trim() : ""}
               googleEnabled={googleEnabled}
               captchaSiteKey={captchaSiteKey}

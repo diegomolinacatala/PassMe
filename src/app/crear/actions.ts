@@ -1,10 +1,10 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { parseFromSlug, welcomePath } from "@/lib/card/quick";
+import { welcomePath } from "@/lib/card/quick";
 import type { FieldErrors } from "@/lib/card/schema";
 import { createSharedRateLimiter } from "@/lib/data/rate-limits";
-import { createQuickCard, parseDraftJson } from "@/lib/onboarding";
+import { createQuickCard, parseDraftJson, parseOrigin } from "@/lib/onboarding";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
 
 export type CreateCardActionResult = { ok: false; error: string; errors?: FieldErrors };
@@ -16,11 +16,11 @@ const createLimiter = createSharedRateLimiter({ name: "create-card-user", limit:
  * email's button, or an account that never finished its card). Guests create
  * theirs in the same request that checks their login code (login/actions.ts).
  */
-export async function createMyCardAction(draftJson: string, from: string | null): Promise<CreateCardActionResult> {
-  const origin = parseFromSlug(from);
+export async function createMyCardAction(draftJson: string, from: string | null, via?: string): Promise<CreateCardActionResult> {
+  const origin = parseOrigin(from, via);
   const supabase = await createServerSupabase();
   // Demo mode: nothing to store, so show the welcome screen with the sample card.
-  if (!supabase) redirect(welcomePath(origin));
+  if (!supabase) redirect(welcomePath(origin.from, origin.via));
 
   const user = await getSessionUser(supabase);
   if (!user) return { ok: false, error: "Tu sesión ha caducado. Vuelve a entrar." };

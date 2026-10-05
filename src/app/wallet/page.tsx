@@ -3,10 +3,12 @@ import { headers } from "next/headers";
 import { Logo } from "@/components/brand/logo";
 import { WalletPass } from "@/components/card/wallet-pass";
 import { buttonClasses } from "@/components/ui/button";
-import { getAppleWalletConfig, getGoogleWalletConfig } from "@/lib/config.server";
+import { AddToWalletButton, passHref } from "@/components/wallet/add-to-wallet-button";
+import { getAppleWalletConfig, getGoogleWalletConfig, isGoogleWalletLive } from "@/lib/config.server";
 import { toPublicCard } from "@/lib/data/cards";
 import { getCardById } from "@/lib/data/wallet";
 import { verifyHandoffToken } from "@/lib/pass/handoff";
+import { detectPlatform } from "@/lib/platform";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 
 export const metadata: Metadata = { title: "Añadir a la cartera", robots: { index: false } };
@@ -33,26 +35,14 @@ export default async function WalletHandoffPage({ searchParams }: PageProps<"/wa
   const admin = createAdminSupabase();
   const card = profileId && admin ? await getCardById(admin, profileId) : null;
 
-  const userAgent = (await headers()).get("user-agent") ?? "";
-  const isAndroid = /android/i.test(userAgent);
+  const isAndroid = detectPlatform((await headers()).get("user-agent")) === "android";
   const appleReady = getAppleWalletConfig() !== null;
-  const googleReady = getGoogleWalletConfig() !== null;
-  const t = token ? encodeURIComponent(token) : "";
+  // Google Wallet is only offered once Google has approved the issuer (GOOGLE_WALLET_LIVE).
+  const googleReady = isGoogleWalletLive() && getGoogleWalletConfig() !== null;
+  const passQuery = token ? `?t=${encodeURIComponent(token)}` : "";
 
-  const apple = appleReady ? (
-    <a key="apple" href={`/api/pass/apple?t=${t}`} className={buttonClasses({ variant: "ink", size: "lg", className: "w-full" })}>
-      Añadir a Apple Wallet
-    </a>
-  ) : null;
-  const google = googleReady ? (
-    <a
-      key="google"
-      href={`/api/pass/google?t=${t}`}
-      className={buttonClasses({ variant: isAndroid ? "ink" : "outline", size: "lg", className: "w-full" })}
-    >
-      Añadir a Google Wallet
-    </a>
-  ) : null;
+  const apple = appleReady ? <AddToWalletButton key="apple" wallet="apple" href={passHref("apple", passQuery)} className="mx-auto" /> : null;
+  const google = googleReady ? <AddToWalletButton key="google" wallet="google" href={passHref("google", passQuery)} className="mx-auto" /> : null;
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col px-5 py-6">
@@ -70,8 +60,12 @@ export default async function WalletHandoffPage({ searchParams }: PageProps<"/wa
               <WalletPass card={toPublicCard(card)} style={isAndroid ? "google" : "apple"} />
             </div>
             <div className="grid gap-3">
-              {isAndroid ? [google, apple] : [apple, google]}
-              {!appleReady && !googleReady ? (
+              {/* An Android phone can't use an Apple pass. */}
+              {isAndroid ? google : [apple, google]}
+              {isAndroid && !googleReady ? (
+                <p className="text-center text-sm text-muted">Google Wallet llegará muy pronto. Mientras, enseña tu QR desde PassMe.</p>
+              ) : null}
+              {!isAndroid && !appleReady && !googleReady ? (
                 <p className="text-center text-sm text-muted">La cartera no está disponible todavía.</p>
               ) : null}
             </div>

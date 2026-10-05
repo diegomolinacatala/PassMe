@@ -8,6 +8,8 @@ const PAGES = [
   "/login",
   "/dashboard",
   "/dashboard?nueva=1",
+  "/dashboard?nueva=1&de=demo&via=share",
+  "/dashboard/qr",
   "/reunion/demo/anfitrion",
   "/reunion/demo/invitado",
   "/privacidad",

@@ -177,6 +177,9 @@ if ((env.CRON_SECRET ?? "").length >= 16) ok("CRON_SECRET configurado (limpieza 
 else warn("Sin CRON_SECRET (≥ 16 caracteres): la limpieza diaria de datos caducados no se ejecutará.");
 
 section("Google Wallet");
+// The button is hidden until Google approves the issuer; /api/pass/google keeps working for tests.
+if (env.GOOGLE_WALLET_LIVE === "true") ok("Botón «Añadir a Google Wallet» visible (GOOGLE_WALLET_LIVE=true).");
+else console.info("  · Botón de Google Wallet oculto (GOOGLE_WALLET_LIVE no es «true»): Android ve «Guardar mi QR en el móvil».");
 const saRaw = env.GOOGLE_WALLET_SERVICE_ACCOUNT_JSON;
 if (!env.GOOGLE_WALLET_ISSUER_ID && !saRaw && !env.GOOGLE_WALLET_PRIVATE_KEY) {
   warn("Sin configurar (opcional).");

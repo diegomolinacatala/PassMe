@@ -4,12 +4,12 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { cleanCode, DEMO_LOGIN_CODE, RESEND_COOLDOWN_SECONDS, retryAfterSeconds } from "@/lib/auth/code";
-import { parseFromSlug, welcomePath } from "@/lib/card/quick";
+import { welcomePath } from "@/lib/card/quick";
 import { clearOtpFailures, registerOtpAttempt } from "@/lib/data/otp-attempts";
 import { createSharedRateLimiter } from "@/lib/data/rate-limits";
 import { getSiteUrl } from "@/lib/env";
 import { log } from "@/lib/log";
-import { createQuickCard, draftFallbackPath, parseDraftJson } from "@/lib/onboarding";
+import { createQuickCard, draftFallbackPath, parseDraftJson, parseOrigin } from "@/lib/onboarding";
 import { clientRateKey, safeNextPath } from "@/lib/request";
 import { createServerSupabase, getSessionUser, type TypedSupabaseClient } from "@/lib/supabase/server";
 
@@ -151,16 +151,16 @@ async function verifyCode(prev: AuthState, formData: FormData): Promise<AuthStat
 async function finishSignIn(supabase: TypedSupabaseClient | null, userId: string | null, formData: FormData): Promise<never> {
   if (!formData.has("draft")) redirect(safeNextPath(String(formData.get("next") ?? "")));
 
-  const from = parseFromSlug(formData.get("from"));
+  const origin = parseOrigin(formData.get("from"), formData.get("via"));
   const draft = parseDraftJson(formData.get("draft"));
-  if (draft === null) redirect(draftFallbackPath(from));
+  if (draft === null) redirect(draftFallbackPath(origin));
   // Demo mode: there is nowhere to store the card, so just show the welcome screen.
-  if (!supabase || !userId) redirect(welcomePath(from));
+  if (!supabase || !userId) redirect(welcomePath(origin.from, origin.via));
 
-  const outcome = await createQuickCard(supabase, userId, draft, from);
+  const outcome = await createQuickCard(supabase, userId, draft, origin);
   if (!outcome.ok) log.warn("quick card after sign-in failed", { error: outcome.error });
   // If the draft couldn't be used, /crear shows it again (the browser still has it).
-  redirect(outcome.ok ? outcome.redirectTo : draftFallbackPath(from));
+  redirect(outcome.ok ? outcome.redirectTo : draftFallbackPath(origin));
 }
 
 /** Lets a tab waiting for the code notice that the email's button signed this browser in. */

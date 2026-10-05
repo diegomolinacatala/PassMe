@@ -7,12 +7,13 @@ import {
   EMPTY_QUICK_DRAFT,
   parseFromSlug,
   parseQuickDraft,
+  parseVia,
   quickDraftToCardInput,
   quickDraftToPublicCard,
   welcomePath,
 } from "@/lib/card/quick";
 import { parseCardInput } from "@/lib/card/schema";
-import { parseDraftJson } from "@/lib/onboarding";
+import { draftFallbackPath, parseDraftJson, parseOrigin } from "@/lib/onboarding";
 import { detectPlatform } from "@/lib/platform";
 
 describe("login codes", () => {
@@ -127,6 +128,30 @@ describe("quick card draft", () => {
     expect(welcomePath(null)).toBe("/dashboard?nueva=1");
   });
 
+  it("carries how the referrer's card was reached, only alongside the card", () => {
+    expect(parseVia("qr")).toBe("qr");
+    expect(parseVia("share")).toBe("share");
+    expect(parseVia("direct")).toBe("direct");
+    expect(parseVia("crear")).toBe("direct");
+    expect(parseVia(["qr"])).toBe("direct");
+    expect(parseVia(undefined)).toBe("direct");
+    expect(createPath("alex", "qr")).toBe("/crear?de=alex&via=qr");
+    expect(createPath("alex", "share")).toBe("/crear?de=alex&via=share");
+    expect(createPath("alex", "direct")).toBe("/crear?de=alex");
+    expect(createPath(null, "qr")).toBe("/crear");
+    expect(welcomePath("alex", "qr")).toBe("/dashboard?nueva=1&de=alex&via=qr");
+    expect(welcomePath("alex", "share")).toBe("/dashboard?nueva=1&de=alex&via=share");
+    expect(welcomePath(null, "share")).toBe("/dashboard?nueva=1");
+  });
+
+  it("validates an origin coming from a form field or an action argument", () => {
+    expect(parseOrigin("Alex", "qr")).toEqual({ from: "alex", via: "qr" });
+    expect(parseOrigin("alex", "evil")).toEqual({ from: "alex", via: "direct" });
+    expect(parseOrigin("../x", "qr")).toEqual({ from: null, via: "direct" });
+    expect(parseOrigin(null, "share")).toEqual({ from: null, via: "direct" });
+    expect(draftFallbackPath({ from: "alex", via: "share" })).toBe("/crear?de=alex&via=share");
+  });
+
   it("parses draft JSON from a form field defensively", () => {
     expect(parseDraftJson(JSON.stringify(VALID))).toEqual(VALID);
     expect(parseDraftJson("{nope")).toBeNull();
@@ -156,20 +181,24 @@ describe("stored draft", () => {
 
   it("round-trips and expires", () => {
     const draft = { ...EMPTY_QUICK_DRAFT, fullName: "Ana" };
-    writeStoredDraft({ draft, pending: true, from: "alex", authEmail: "ana@example.com", viaGoogle: false }, 1_000);
-    expect(readStoredDraft(1_000 + 60_000)).toMatchObject({ draft, pending: true, from: "alex", authEmail: "ana@example.com" });
+    writeStoredDraft({ draft, pending: true, from: "alex", via: "share", authEmail: "ana@example.com", viaGoogle: false }, 1_000);
+    expect(readStoredDraft(1_000 + 60_000)).toMatchObject({ draft, pending: true, from: "alex", via: "share", authEmail: "ana@example.com" });
     expect(readStoredDraft(1_000 + DRAFT_TTL_MS + 1)).toBeNull();
     // Expired drafts are removed, not just ignored.
     expect(readStoredDraft(1_000)).toBeNull();
   });
 
   it("merges details typed elsewhere without wiping the rest", () => {
-    writeStoredDraft({ draft: { ...EMPTY_QUICK_DRAFT, headline: "CEO", theme: "cafe" }, pending: false, from: null, authEmail: null, viaGoogle: false }, 1_000);
-    rememberDetails({ fullName: "Ana", email: "ana@example.com", phone: "", company: "Norte" }, "alex", 2_000);
+    writeStoredDraft(
+      { draft: { ...EMPTY_QUICK_DRAFT, headline: "CEO", theme: "cafe" }, pending: false, from: null, via: "direct", authEmail: null, viaGoogle: false },
+      1_000,
+    );
+    rememberDetails({ fullName: "Ana", email: "ana@example.com", phone: "", company: "Norte" }, "alex", "qr", 2_000);
     expect(readStoredDraft(2_000)).toMatchObject({
       draft: { fullName: "Ana", email: "ana@example.com", phone: "", company: "Norte", headline: "CEO", theme: "cafe" },
       pending: false,
       from: "alex",
+      via: "qr",
     });
     clearStoredDraft();
     expect(readStoredDraft(2_000)).toBeNull();
@@ -190,7 +219,9 @@ describe("stored draft", () => {
       },
     });
     expect(readStoredDraft()).toBeNull();
-    expect(() => writeStoredDraft({ draft: EMPTY_QUICK_DRAFT, pending: false, from: null, authEmail: null, viaGoogle: false })).not.toThrow();
+    expect(() =>
+      writeStoredDraft({ draft: EMPTY_QUICK_DRAFT, pending: false, from: null, via: "direct", authEmail: null, viaGoogle: false }),
+    ).not.toThrow();
     expect(() => clearStoredDraft()).not.toThrow();
   });
 });

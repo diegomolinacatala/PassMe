@@ -2,8 +2,8 @@ import Link from "next/link";
 import type { ComponentPropsWithoutRef, ComponentPropsWithRef, ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
-type Variant = "ink" | "signal" | "outline" | "ghost" | "danger" | "paper";
-type Size = "sm" | "md" | "lg";
+export type Variant = "ink" | "signal" | "outline" | "ghost" | "danger" | "paper";
+export type Size = "sm" | "md" | "lg";
 
 const VARIANTS: Record<Variant, string> = {
   ink: "bg-ink text-paper shadow-[0_1px_0_rgb(255_255_255/0.12)_inset,0_6px_16px_-8px_rgb(34_27_23/0.6)] hover:bg-ink-soft",

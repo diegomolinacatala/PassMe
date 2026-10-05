@@ -23,6 +23,8 @@ export interface EmailCodeAuthProps {
   draft?: string;
   /** Slug of the card that led to /crear. */
   from?: string | null;
+  /** How the newcomer reached that card ("qr", "share"); travels with `from`. */
+  via?: string;
   initialEmail?: string;
   initialError?: string;
   googleEnabled: boolean;
@@ -204,7 +206,7 @@ interface CodeStepProps extends EmailCodeAuthProps {
   onEditEmail: () => void;
 }
 
-function CodeStep({ state, dispatch, pending, onEditEmail, next, draft, from, submitLabel, captchaSiteKey }: CodeStepProps) {
+function CodeStep({ state, dispatch, pending, onEditEmail, next, draft, from, via, submitLabel, captchaSiteKey }: CodeStepProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [code, setCode] = useState("");
@@ -262,6 +264,7 @@ function CodeStep({ state, dispatch, pending, onEditEmail, next, draft, from, su
         <input type="hidden" name="next" value={next} />
         {draft ? <input type="hidden" name="draft" value={draft} /> : null}
         {from ? <input type="hidden" name="from" value={from} /> : null}
+        {from && via ? <input type="hidden" name="via" value={via} /> : null}
         <div>
           <p className="eyebrow mb-2" aria-hidden="true">
             Escribe el código de {LOGIN_CODE_LENGTH} cifras

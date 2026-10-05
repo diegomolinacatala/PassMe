@@ -39,25 +39,30 @@ export function ContactMarquee() {
   );
 }
 
-const STEPS = [
-  {
-    n: "01",
-    title: "Diseña tu tarjeta",
-    body: "Nombre, cargo, foto y los contactos que quieras. Eliges motivo, tintas y letra; nosotros nos aseguramos de que se lea bien.",
-  },
-  {
-    n: "02",
-    title: "Añádela a tu cartera",
-    body: "Un toque y vive en Apple Wallet o Google Wallet, junto a tus tarjetas y billetes. No hay app que instalar.",
-  },
-  {
-    n: "03",
-    title: "Enséñala en un segundo",
-    body: "Doble clic al botón lateral, muestras el QR y la otra persona guarda tu contacto con lo que tú has decidido compartir.",
-  },
-];
+/** Step 02 depends on whether Google Wallet is live (GOOGLE_WALLET_LIVE): never promise what doesn't work yet. */
+function steps(googleWallet: boolean) {
+  return [
+    {
+      n: "01",
+      title: "Diseña tu tarjeta",
+      body: "Nombre, cargo, foto y los contactos que quieras. Eliges motivo, tintas y letra; nosotros nos aseguramos de que se lea bien.",
+    },
+    {
+      n: "02",
+      title: "Añádela a tu cartera",
+      body: googleWallet
+        ? "Un toque y vive en Apple Wallet o Google Wallet, junto a tus tarjetas y billetes. No hay app que instalar."
+        : "Un toque y vive en Apple Wallet, junto a tus tarjetas y billetes. En Android, tu QR a un toque desde la pantalla de inicio. No hay app que instalar.",
+    },
+    {
+      n: "03",
+      title: "Enséñala en un segundo",
+      body: "Doble clic al botón lateral, muestras el QR y la otra persona guarda tu contacto con lo que tú has decidido compartir.",
+    },
+  ];
+}
 
-export function HowItWorks() {
+export function HowItWorks({ googleWallet }: { googleWallet: boolean }) {
   return (
     <section id="como-funciona" aria-labelledby="como-funciona-title" className="scroll-mt-10">
       <div className="mx-auto max-w-[1240px] px-5 py-24 sm:px-8 sm:py-32">
@@ -69,7 +74,7 @@ export function HowItWorks() {
         </div>
 
         <ol className="mt-16 grid gap-px overflow-hidden rounded-[28px] border hairline bg-ink/10 md:grid-cols-3">
-          {STEPS.map((step) => (
+          {steps(googleWallet).map((step) => (
             <li key={step.n} className="group relative bg-paper p-8 transition-colors duration-500 hover:bg-card sm:p-10">
               <span className="font-display text-[5.5rem] leading-none text-muted transition-colors duration-500 group-hover:text-signal">
                 {step.n}
@@ -178,7 +183,7 @@ export function PrivacySection() {
   );
 }
 
-export function AlwaysUpdated({ card }: { card: PublicCard }) {
+export function AlwaysUpdated({ card, googleWallet }: { card: PublicCard; googleWallet: boolean }) {
   const before: PublicCard = { ...card, ...themeDesign("arena", "arco", 48_213), headline: "Product Designer", company: "Estudio Norte" };
   const after: PublicCard = {
     ...card,
@@ -201,7 +206,7 @@ export function AlwaysUpdated({ card }: { card: PublicCard }) {
           </p>
           <p className="mt-8 inline-flex items-center gap-2 font-mono text-[12px] tracking-[0.12em] text-muted uppercase">
             <RefreshCw className="size-4 text-signal" aria-hidden />
-            Actualización automática en Apple y Google Wallet
+            {googleWallet ? "Actualización automática en Apple y Google Wallet" : "Actualización automática en Apple Wallet"}
           </p>
         </div>
 
@@ -221,7 +226,7 @@ export function AlwaysUpdated({ card }: { card: PublicCard }) {
   );
 }
 
-export function FinalCta({ ctaHref }: { ctaHref: string }) {
+export function FinalCta({ ctaHref, googleWallet }: { ctaHref: string; googleWallet: boolean }) {
   return (
     <section aria-labelledby="cta-title" className="px-5 pb-24 sm:px-8">
       <div className="relative isolate mx-auto max-w-[1240px] overflow-hidden rounded-[36px] bg-glow px-6 py-20 text-center text-ink sm:px-12 sm:py-28">
@@ -238,7 +243,7 @@ export function FinalCta({ ctaHref }: { ctaHref: string }) {
           Deja de repartir papel. <em className="text-signal-deep">Pásate.</em>
         </h2>
         <ul className="relative mx-auto mt-8 flex max-w-xl flex-wrap justify-center gap-x-6 gap-y-2 text-ink">
-          {["Gratis para siempre", "Listo en 2 minutos", "iPhone y Android"].map((item) => (
+          {["Gratis para siempre", "Listo en 2 minutos", googleWallet ? "iPhone y Android" : "Funciona en cualquier móvil con cámara"].map((item) => (
             <li key={item} className="inline-flex items-center gap-1.5">
               <Check className="size-4 text-signal-deep" aria-hidden /> {item}
             </li>

@@ -1,4 +1,5 @@
-import { coerceQuickDraft, type QuickCardDraft } from "./quick";
+import type { VisitSource } from "@/lib/env";
+import { coerceQuickDraft, parseVia, type QuickCardDraft } from "./quick";
 
 /**
  * The quick-card draft, kept in this browser only while its owner signs in:
@@ -18,6 +19,8 @@ export interface StoredDraft {
   pending: boolean;
   /** Slug of the card that led here (/crear?de=…). */
   from: string | null;
+  /** How they reached that card (/crear?via=…). Older drafts lack it: "direct". */
+  via: VisitSource;
   /** Email the login code was sent to: only that account may create the card unattended. */
   authEmail: string | null;
   /** They chose Google (PKCE ties that sign-in to this browser, so it may create the card unattended). */
@@ -49,6 +52,7 @@ export function readStoredDraft(now: number = Date.now()): StoredDraft | null {
       draft: coerceQuickDraft(parsed.draft),
       pending: parsed.pending === true,
       from: typeof parsed.from === "string" ? parsed.from : null,
+      via: parseVia(parsed.via),
       authEmail: typeof parsed.authEmail === "string" ? parsed.authEmail : null,
       viaGoogle: parsed.viaGoogle === true,
       savedAt,
@@ -67,7 +71,12 @@ export function writeStoredDraft(value: Omit<StoredDraft, "savedAt">, now: numbe
 }
 
 /** Merges details the visitor already typed elsewhere (e.g. "Te dejo mi contacto") into the draft. */
-export function rememberDetails(details: Partial<QuickCardDraft>, from: string | null, now: number = Date.now()): void {
+export function rememberDetails(
+  details: Partial<QuickCardDraft>,
+  from: string | null,
+  via: VisitSource = "direct",
+  now: number = Date.now(),
+): void {
   const current = readStoredDraft(now);
   const filled = Object.fromEntries(Object.entries(details).filter(([, value]) => typeof value === "string" && value.trim()));
   writeStoredDraft(
@@ -75,6 +84,7 @@ export function rememberDetails(details: Partial<QuickCardDraft>, from: string |
       draft: coerceQuickDraft({ ...current?.draft, ...filled }),
       pending: false,
       from: from ?? current?.from ?? null,
+      via: from ? via : (current?.via ?? "direct"),
       authEmail: null,
       viaGoogle: false,
     },

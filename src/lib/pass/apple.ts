@@ -64,12 +64,9 @@ function backFields(card: PublicCard): PassField[] {
   });
 
   if (card.bio) fields.push({ key: "bio", label: "Sobre mí", value: card.bio });
-  fields.push({
-    key: "passme",
-    label: "Hecho con PassMe",
-    value: getSiteUrl(),
-    attributedValue: anchor(getSiteUrl(), "Crea tu tarjeta gratis"),
-  });
+  // The back is the owner's side of the pass: a way back to their editor.
+  const editor = `${getSiteUrl()}/dashboard`;
+  fields.push({ key: "edit", label: "Tu tarjeta", value: editor, attributedValue: anchor(editor, "Editar mi tarjeta") });
   return fields;
 }
 

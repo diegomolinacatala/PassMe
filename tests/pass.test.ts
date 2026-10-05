@@ -92,6 +92,18 @@ describe("buildApplePassJson", () => {
     expect(attributed).toContain("&lt;b&gt;");
   });
 
+  it("ends the back with a way to the owner's editor, not an ad", () => {
+    const json = buildApplePassJson({ card, serialNumber: "x" }, appleConfig);
+    const last = json.storeCard.backFields.at(-1);
+    expect(last).toEqual({
+      key: "edit",
+      label: "Tu tarjeta",
+      value: `${SITE}/dashboard`,
+      attributedValue: `<a href="${SITE}/dashboard">Editar mi tarjeta</a>`,
+    });
+    expect(JSON.stringify(json.storeCard.backFields)).not.toContain("Hecho con PassMe");
+  });
+
   it("omits the web service without a token or when disabled", () => {
     expect(buildApplePassJson({ card, serialNumber: "x" }, appleConfig)).not.toHaveProperty("webServiceURL");
     expect(

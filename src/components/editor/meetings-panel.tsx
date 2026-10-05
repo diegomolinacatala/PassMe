@@ -6,6 +6,7 @@ import { deleteMeetingAction } from "@/app/dashboard/actions";
 import { buttonClasses } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { formatSlotShort } from "@/lib/meetings/time";
+import { needsOwnerAnswer } from "@/lib/pending";
 import type { MeetingStage } from "@/lib/meetings/state";
 import type { MeetingView } from "@/lib/meetings/view";
 
@@ -36,7 +37,7 @@ const STAGE_LABEL: Record<MeetingStage, string> = {
 };
 
 function groupOf(view: MeetingView): Group {
-  if (view.stage === "awaiting") return view.actions.includes("confirm") ? "answer" : "waiting";
+  if (view.stage === "awaiting") return needsOwnerAnswer(view) ? "answer" : "waiting";
   if (view.stage === "confirmed") return "upcoming";
   return "closed";
 }

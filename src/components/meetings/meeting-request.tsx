@@ -7,7 +7,7 @@ import { submitMeetingAction, type MeetingRequestState } from "@/app/u/[slug]/me
 import { Button, buttonClasses } from "@/components/ui/button";
 import { Turnstile } from "@/components/ui/turnstile";
 import { rememberDetails } from "@/lib/card/draft-storage";
-import { createPath } from "@/lib/card/quick";
+import { createPath, parseVia } from "@/lib/card/quick";
 import type { FieldErrors } from "@/lib/card/schema";
 import { cn } from "@/lib/cn";
 import { firstName, formatDuration } from "@/lib/meetings/model";
@@ -44,20 +44,22 @@ interface Who {
 
 const STEP_ONE_FIELDS = new Set(["slots", "duration", "format", "location"]);
 
-function SentMessage({ owner, slug, state, slots, timeZone }: {
+function SentMessage({ owner, slug, source, state, slots, timeZone }: {
   owner: string;
   slug: string;
+  source: string;
   state: Extract<MeetingRequestState, { status: "sent" }>;
   slots: ReadonlyArray<string>;
   timeZone: string;
 }) {
   const heading = useRef<HTMLParagraphElement>(null);
   const { details } = state;
+  const via = parseVia(source);
   useEffect(() => heading.current?.focus(), []);
   // Any "create mine" button on the page (top bar, dark block) now starts with these details.
   useEffect(() => {
-    rememberDetails({ fullName: details.name, email: details.email, phone: details.phone, company: details.company }, slug);
-  }, [details, slug]);
+    rememberDetails({ fullName: details.name, email: details.email, phone: details.phone, company: details.company }, slug, via);
+  }, [details, slug, via]);
   return (
     <div role="status" className="animate-rise rounded-[24px] border hairline bg-card px-5 py-6 text-center">
       <CircleCheck className="mx-auto size-7 text-ok" aria-hidden />
@@ -79,7 +81,7 @@ function SentMessage({ owner, slug, state, slots, timeZone }: {
       <div className="mt-5 border-t hairline pt-5">
         <p className="text-sm text-ink-soft">¿Y si te haces tu propia tarjeta? Ya tenemos tus datos.</p>
         <Link
-          href={createPath(slug)}
+          href={createPath(slug, via)}
           className={buttonClasses({ variant: "signal", className: "group mt-3" })}
         >
           Crear la mía con estos datos
@@ -351,7 +353,7 @@ export function MeetingRequest({ slug, ownerName, source, captchaSiteKey }: Meet
   }
 
   if (state.status === "sent" && open) {
-    return <SentMessage owner={owner} slug={slug} state={state} slots={when.slots} timeZone={open.timeZone} />;
+    return <SentMessage owner={owner} slug={slug} source={source} state={state} slots={when.slots} timeZone={open.timeZone} />;
   }
   if (!open) return <CollapsedCta owner={owner} onOpen={() => setOpen({ now: Date.now(), timeZone: localTimeZone() })} />;
 

@@ -16,9 +16,10 @@ function collectErrors(page: Page): string[] {
 
 test("a scanned card invites the visitor to create their own", async ({ page }) => {
   await page.goto("/u/demo?src=qr");
-  await expect(page.getByRole("link", { name: "Crear la mía" })).toHaveAttribute("href", "/crear?de=demo");
+  // How they got here travels along: the welcome is different for a scan and for a shared link.
+  await expect(page.getByRole("link", { name: "Crear la mía" })).toHaveAttribute("href", "/crear?de=demo&via=qr");
   const cta = page.getByRole("region", { name: /Ten tu tarjeta así/ });
-  await expect(cta.getByRole("link", { name: "Crear mi tarjeta" })).toHaveAttribute("href", "/crear?de=demo");
+  await expect(cta.getByRole("link", { name: "Crear mi tarjeta" })).toHaveAttribute("href", "/crear?de=demo&via=qr");
 });
 
 test("create a card: form, email, code, welcome with the QR to show", async ({ page }) => {
@@ -59,9 +60,10 @@ test("create a card: form, email, code, welcome with the QR to show", async ({ p
   await page.waitForURL(/\/dashboard\?nueva=1&de=demo/);
   const welcome = page.getByRole("region", { name: /Ya tienes tu tarjeta/ });
   await expect(welcome.getByRole("img", { name: /QR de la tarjeta/ })).toBeVisible();
-  await expect(welcome.getByRole("button", { name: "Compartir enlace" })).toBeVisible();
+  await expect(welcome.getByRole("button", { name: /^(Compartir|Copiar enlace)$/ })).toBeVisible();
 
-  await welcome.getByRole("button", { name: "Cerrar la bienvenida" }).click();
+  // One way out, which says where it leads.
+  await welcome.getByRole("button", { name: "Personalizar mi tarjeta" }).click();
   await expect(welcome).toHaveCount(0);
   // Focus lands in the editor, not on <body>.
   await expect(page.getByRole("heading", { level: 1 })).toBeFocused();

@@ -3,22 +3,25 @@ import { themeDesign } from "@/lib/card/design";
 import type { PublicCard } from "@/lib/card/types";
 
 /**
- * Hero object: a phone showing the Apple pass, a Google pass tucked behind,
- * and the side button that you double-press to bring the wallet up.
+ * Hero object: a phone showing the Apple pass, a Google pass tucked behind
+ * (only once Google Wallet is live), and the side button that you
+ * double-press to bring the wallet up.
  */
-export function PhoneShowcase({ card }: { card: PublicCard }) {
+export function PhoneShowcase({ card, googleWallet }: { card: PublicCard; googleWallet: boolean }) {
   const backCard: PublicCard = { ...card, ...themeDesign("cafe", "pliegue", 311_724) };
 
   return (
     <div className="relative mx-auto w-[300px] sm:w-[330px]" aria-label="Ejemplo de tarjeta PassMe en la cartera del móvil">
       {/* Google pass peeking from behind */}
-      <div
-        className="absolute top-16 -left-20 hidden w-[270px] animate-float opacity-95 [--tilt:-9deg] sm:block"
-        style={{ animationDelay: "-2.5s" }}
-        aria-hidden="true"
-      >
-        <WalletPass card={backCard} style="google" className="scale-[0.92]" />
-      </div>
+      {googleWallet ? (
+        <div
+          className="absolute top-16 -left-20 hidden w-[270px] animate-float opacity-95 [--tilt:-9deg] sm:block"
+          style={{ animationDelay: "-2.5s" }}
+          aria-hidden="true"
+        >
+          <WalletPass card={backCard} style="google" className="scale-[0.92]" />
+        </div>
+      ) : null}
 
       {/* Phone */}
       <div className="crop-marks relative animate-float [--tilt:3deg]">
