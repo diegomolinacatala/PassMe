@@ -75,7 +75,8 @@ function Title({ view }: { view: MeetingView }) {
     case "declined":
       return view.closedBy === view.party ? <>Has dicho que no esta vez</> : <>{other} no puede esta vez</>;
     case "cancelled":
-      return view.closedBy === view.party ? <>Reunión cancelada</> : <>{other} ha cancelado</>;
+      if (view.closedBy !== view.party) return <>{other} ha cancelado</>;
+      return view.confirmedStart ? <>Reunión cancelada</> : <>Propuesta cancelada</>;
     case "expired":
       return <>Las horas propuestas ya pasaron</>;
   }
@@ -181,7 +182,21 @@ function Summary({ view }: { view: MeetingView }) {
   );
 }
 
-function NoteField({ label, placeholder, value, onChange, error }: { label: string; placeholder: string; value: string; onChange: (v: string) => void; error?: string }) {
+function NoteField({
+  label,
+  placeholder,
+  value,
+  onChange,
+  error,
+  autoFocus,
+}: {
+  label: string;
+  placeholder: string;
+  value: string;
+  onChange: (v: string) => void;
+  error?: string;
+  autoFocus?: boolean;
+}) {
   return (
     <Field label={label} optional error={error}>
       {(props) => (
@@ -189,6 +204,7 @@ function NoteField({ label, placeholder, value, onChange, error }: { label: stri
           {...props}
           name="note"
           rows={3}
+          autoFocus={autoFocus}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           maxLength={MEETING_LIMITS.note}
@@ -209,6 +225,13 @@ function SubmitButton({ pending, children, variant = "signal", icon }: { pending
   );
 }
 
+/** A panel's title takes focus when it opens, so the change is announced and the keyboard follows. */
+function useFocusOnMount<T extends HTMLElement>() {
+  const ref = useRef<T>(null);
+  useEffect(() => ref.current?.focus(), []);
+  return ref;
+}
+
 function BackButton({ onClick }: { onClick: () => void }) {
   return (
     <button type="button" onClick={onClick} className="mt-3 inline-flex min-h-10 items-center gap-1.5 rounded-full px-2 text-sm font-medium text-muted hover:text-ink">
@@ -226,9 +249,25 @@ interface PanelProps {
 }
 
 /** One tap: the proposed times as large choices, plus the place or video link. */
-function ConfirmPanel({ view, act, pending, errors, selected, onSelect, onMode }: PanelProps & { selected: string | null; onSelect: (slot: string) => void; onMode: (mode: Mode) => void }) {
+function ConfirmPanel({
+  view,
+  act,
+  pending,
+  errors,
+  selected,
+  onSelect,
+  onMode,
+  returnFocus,
+}: PanelProps & { selected: string | null; onSelect: (slot: string) => void; onMode: (mode: Mode) => void; returnFocus: Mode | null }) {
   const [location, setLocation] = useState(view.location);
   const other = otherName(view);
+  const counterButton = useRef<HTMLButtonElement>(null);
+  const declineButton = useRef<HTMLButtonElement>(null);
+  // Back from "Proponer otras horas" or "No puedo": focus returns to the button that opened it.
+  useEffect(() => {
+    if (returnFocus === "counter") counterButton.current?.focus();
+    if (returnFocus === "decline") declineButton.current?.focus();
+  }, [returnFocus]);
   return (
     <Panel className="animate-rise">
       <form action={act} className="space-y-4">
@@ -299,12 +338,17 @@ function ConfirmPanel({ view, act, pending, errors, selected, onSelect, onMode }
       </form>
       <div className="mt-4 grid grid-cols-2 gap-2 border-t hairline pt-4">
         {view.actions.includes("counter") ? (
-          <Button variant="outline" onClick={() => onMode("counter")}>
+          <Button ref={counterButton} variant="outline" onClick={() => onMode("counter")}>
             <CalendarClock className="size-4" aria-hidden />
-            Otra hora
+            Proponer otras horas
           </Button>
         ) : null}
-        <Button variant="ghost" onClick={() => onMode("decline")} className={view.actions.includes("counter") ? "" : "col-span-2"}>
+        <Button
+          ref={declineButton}
+          variant="ghost"
+          onClick={() => onMode("decline")}
+          className={view.actions.includes("counter") ? "" : "col-span-2"}
+        >
           <CalendarX2 className="size-4" aria-hidden />
           No puedo
         </Button>
@@ -318,6 +362,7 @@ function CounterPanel({ view, act, pending, errors, onBack }: PanelProps & { onB
   const [note, setNote] = useState("");
   const now = useClientNow();
   const other = otherName(view);
+  const heading = useFocusOnMount<HTMLHeadingElement>();
   return (
     <Panel className="animate-rise">
       <form action={act} className="space-y-5" id="otra-hora">
@@ -326,7 +371,9 @@ function CounterPanel({ view, act, pending, errors, onBack }: PanelProps & { onB
           <input key={iso} type="hidden" name="slot" value={iso} />
         ))}
         <div>
-          <h2 className="font-display text-2xl leading-tight">Propón otras horas</h2>
+          <h2 ref={heading} tabIndex={-1} className="font-display text-2xl leading-tight outline-none">
+            Proponer otras horas
+          </h2>
           <p className="mt-1 text-sm text-muted">
             Hasta tres (hora de {timeZoneCity(view.timeZone)}). {other} recibirá un email para elegir una.
           </p>
@@ -348,12 +395,15 @@ function CounterPanel({ view, act, pending, errors, onBack }: PanelProps & { onB
 
 function DeclinePanel({ view, act, pending, errors, onBack }: PanelProps & { onBack: () => void }) {
   const [note, setNote] = useState("");
+  const heading = useFocusOnMount<HTMLHeadingElement>();
   return (
     <Panel className="animate-rise">
       <form action={act} className="space-y-4">
         <input type="hidden" name="intent" value="decline" />
         <div>
-          <h2 className="font-display text-2xl leading-tight">¿No puedes en ninguna?</h2>
+          <h2 ref={heading} tabIndex={-1} className="font-display text-2xl leading-tight outline-none">
+            ¿No puedes en ninguna?
+          </h2>
           <p className="mt-1 text-sm text-muted">Le avisamos a {otherName(view)} con un mensaje amable. Si quieres, añade una nota.</p>
         </div>
         <NoteField label="Nota" placeholder="Gracias, pero estas semanas voy muy liado." value={note} onChange={setNote} error={errors.note} />
@@ -379,9 +429,15 @@ interface CancelBlockProps {
 /** Cancelling asks once more, with room for a note. */
 function CancelBlock({ open, onOpen, onClose, act, pending, label, error }: CancelBlockProps) {
   const [note, setNote] = useState("");
+  const opener = useRef<HTMLButtonElement>(null);
+  // "No, mantener": close, then give focus back to the button that opened it (once it's back).
+  function keep() {
+    onClose();
+    requestAnimationFrame(() => opener.current?.focus());
+  }
   if (!open) {
     return (
-      <button type="button" onClick={onOpen} className="mt-4 inline-flex min-h-10 items-center gap-1.5 rounded-full px-2 text-sm font-medium text-danger hover:bg-danger/10">
+      <button ref={opener} type="button" onClick={onOpen} className="mt-4 inline-flex min-h-10 items-center gap-1.5 rounded-full px-2 text-sm font-medium text-danger hover:bg-danger/10">
         <Undo2 className="size-4" aria-hidden />
         {label}
       </button>
@@ -390,9 +446,9 @@ function CancelBlock({ open, onOpen, onClose, act, pending, label, error }: Canc
   return (
     <form action={act} className="mt-4 animate-rise space-y-3 border-t hairline pt-4">
       <input type="hidden" name="intent" value="cancel" />
-      <NoteField label="Nota" placeholder="Me ha surgido algo, ¿lo movemos?" value={note} onChange={setNote} error={error} />
+      <NoteField label="Nota" placeholder="Me ha surgido algo, ¿lo movemos?" value={note} onChange={setNote} error={error} autoFocus />
       <div className="grid grid-cols-2 gap-2">
-        <Button variant="ghost" onClick={onClose}>
+        <Button variant="ghost" onClick={keep}>
           No, mantener
         </Button>
         <Button type="submit" variant="danger" disabled={pending} aria-busy={pending}>
@@ -449,6 +505,24 @@ function ConfirmedPanel({ view, icsHref, cancel }: { view: MeetingView; icsHref:
   );
 }
 
+/** What this page is for later: the owner's editor, or the guest's link to come back to. */
+function Footer({ view }: { view: MeetingView }) {
+  if (view.party === "owner") {
+    return (
+      <p className="pt-2 text-center text-xs text-muted">
+        Las propuestas de {displayName(view.guest)} también están en tu editor, en «Reuniones».
+      </p>
+    );
+  }
+  const text =
+    view.stage === "awaiting"
+      ? "Guarda este enlace: desde aquí puedes ver o cancelar tu propuesta."
+      : view.stage === "confirmed"
+        ? "Guarda este enlace: desde aquí puedes ver o cancelar la reunión."
+        : null;
+  return text ? <p className="pt-2 text-center text-xs text-muted">{text}</p> : null;
+}
+
 /**
  * One side of a meeting: answer a proposal (confirm with one tap, propose
  * other times, or decline), wait for the other side, or manage a confirmed
@@ -461,25 +535,40 @@ export function MeetingResponse({ id, signature, initial, preset, demo }: Meetin
 
   const presetSlot = preset.slotIndex !== null ? initial.slots[preset.slotIndex] : undefined;
   const [selected, setSelected] = useState<string | null>(presetSlot && initial.openSlots.includes(presetSlot) ? presetSlot : (initial.openSlots[0] ?? null));
-  const [mode, setMode] = useState<Mode>(preset.mode && initial.actions.includes(preset.mode) ? preset.mode : "confirm");
+  const [mode, setModeState] = useState<Mode>(preset.mode && initial.actions.includes(preset.mode) ? preset.mode : "confirm");
+  // The panel the person just left, so focus can return to the button that opened it.
+  const [returnFocus, setReturnFocus] = useState<Mode | null>(null);
+  const setMode = (next: Mode) => {
+    setReturnFocus(next === "confirm" && mode !== "confirm" ? mode : null);
+    setModeState(next);
+  };
 
   // Back to the default view after every successful change.
   const [handled, setHandled] = useState(state);
   if (handled !== state) {
     setHandled(state);
     if (state.status === "done") {
-      setMode("confirm");
+      setModeState("confirm");
+      setReturnFocus(null);
       setSelected(state.view.openSlots[0] ?? null);
     }
   }
 
   const errors = state.status === "error" ? (state.errors ?? {}) : {};
-  const panel: PanelProps = { view, act, pending, errors };
+  // Demo pages store nothing: each answer tells the server where the sample meeting stands.
+  const send: Act = demo
+    ? (formData) => {
+        const { status, proposedBy, slots, confirmedStart, location, closedBy } = view;
+        formData.set("demoState", JSON.stringify({ status, proposedBy, slots, confirmedStart, location, closedBy }));
+        act(formData);
+      }
+    : act;
+  const panel: PanelProps = { view, act: send, pending, errors };
   const cancel = (label: string): CancelBlockProps => ({
     open: mode === "cancel",
     onOpen: () => setMode("cancel"),
     onClose: () => setMode("confirm"),
-    act,
+    act: send,
     pending,
     label,
     error: errors.note,
@@ -505,25 +594,21 @@ export function MeetingResponse({ id, signature, initial, preset, demo }: Meetin
       <Summary view={view} />
 
       {view.stage === "awaiting" && canAnswer && mode === "confirm" ? (
-        <ConfirmPanel {...panel} selected={selected} onSelect={setSelected} onMode={setMode} />
+        <ConfirmPanel {...panel} selected={selected} onSelect={setSelected} onMode={setMode} returnFocus={returnFocus} />
       ) : null}
       {view.stage === "awaiting" && canAnswer && mode === "counter" ? <CounterPanel {...panel} onBack={() => setMode("confirm")} /> : null}
       {view.stage === "awaiting" && canAnswer && mode === "decline" ? <DeclinePanel {...panel} onBack={() => setMode("confirm")} /> : null}
-      {view.stage === "awaiting" && !canAnswer ? <WaitingPanel view={view} cancel={cancel("Retirar propuesta")} /> : null}
+      {view.stage === "awaiting" && !canAnswer ? <WaitingPanel view={view} cancel={cancel("Cancelar propuesta")} /> : null}
       {view.stage === "confirmed" ? <ConfirmedPanel view={view} icsHref={`/reunion/${id}/${signature}/invitacion.ics`} cancel={cancel("Cancelar reunión")} /> : null}
 
       {view.party === "guest" && ["declined", "cancelled", "expired"].includes(view.stage) ? (
         <a href={`/u/${view.owner.slug}`} className={buttonClasses({ variant: "signal", size: "lg", className: "w-full" })}>
           <CalendarClock className="size-5" aria-hidden />
-          Proponer otra fecha
+          Proponer otras horas
         </a>
       ) : null}
 
-      <p className="pt-2 text-center text-xs text-muted">
-        {view.party === "owner"
-          ? `Las propuestas de ${displayName(view.guest)} también están en tu editor, en «Reuniones».`
-          : "Guarda este enlace: desde aquí puedes ver o cancelar la reunión."}
-      </p>
+      <Footer view={view} />
     </div>
   );
 }

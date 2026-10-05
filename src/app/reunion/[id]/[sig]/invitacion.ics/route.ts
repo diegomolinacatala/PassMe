@@ -5,7 +5,7 @@ import { buildIcs } from "@/lib/meetings/calendar";
 import { verifyMeetingSignature } from "@/lib/meetings/links";
 import { meetingEvent, type Meeting } from "@/lib/meetings/model";
 import type { MeetingParty } from "@/lib/meetings/state";
-import { DEMO_MEETING_ID, demoMeeting } from "@/lib/meetings/view";
+import { demoMeetingById, isDemoMeetingId } from "@/lib/meetings/view";
 
 const HEADERS = {
   "Content-Type": "text/calendar; charset=utf-8; method=PUBLISH",
@@ -22,10 +22,10 @@ interface Loaded {
 }
 
 async function load(rawId: string, signature: string, host: string): Promise<Loaded | null> {
-  if (rawId === DEMO_MEETING_ID && !isSupabaseConfigured()) {
-    const demo = demoMeeting(new Date());
+  if (isDemoMeetingId(rawId) && !isSupabaseConfigured()) {
+    const demo = demoMeetingById(rawId, new Date());
     return {
-      meeting: { ...demo, status: "confirmed", confirmedStart: demo.slots[0]! },
+      meeting: { ...demo, status: "confirmed", confirmedStart: demo.confirmedStart ?? demo.slots[0]! },
       owner: { name: DEMO_CARD.fullName, email: "alex@example.com" },
       party: signature === "invitado" ? "guest" : "owner",
     };

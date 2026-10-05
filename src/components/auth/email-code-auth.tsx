@@ -287,7 +287,7 @@ function CodeStep({ state, dispatch, pending, onEditEmail, next, draft, from, su
             {state.error}
           </p>
         ) : null}
-        <SubmitButton pendingLabel="Comprobando…" disabled={code.length < 6}>
+        <SubmitButton pendingLabel="Comprobando…" disabled={code.length < LOGIN_CODE_LENGTH}>
           {submitLabel}
         </SubmitButton>
       </form>

@@ -17,7 +17,7 @@ import { listOwnMeetings } from "@/lib/data/meetings";
 import type { MeetingItem } from "@/components/editor/meetings-panel";
 import { meetingPath } from "@/lib/meetings/links";
 import type { Meeting } from "@/lib/meetings/model";
-import { demoOwnerMeetings, toMeetingView } from "@/lib/meetings/view";
+import { demoOwnerMeetings, isDemoMeetingId, toMeetingView } from "@/lib/meetings/view";
 import { getSiteUrl, profileUrl } from "@/lib/env";
 import { detectPlatform } from "@/lib/platform";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
@@ -41,6 +41,13 @@ function DashboardHeader({ slug }: { slug: string }) {
   );
 }
 
+/** What a failed pass download (/api/pass/…, followed as a link) comes back to say. */
+const PASS_NOTICES: Record<string, string> = {
+  error: "No hemos podido preparar tu pase. Guarda tu tarjeta y vuelve a intentarlo; si sigue fallando, escríbenos.",
+  espera: "Has pedido el pase muchas veces seguidas. Espera un minuto y vuelve a intentarlo.",
+  pronto: "Esa cartera aún no está disponible. Mientras tanto, enseña tu QR desde aquí.",
+};
+
 /**
  * The just-created card's welcome (?nueva=1), naming whose card led here (?de=…),
  * or a note for an account that went through /crear but already had a card (?existente=1).
@@ -51,6 +58,14 @@ async function welcomeFor(
   wallet: WalletAvailability,
   demo: boolean,
 ) {
+  const passNotice = typeof query.pase === "string" ? PASS_NOTICES[query.pase] : undefined;
+  if (passNotice) {
+    return (
+      <p role="alert" className="rounded-2xl bg-danger-wash px-4 py-3 text-sm text-danger">
+        {passNotice}
+      </p>
+    );
+  }
   if (query.existente === "1") {
     return (
       <p role="status" className="rounded-2xl border hairline bg-card px-4 py-3 text-sm text-ink-soft">
@@ -81,8 +96,8 @@ function meetingItems(meetings: Meeting[], card: OwnerCard, demo: boolean): Meet
   const owner = { id: card.id, name: card.fullName, slug: card.slug, email: null };
   return meetings.map((meeting) => ({
     view: toMeetingView(meeting, owner, "owner", now),
-    // The demo's sample proposal has its own page; the others only exist in the panel.
-    href: demo ? (meeting.id === "demo" ? "/reunion/demo/anfitrion" : null) : meetingPath(meeting.id, "owner"),
+    // Every demo sample has its own page (/reunion/demo…/anfitrion).
+    href: demo ? (isDemoMeetingId(meeting.id) ? `/reunion/${meeting.id}/anfitrion` : null) : meetingPath(meeting.id, "owner"),
   }));
 }
 

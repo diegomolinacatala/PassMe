@@ -142,7 +142,8 @@ export function CreateFlow({ mode, from, referrer, initialSeed, accountEmail, pr
     // Kept for the email's button or Google, which may finish in another tab.
     writeStoredDraft({ draft, pending: true, from: origin, authEmail: null, viaGoogle: false });
     setStep("auth");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
   }
 
   const preview = quickDraftToPublicCard(draft);
@@ -217,7 +218,7 @@ export function CreateFlow({ mode, from, referrer, initialSeed, accountEmail, pr
           <WalletPass card={preview} style={previewStyle} className="animate-rise" />
         </div>
         <p className="mt-3 text-center text-xs text-muted max-lg:hidden">
-          Así se verá en {previewStyle === "google" ? "Google Wallet" : "Apple Wallet"}. El QR lleva a tu página.
+          Así se verá en {previewStyle === "google" ? "Google Wallet" : "Apple Wallet"}. El QR lleva a tu tarjeta.
         </p>
       </aside>
 

@@ -50,6 +50,8 @@ export function WelcomePanel({ slug, fullName, qrUrl, shareUrl, referrerName, wa
     setOpen(false);
     // Drop ?nueva=1 so a reload doesn't bring the welcome back.
     window.history.replaceState(null, "", "/dashboard");
+    // The panel is gone: keep the keyboard (and screen reader) in the editor, not on <body>.
+    document.getElementById("editor-title")?.focus();
   }
 
   async function share() {

@@ -1,9 +1,10 @@
 "use client";
 
 import { CircleCheck, LoaderCircle, TriangleAlert } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition, type ReactNode } from "react";
 import { saveCardAction } from "@/app/dashboard/actions";
 import { Button } from "@/components/ui/button";
+import { describeErrors } from "@/lib/card/save-errors";
 import { LIMITS, type FieldErrors } from "@/lib/card/schema";
 import type { OwnerCard } from "@/lib/card/types";
 import type { ContactRequest } from "@/lib/card/contact";
@@ -14,7 +15,7 @@ import { AccountPanel } from "./account-panel";
 import { AvatarField } from "./avatar-field";
 import { ContactsPanel } from "./contacts-panel";
 import { DesignField } from "./design-field";
-import { Section, Switch, TextField } from "./fields";
+import { Section, SwitchRow, TextField } from "./fields";
 import { LinksEditor } from "./links-editor";
 import { MeetingsPanel, type MeetingItem } from "./meetings-panel";
 import { PreviewPanel } from "./preview-panel";
@@ -51,6 +52,20 @@ type SaveStatus =
   | { kind: "error"; message: string }
   | { kind: "demo" };
 
+/** How long "Guardado" stays on screen before the bar slides away. */
+const SAVED_NOTICE_MS = 3000;
+
+/** Brings the first (or the next) field marked invalid into view and focuses it. */
+function focusInvalid(root: HTMLElement | null, after?: Element | null) {
+  const fields = Array.from(root?.querySelectorAll<HTMLElement>('[aria-invalid="true"]') ?? []);
+  if (fields.length === 0) return;
+  const index = after ? fields.findIndex((field) => field === after) : -1;
+  const target = fields[(index + 1) % fields.length]!;
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  target.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" });
+  target.focus({ preventScroll: true });
+}
+
 export function CardEditor({ initialCard, stats, contacts, meetings, wallet, siteUrl, email, demo, welcome }: CardEditorProps) {
   const initialDraft = useMemo(() => draftFromCard(initialCard), [initialCard]);
   const editor = useCardDraft(initialDraft);
@@ -74,6 +89,9 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, sit
   const [serverResult, setServerResult] = useState<{ draft: CardDraft; errors: FieldErrors } | null>(null);
   const [status, setStatus] = useState<SaveStatus>({ kind: "idle" });
   const [saving, startSaving] = useTransition();
+  const root = useRef<HTMLDivElement>(null);
+  // Bumped on every save that fails validation: the effect below takes the person to the field.
+  const [errorJump, setErrorJump] = useState(0);
 
   const siteHost = siteUrl.replace(/^https?:\/\//, "");
   const preview = useMemo(() => draftToPublicCard(draft), [draft]);
@@ -87,7 +105,8 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, sit
   const save = useCallback(() => {
     setSubmitted(true);
     if (errorCount > 0) {
-      setStatus({ kind: "error", message: "Revisa los campos marcados en rojo." });
+      setStatus({ kind: "error", message: describeErrors(errors, draft) });
+      setErrorJump((n) => n + 1);
       return;
     }
     if (demo) {
@@ -109,10 +128,23 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, sit
         setStatus(result.designPending ? { kind: "partial" } : { kind: "saved", at: Date.now() });
       } else {
         setServerResult({ draft, errors: result.errors });
-        setStatus({ kind: "error", message: result.errors._form ?? "Revisa los campos marcados en rojo." });
+        setStatus({ kind: "error", message: describeErrors(result.errors, draft) });
+        setErrorJump((n) => n + 1);
       }
     });
-  }, [demo, draft, editor, errorCount]);
+  }, [demo, draft, editor, errorCount, errors]);
+
+  // After the fields re-render with aria-invalid, go to the first one.
+  useEffect(() => {
+    if (errorJump > 0) focusInvalid(root.current);
+  }, [errorJump]);
+
+  // "Guardado" says its piece and the bar goes away.
+  useEffect(() => {
+    if (status.kind !== "saved" && status.kind !== "demo") return;
+    const timer = window.setTimeout(() => setStatus({ kind: "idle" }), SAVED_NOTICE_MS);
+    return () => window.clearTimeout(timer);
+  }, [status]);
 
   // Cmd/Ctrl+S saves; warn before leaving with unsaved changes.
   useEffect(() => {
@@ -152,12 +184,12 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, sit
       : null;
 
   return (
-    <div className="mx-auto max-w-[1240px] px-4 pb-36 sm:px-8">
+    <div ref={root} className="mx-auto max-w-[1240px] px-4 pb-36 sm:px-8">
       {welcome ? <div className="pt-6 sm:pt-10">{welcome}</div> : null}
       <div className="flex flex-wrap items-end justify-between gap-4 pt-6 pb-8 sm:pt-10">
         <div>
           <p className="eyebrow">{demo ? "Editor · modo demo" : "Editor"}</p>
-          <h1 className="mt-2 font-display text-[length:var(--text-title)] leading-none tracking-tight">
+          <h1 id="editor-title" tabIndex={-1} className="mt-2 font-display text-[length:var(--text-title)] leading-none tracking-tight outline-none">
             Tu tarjeta, <em className="text-signal">a tu manera.</em>
           </h1>
         </div>
@@ -176,19 +208,18 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, sit
         <div className="mb-8 flex items-start gap-3 rounded-2xl border border-dashed border-signal/50 bg-signal-wash/60 px-4 py-3 text-sm text-signal-deep">
           <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
           <p>
-            <strong>Modo demo.</strong> Supabase aún no está conectado: puedes jugar con el editor pero nada se guarda. Sigue{" "}
-            <code className="font-mono">docs/SETUP.md</code> para activarlo.
+            <strong>Modo demo:</strong> los cambios no se guardan.
           </p>
         </div>
       ) : null}
 
-      <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_400px] xl:gap-12">
+      <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,1fr)_400px] xl:gap-12">
         <div className="min-w-0 space-y-6">
           {/* On phones the live preview sits on top; on desktop it lives in the sticky aside. */}
           <div className="lg:hidden">
             <PreviewPanel card={preview} />
           </div>
-          <Section number="01" title="Quién eres" description="Lo básico que aparece en el pase y en tu página.">
+          <Section number="01" title="Quién eres" description="Lo básico que aparece en tu tarjeta y en el pase.">
             <div className="space-y-5">
               <AvatarField
                 userId={initialCard.id}
@@ -222,8 +253,8 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, sit
 
           <Section
             number="02"
-            title="Tus contactos"
-            description="Añade todos los que quieras y oculta los que no quieras enseñar. Lo oculto nunca sale del servidor."
+            title="Cómo contactarte"
+            description="Añade todos los datos que quieras y oculta los que no quieras enseñar. Lo que ocultes no lo verá nadie."
           >
             <LinksEditor
               links={draft.links}
@@ -240,7 +271,7 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, sit
           <Section
             number="03"
             title="Estilo"
-            description="Motivo, colores y letra de tu pase. Se aplican también a tu página. El texto se ajusta solo para que se lea."
+            description="Motivo, colores y letra de tu pase y de tu tarjeta. El texto se ajusta solo para que se lea."
           >
             <DesignField
               value={{
@@ -255,16 +286,18 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, sit
             />
           </Section>
 
-          <Section
-            number="04"
-            title="Publicación"
-            aside={<Switch checked={draft.isPublished} onChange={editor.setPublished} label="Tarjeta publicada" />}
-            description={
-              draft.isPublished
-                ? "Tu tarjeta es visible para quien tenga el enlace o escanee tu QR."
-                : "Despublicada: el enlace y el QR mostrarán «no encontrada»."
-            }
-          >
+          <Section number="04" title="Publicación">
+            <SwitchRow
+              checked={draft.isPublished}
+              onChange={editor.setPublished}
+              label="Tarjeta publicada"
+              description={
+                draft.isPublished
+                  ? "Tu tarjeta es visible para quien tenga el enlace o escanee tu QR."
+                  : "Despublicada: quien abra tu enlace o escanee tu QR verá que no está disponible."
+              }
+              className="mb-6 border-b hairline pb-5"
+            />
             <SlugField
               value={draft.slug}
               savedValue={savedSlug}
@@ -274,34 +307,20 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, sit
               suggestion={isPlaceholderSlug(draft.slug) ? suggestSlug(draft.fullName) : null}
               onChange={(v) => editor.setField("slug", v)}
             />
-            <div className="mt-6 flex items-start justify-between gap-4 border-t hairline pt-5">
-              <div>
-                <p className="text-sm font-medium text-ink-soft">Deja que te propongan reuniones</p>
-                <p className="mt-1 max-w-md text-sm text-muted">
-                  Tu página muestra «Agendar reunión»: quien te escanee propone día y hora, y a ti te llega un email para confirmarla
-                  con un toque. Os enviamos la invitación a los dos.
-                </p>
-              </div>
-              <Switch
-                checked={draft.acceptsMeetingRequests}
-                onChange={editor.setAcceptsMeetingRequests}
-                label="Agendar reunión en tu página"
-              />
-            </div>
-            <div className="mt-5 flex items-start justify-between gap-4 border-t hairline pt-5">
-              <div>
-                <p className="text-sm font-medium text-ink-soft">Deja que te dejen su contacto</p>
-                <p className="mt-1 max-w-md text-sm text-muted">
-                  Tu página muestra un formulario para que quien te escanee te deje su nombre, email o teléfono. Lo verás en
-                  «Contactos recibidos».
-                </p>
-              </div>
-              <Switch
-                checked={draft.acceptsContactRequests}
-                onChange={editor.setAcceptsContactRequests}
-                label="Formulario de contacto en tu página"
-              />
-            </div>
+            <SwitchRow
+              checked={draft.acceptsMeetingRequests}
+              onChange={editor.setAcceptsMeetingRequests}
+              label="Recibir propuestas de reunión"
+              description="Tu tarjeta muestra «Agendar reunión»: quien te escanee propone día y hora, y a ti te llega un email para confirmarla con un toque. Os enviamos la invitación a los dos."
+              className="mt-6 border-t hairline pt-5"
+            />
+            <SwitchRow
+              checked={draft.acceptsContactRequests}
+              onChange={editor.setAcceptsContactRequests}
+              label="Recibir contactos"
+              description="Tu tarjeta muestra «Déjale tu contacto» para que quien te escanee te deje su nombre, email o teléfono. Lo verás en «Contactos recibidos»."
+              className="mt-5 border-t hairline pt-5"
+            />
           </Section>
         </div>
 
@@ -323,18 +342,10 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, sit
               isPublished={savedPublished}
             />
           </Section>
-          <Section
-            number="06"
-            title="Reuniones"
-            description={meetings.items.length > 0 ? `${meetings.items.length} en total` : undefined}
-          >
+          <Section number="06" title="Reuniones">
             <MeetingsPanel items={meetings.items} available={meetings.available} enabled={savedAcceptsMeetings} demo={demo} />
           </Section>
-          <Section
-            number="07"
-            title="Contactos recibidos"
-            description={contacts.requests.length > 0 ? `${contacts.requests.length} en total` : undefined}
-          >
+          <Section number="07" title="Contactos recibidos">
             <ContactsPanel
               requests={contacts.requests}
               available={contacts.available}
@@ -346,14 +357,50 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, sit
             <StatsPanel stats={stats} links={draft.links} demo={demo} />
           </Section>
           <Section number="09" title="Cuenta">
-            <AccountPanel email={email} demo={demo} />
+            <AccountPanel email={email} demo={demo} hasContacts={contacts.requests.length > 0} />
           </Section>
         </aside>
       </div>
 
-      <SaveBar dirty={dirty} saving={saving} status={status} errorCount={submitted ? errorCount : 0} onSave={save} />
+      <SaveBar
+        dirty={dirty}
+        saving={saving}
+        status={status}
+        errorCount={submitted ? errorCount : 0}
+        onSave={save}
+        onNextError={() => focusInvalid(root.current, document.activeElement)}
+      />
     </div>
   );
+}
+
+const subscribeNoop = () => () => {};
+
+/** "⌘S" on Apple devices, "Ctrl S" elsewhere (null while rendering on the server). */
+function useSaveShortcut(): string | null {
+  return useSyncExternalStore(
+    subscribeNoop,
+    () => (/Mac|iPhone|iPad|iPod/.test(navigator.userAgent) ? "⌘S" : "Ctrl S"),
+    () => null,
+  );
+}
+
+/** Keeps a focused field from ending up under the fixed bar (WCAG 2.4.11). */
+function useScrollPadding(bar: HTMLElement | null, visible: boolean) {
+  useEffect(() => {
+    if (!visible || !bar) return;
+    const html = document.documentElement;
+    const apply = () => {
+      html.style.scrollPaddingBottom = `${bar.offsetHeight + 16}px`;
+    };
+    apply();
+    const observer = new ResizeObserver(apply);
+    observer.observe(bar);
+    return () => {
+      observer.disconnect();
+      html.style.scrollPaddingBottom = "";
+    };
+  }, [bar, visible]);
 }
 
 interface SaveBarProps {
@@ -362,9 +409,20 @@ interface SaveBarProps {
   status: SaveStatus;
   errorCount: number;
   onSave: () => void;
+  onNextError: () => void;
 }
 
-function SaveBar({ dirty, saving, status, errorCount, onSave }: SaveBarProps) {
+/**
+ * Slides up with the first change and stays while there's something to say:
+ * unsaved changes, saving, an error, or "Guardado" for a moment. Otherwise it
+ * isn't there, so it never covers the welcome, the QR or a field.
+ */
+function SaveBar({ dirty, saving, status, errorCount, onSave, onNextError }: SaveBarProps) {
+  const [bar, setBar] = useState<HTMLDivElement | null>(null);
+  const shortcut = useSaveShortcut();
+  const visible = dirty || saving || (status.kind === "error" ? errorCount > 0 : status.kind !== "idle");
+  useScrollPadding(bar, visible);
+
   const message = saving
     ? "Guardando…"
     : status.kind === "error" && (dirty || errorCount > 0)
@@ -383,25 +441,53 @@ function SaveBar({ dirty, saving, status, errorCount, onSave }: SaveBarProps) {
     status.kind === "error" && (dirty || errorCount > 0) ? "error" : dirty ? "dirty" : status.kind === "partial" ? "warn" : "ok";
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 px-3 pb-3 sm:px-6 sm:pb-5">
-      <div
-        className={cn(
-          "pointer-events-auto mx-auto flex max-w-[640px] items-center gap-3 rounded-full border py-2 pr-2 pl-5 shadow-object backdrop-blur-md transition-colors duration-300",
-          tone === "dirty" ? "border-ink bg-ink text-paper" : "border-line bg-card/90 text-ink",
-        )}
-        role="status"
-        aria-live="polite"
-      >
-        {tone === "error" ? <TriangleAlert className="size-4 shrink-0 text-danger" aria-hidden /> : null}
-        {tone === "warn" ? <TriangleAlert className="size-4 shrink-0 text-signal-deep" aria-hidden /> : null}
-        {tone === "ok" ? <CircleCheck className="size-4 shrink-0 text-ok" aria-hidden /> : null}
-        {tone === "dirty" ? <span className="size-2 shrink-0 animate-pulse rounded-full bg-signal" aria-hidden /> : null}
-        <p className="min-w-0 flex-1 truncate text-sm">{message}</p>
-        <span className="hidden font-mono text-[10px] tracking-widest opacity-50 sm:inline">⌘S</span>
-        <Button variant={tone === "dirty" ? "signal" : "ink"} size="sm" onClick={onSave} disabled={saving || (!dirty && tone !== "error")}>
-          {saving ? <LoaderCircle className="size-4 animate-spin" aria-hidden /> : null}
-          Guardar
-        </Button>
+    <div
+      ref={setBar}
+      // Out of the tab order and hidden from screen readers while it's off screen.
+      inert={!visible}
+      aria-hidden={!visible}
+      className={cn(
+        "pointer-events-none fixed inset-x-0 bottom-0 z-30 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] transition-[transform,opacity] duration-200 ease-[var(--ease-out-expo)] sm:px-6 sm:pb-5",
+        visible ? "translate-y-0 opacity-100" : "translate-y-full opacity-0",
+      )}
+    >
+      {/* On desktop the bar sits under the form column, clear of the preview. */}
+      <div className="mx-auto max-w-[1240px] lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-8 lg:px-2 xl:gap-12">
+        <div
+          className={cn(
+            "flex items-center gap-3 rounded-[28px] border py-2 pr-2 pl-5 shadow-object backdrop-blur-md transition-colors duration-300 max-lg:mx-auto max-lg:max-w-[640px]",
+            visible && "pointer-events-auto",
+            tone === "dirty" ? "border-ink bg-ink text-paper" : "border-line bg-card/90 text-ink",
+          )}
+        >
+          {tone === "error" ? <TriangleAlert className="size-4 shrink-0 text-danger" aria-hidden /> : null}
+          {tone === "warn" ? <TriangleAlert className="size-4 shrink-0 text-signal-deep" aria-hidden /> : null}
+          {tone === "ok" ? <CircleCheck className="size-4 shrink-0 text-ok" aria-hidden /> : null}
+          {tone === "dirty" ? <span className="size-2 shrink-0 animate-pulse rounded-full bg-signal" aria-hidden /> : null}
+          <p className="line-clamp-2 min-w-0 flex-1 text-sm" role="status" aria-live="polite">
+            {message}
+          </p>
+          {tone === "error" && errorCount > 1 ? (
+            <Button variant="ghost" size="sm" onClick={onNextError} className="shrink-0">
+              Ver
+            </Button>
+          ) : null}
+          {shortcut ? (
+            <span className="hidden font-mono text-[10px] tracking-widest opacity-60 sm:inline" aria-hidden>
+              {shortcut}
+            </span>
+          ) : null}
+          <Button
+            variant={tone === "dirty" ? "signal" : "ink"}
+            size="sm"
+            onClick={onSave}
+            disabled={saving || (!dirty && tone !== "error")}
+            className="shrink-0"
+          >
+            {saving ? <LoaderCircle className="size-4 animate-spin" aria-hidden /> : null}
+            {saving ? "Guardando…" : "Guardar"}
+          </Button>
+        </div>
       </div>
     </div>
   );

@@ -87,7 +87,7 @@ export function HowItWorks() {
 const PRIVACY_ROWS: Array<{ kind: LinkKind; label: string; value: string; visible: boolean }> = [
   { kind: "email", label: "Email", value: "alex@estudionorte.com", visible: true },
   { kind: "linkedin", label: "LinkedIn", value: "in/alex-rivera", visible: true },
-  { kind: "booking", label: "Reservar cita", value: "cal.com/alex", visible: true },
+  { kind: "booking", label: "Reservar una cita", value: "cal.com/alex", visible: true },
   { kind: "phone", label: "Teléfono", value: "+34 600 ·· ·· ··", visible: false },
   { kind: "whatsapp", label: "WhatsApp", value: "+34 600 ·· ·· ··", visible: false },
 ];
@@ -95,8 +95,8 @@ const PRIVACY_ROWS: Array<{ kind: LinkKind; label: string; value: string; visibl
 const PRIVACY_POINTS = [
   {
     icon: EyeOff,
-    title: "Lo oculto no sale del servidor",
-    body: "Los contactos que ocultas no se envían ni al navegador. No es un truco visual: simplemente no están.",
+    title: "Lo que ocultas no lo ve nadie",
+    body: "Los datos que ocultas no se envían ni al navegador. No es un truco visual: simplemente no están.",
   },
   {
     icon: ShieldCheck,
@@ -141,7 +141,7 @@ export function PrivacySection() {
 
         <div className="lg:col-span-5 lg:col-start-8">
           <div className="rounded-[28px] border border-paper/12 bg-paper/[0.04] p-3 sm:p-4" aria-label="Ejemplo de contactos visibles y ocultos">
-            <p className="eyebrow px-3 pt-2 pb-4 text-paper/60">Tus contactos</p>
+            <p className="eyebrow px-3 pt-2 pb-4 text-paper/60">Tus datos de contacto</p>
             <ul className="space-y-2">
               {PRIVACY_ROWS.map((row) => (
                 <li
@@ -238,7 +238,7 @@ export function FinalCta({ ctaHref }: { ctaHref: string }) {
           Deja de repartir papel. <em className="text-signal-deep">Pásate.</em>
         </h2>
         <ul className="relative mx-auto mt-8 flex max-w-xl flex-wrap justify-center gap-x-6 gap-y-2 text-ink">
-          {["Gratis", "Listo en 2 minutos", "iPhone y Android"].map((item) => (
+          {["Gratis para siempre", "Listo en 2 minutos", "iPhone y Android"].map((item) => (
             <li key={item} className="inline-flex items-center gap-1.5">
               <Check className="size-4 text-signal-deep" aria-hidden /> {item}
             </li>

@@ -90,7 +90,10 @@ test.describe("public card", () => {
   test("returns 404 for unknown cards", async ({ page }) => {
     const response = await page.goto("/u/esta-tarjeta-no-existe");
     expect(response?.status()).toBe(404);
-    await expect(page.getByRole("heading", { name: "Esta tarjeta no existe" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Esta tarjeta no está disponible" })).toBeVisible();
+    await expect(page.getByText("Error")).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Ir a PassMe" })).toHaveAttribute("href", "/");
+    await expect(page.getByRole("link", { name: "Crear mi tarjeta" })).toHaveAttribute("href", "/crear");
   });
 
   test("has link-preview metadata", async ({ page }) => {

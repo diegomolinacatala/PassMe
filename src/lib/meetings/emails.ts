@@ -104,7 +104,7 @@ export function proposalEmail(ctx: MeetingEmailContext, respondUrl: string): Mee
       href: `${respondUrl}?hora=${index}`,
     })),
     links: [
-      { label: "Proponer otra hora", href: `${respondUrl}?accion=otra` },
+      { label: "Proponer otras horas", href: `${respondUrl}?accion=otra` },
       { label: "No puedo", href: `${respondUrl}?accion=no` },
     ],
     footer: footerFor(ctx, recipient, [`Las horas son de ${timeZoneCity(meeting.timeZone)}.`, ...(recipient === "guest" ? [NO_REPLY] : [])]),
@@ -162,7 +162,7 @@ export function declinedEmail(ctx: MeetingEmailContext, links: { respond: string
     title: `${firstName(declinerName)} no puede esta vez`,
     paragraphs: [
       recipient === "guest"
-        ? `${declinerName} ha respondido a tu propuesta: no le viene bien ninguna de las horas. Desde la reunión puedes proponerle otra fecha.`
+        ? `${declinerName} ha respondido a tu propuesta: no le viene bien ninguna de las horas. Desde la reunión puedes proponerle otras horas.`
         : `${declinerName} ha respondido a las horas que le propusiste: no le viene bien ninguna.`,
     ],
     quote: noteFor(ctx, recipient, declinerName, true),

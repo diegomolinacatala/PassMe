@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
-/** "Te dejo mi contacto" on the demo card (demo mode: validated, nothing stored). */
+/** "Déjale tu contacto" on the demo card (demo mode: validated, nothing stored). */
 test.describe("contact exchange", () => {
   test("validates and 'sends' the visitor's details", async ({ page }) => {
     await page.goto("/u/demo?src=qr");
@@ -10,7 +10,7 @@ test.describe("contact exchange", () => {
     const axe = await new AxeBuilder({ page }).include("form").withTags(["wcag2a", "wcag2aa", "wcag22aa"]).analyze();
     expect(axe.violations.filter((v) => v.impact === "serious" || v.impact === "critical").map((v) => v.id)).toEqual([]);
 
-    await page.getByRole("button", { name: "Enviar mi contacto" }).click();
+    await page.getByRole("button", { name: "Dejarle mi contacto" }).click();
     await expect(page.getByText("Dinos cómo te llamas.")).toBeVisible();
     await expect(page.getByText("Deja al menos un email o un teléfono.")).toBeVisible();
     await expect(page.getByText("Marca la casilla para poder enviar tus datos.")).toBeVisible();
@@ -18,13 +18,16 @@ test.describe("contact exchange", () => {
     // Values survive the failed attempt.
     await page.getByLabel("Nombre").fill("Lucía Martín");
     await page.getByLabel("Email").fill("lucia@example");
-    await page.getByRole("button", { name: "Enviar mi contacto" }).click();
+    await page.getByRole("checkbox").check();
+    await page.getByRole("button", { name: "Dejarle mi contacto" }).click();
     await expect(page.getByText("Email no válido.")).toBeVisible();
+    // The first field to fix gets the focus; everything else stays as it was (the checkbox too).
+    await expect(page.getByLabel("Email")).toBeFocused();
     await expect(page.getByLabel("Nombre")).toHaveValue("Lucía Martín");
+    await expect(page.getByRole("checkbox")).toBeChecked();
 
     await page.getByLabel("Email").fill("lucia@example.com");
-    await page.getByRole("checkbox").check();
-    await page.getByRole("button", { name: "Enviar mi contacto" }).click();
+    await page.getByRole("button", { name: "Dejarle mi contacto" }).click();
     await expect(page.getByRole("status")).toContainText("Alex ya tiene tu contacto.");
     await expect(page.getByRole("status")).toContainText("tarjeta de ejemplo");
   });
@@ -34,7 +37,7 @@ test.describe("contact exchange", () => {
     await expect(page.getByRole("heading", { name: "Contactos recibidos" })).toBeVisible();
     await expect(page.locator("#contactos").getByText("Lucía Martín")).toBeVisible();
     await expect(page.getByRole("link", { name: "lucia@example.com" })).toHaveAttribute("href", "mailto:lucia@example.com");
-    await expect(page.getByRole("switch", { name: "Formulario de contacto en tu página" })).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByRole("switch", { name: "Recibir contactos" })).toHaveAttribute("aria-checked", "true");
   });
 });
 

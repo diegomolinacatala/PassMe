@@ -34,7 +34,7 @@ export default function PrivacyPage() {
         "Lo que tú escribes en tu tarjeta: nombre, cargo, empresa, ubicación, biografía, foto y los contactos que añadas. Los contactos que marcas como ocultos se guardan, pero nunca se muestran ni se envían a quien visita tu tarjeta.",
         "Estadísticas de tu tarjeta (visitas, clics, contactos guardados). No guardamos direcciones IP ni usamos cookies de seguimiento: una visita se cuenta una vez por sesión del navegador.",
         "Si añades tu pase a Apple Wallet, el identificador del dispositivo y el token de notificaciones que Apple nos envía, solo para poder actualizar el pase.",
-        "Si activas el formulario «Te dejo mi contacto», los datos que otras personas te dejan (ver el apartado siguiente).",
+        "Si activas «Recibir contactos», los datos que otras personas te dejan (ver el apartado siguiente).",
         "Si activas «Agendar reunión», las propuestas de reunión que recibes y tus respuestas (ver «Si propones una reunión»).",
         "Para frenar abusos (spam, fuerza bruta) guardamos contadores asociados a un identificador seudonimizado de tu conexión (un hash con clave secreta de la IP, que no permite recuperarla) durante como mucho un día, y durante 24 horas los intentos de código de acceso asociados a un hash de tu email.",
       ],
@@ -43,8 +43,8 @@ export default function PrivacyPage() {
       id: "contactos",
       title: "Si dejas tu contacto en una tarjeta",
       body: [
-        "Cuando rellenas «Te dejo mi contacto» en la tarjeta de alguien, tus datos (nombre, email o teléfono, empresa y mensaje) se envían a esa persona, que es quien decide cómo usarlos. PassMe los guarda en su nombre, visibles solo para ella.",
-        "La base legal es tu consentimiento, que das al marcar la casilla. Puedes retirarlo pidiéndole a esa persona que borre tus datos, o escribiéndonos y lo trasladamos.",
+        "Cuando usas «Déjale tu contacto» en la tarjeta de alguien, tus datos (nombre, email o teléfono, empresa y mensaje) se envían a esa persona, que es quien decide cómo usarlos. PassMe los guarda en su nombre, visibles solo para ella.",
+        "La base legal es tu consentimiento, que das al marcar la casilla. Puedes revocarlo pidiéndole a esa persona que borre tus datos, o escribiéndonos y lo trasladamos.",
         "Se conservan hasta que el dueño de la tarjeta los borra o elimina su cuenta, como mucho 24 meses (y solo los 1.000 más recientes por tarjeta).",
       ],
     },
@@ -56,7 +56,7 @@ export default function PrivacyPage() {
         "Para organizarla, PassMe hace de intermediario por email. Al dueño le enviamos las horas que propones, cómo queréis veros, tu nombre y tu empresa; el lugar, el tema y tus notas los ve en la página de la reunión. A ti te escribimos solo cuando responde (confirmación, otras horas o un no) o cuando alguno cancela, con un texto fijo de PassMe y, si se confirma, la invitación de calendario (.ics); sus notas las ves en tu página de la reunión. No te enviamos nada más ni te apuntamos a ninguna lista, y limitamos cuántos correos puede recibir una misma dirección.",
         "El email del dueño solo te llega cuando confirma la reunión, dentro de la invitación, para que podáis hablar. Los correos de confirmación permiten responder directamente a la otra persona.",
         "Cada parte gestiona la reunión desde un enlace personal que le enviamos por email. Quien tenga ese enlace puede verla y responder, así que no lo compartas.",
-        "La base legal es tu consentimiento (la casilla del formulario) y la gestión de lo que tú mismo pides. Puedes retirar la propuesta o cancelar la reunión desde tu enlace, o escribirnos.",
+        "La base legal es tu consentimiento (la casilla del formulario) y la gestión de lo que tú mismo pides. Puedes cancelar la propuesta o la reunión desde tu enlace, o escribirnos.",
         "Se conservan hasta 90 días después de la última hora propuesta (como mucho 12 meses), o hasta que el dueño las borra o elimina su cuenta.",
       ],
     },
@@ -89,7 +89,7 @@ export default function PrivacyPage() {
     {
       title: "Tus derechos",
       body: [
-        "Puedes editar o despublicar tu tarjeta en cualquier momento, y borrar tu cuenta desde el editor (Cuenta › Eliminar).",
+        "Puedes editar o despublicar tu tarjeta en cualquier momento, y borrar tu cuenta desde el editor (Cuenta › Borrar mi cuenta y mi tarjeta).",
         <>
           Para ejercer tus derechos de acceso, rectificación, supresión, portabilidad, limitación u oposición, escríbenos a {mail}.
           También puedes reclamar ante la Agencia Española de Protección de Datos (aepd.es).

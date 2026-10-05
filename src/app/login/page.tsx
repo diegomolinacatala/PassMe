@@ -17,7 +17,7 @@ export const metadata: Metadata = { title: "Entrar", robots: { index: false } };
 const ERRORS: Record<string, string> = {
   link: "El enlace ha caducado o ya se usó. Pide uno nuevo.",
   oauth: "No se pudo iniciar sesión con Google. Inténtalo de nuevo.",
-  config: "El login aún no está conectado (falta configurar Supabase).",
+  config: "El acceso no está disponible ahora mismo. Inténtalo más tarde.",
 };
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
@@ -32,7 +32,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
       <section className="flex flex-col px-5 py-6 sm:px-10">
         <Logo />
         <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-16">
-          <p className="eyebrow">Acceso</p>
+          <p className="eyebrow">Entrar</p>
           <h1 className="mt-3 font-display text-5xl leading-[0.95] tracking-tight">
             Entra en <em className="text-signal">tu tarjeta.</em>
           </h1>
@@ -40,7 +40,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
 
           {configured ? null : (
             <p className="mt-6 rounded-2xl border border-dashed border-signal/50 bg-signal-wash/60 px-4 py-3 text-sm text-signal-deep">
-              <strong>Modo demo.</strong> Supabase no está conectado: no se envía ningún email y el código es{" "}
+              <strong>Modo demo:</strong> no se envía ningún email y el código es{" "}
               <span className="font-mono">{DEMO_LOGIN_CODE}</span>.
             </p>
           )}
@@ -60,7 +60,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           <p className="mt-8 text-sm text-ink-soft">
             ¿Aún no tienes tarjeta?{" "}
             <Link href="/crear" className="font-medium text-signal-deep underline underline-offset-4 hover:text-ink">
-              Créala en un minuto
+              Crear mi tarjeta
             </Link>
           </p>
           <p className="mt-3 text-xs leading-relaxed text-muted">

@@ -1,4 +1,4 @@
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, CircleCheck } from "lucide-react";
 import { BrandMotif } from "@/components/brand/brand-motif";
 import { PhoneShowcase } from "@/components/landing/phone-showcase";
 import { DesignSection } from "@/components/landing/design-section";
@@ -9,15 +9,25 @@ import { LinkButton } from "@/components/ui/button";
 import { DEMO_CARD } from "@/lib/card/demo";
 import { toPublicCard } from "@/lib/data/cards";
 
-export default function HomePage() {
+export default async function HomePage({ searchParams }: PageProps<"/">) {
   // The card first, the email at the end (demo mode simulates the code).
   const ctaHref = "/crear";
   const demo = toPublicCard(DEMO_CARD);
+  // deleteAccountAction lands here after erasing everything.
+  const accountDeleted = (await searchParams).cuenta === "borrada";
 
   return (
     <>
       <SiteHeader ctaHref={ctaHref} />
       <main>
+        {accountDeleted ? (
+          <div className="mx-auto max-w-[1240px] px-5 sm:px-8">
+            <p role="status" className="flex items-start gap-2.5 rounded-2xl bg-ok/10 px-4 py-3 text-sm text-ok">
+              <CircleCheck className="mt-0.5 size-4 shrink-0" aria-hidden />
+              Tu cuenta y tu tarjeta se han borrado. Gracias por probar PassMe.
+            </p>
+          </div>
+        ) : null}
         <section aria-labelledby="hero-title" className="relative isolate overflow-hidden">
           <div className="mx-auto grid max-w-[1240px] grid-cols-1 items-center gap-16 px-5 pt-8 pb-24 sm:px-8 lg:grid-cols-12 lg:gap-8 lg:pt-14 lg:pb-32">
             <div className="animate-rise lg:col-span-7">
@@ -37,7 +47,7 @@ export default function HomePage() {
               </p>
               <div className="mt-10 flex flex-wrap items-center gap-3">
                 <LinkButton href={ctaHref} variant="signal" size="lg">
-                  Crear mi tarjeta gratis
+                  Crear mi tarjeta
                 </LinkButton>
                 <LinkButton href="/u/demo" variant="ghost" size="lg" className="group">
                   Ver un ejemplo

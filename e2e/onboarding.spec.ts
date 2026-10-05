@@ -16,7 +16,7 @@ function collectErrors(page: Page): string[] {
 
 test("a scanned card invites the visitor to create their own", async ({ page }) => {
   await page.goto("/u/demo?src=qr");
-  await expect(page.getByRole("link", { name: "Crea la tuya gratis" })).toHaveAttribute("href", "/crear?de=demo");
+  await expect(page.getByRole("link", { name: "Crear la mía" })).toHaveAttribute("href", "/crear?de=demo");
   const cta = page.getByRole("region", { name: /Ten tu tarjeta así/ });
   await expect(cta.getByRole("link", { name: "Crear mi tarjeta" })).toHaveAttribute("href", "/crear?de=demo");
 });
@@ -63,21 +63,24 @@ test("create a card: form, email, code, welcome with the QR to show", async ({ p
 
   await welcome.getByRole("button", { name: "Cerrar la bienvenida" }).click();
   await expect(welcome).toHaveCount(0);
+  // Focus lands in the editor, not on <body>.
+  await expect(page.getByRole("heading", { level: 1 })).toBeFocused();
   await expect(page).toHaveURL(/\/dashboard$/);
   expect(errors).toEqual([]);
 });
 
-test("details left with 'Te dejo mi contacto' prefill the new card", async ({ page }) => {
+test("details left with 'Déjale tu contacto' prefill the new card", async ({ page }) => {
   await page.goto("/u/demo?src=qr");
   await page.getByRole("button", { name: /Déjale tu contacto a Alex/ }).click();
   await page.getByLabel("Nombre").fill("Lucía Martín");
   await page.getByLabel("Teléfono").fill("+34 611 22 33 44");
   await page.getByLabel("Empresa").fill("Hotel Mirador");
   await page.getByRole("checkbox").check();
-  await page.getByRole("button", { name: "Enviar mi contacto" }).click();
+  await page.getByRole("button", { name: "Dejarle mi contacto" }).click();
   await expect(page.getByRole("status")).toContainText("Alex ya tiene tu contacto.");
 
-  await page.getByRole("link", { name: "Crear la mía con estos datos" }).click();
+  // Any "create mine" button works, not only the one in the confirmation.
+  await page.getByRole("link", { name: "Crear la mía", exact: true }).click();
   await page.waitForURL(/\/crear\?de=demo/);
   await expect(page.getByLabel("Nombre y apellidos")).toHaveValue("Lucía Martín");
   await expect(page.getByLabel("Empresa")).toHaveValue("Hotel Mirador");
@@ -97,7 +100,7 @@ test("the email's button asks for a tap instead of signing in on open", async ({
 test("login: the code screen shows up, can change the email and signs in", async ({ page }) => {
   await page.goto("/login");
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Entra en tu tarjeta");
-  await expect(page.getByRole("link", { name: "Créala en un minuto" })).toHaveAttribute("href", "/crear");
+  await expect(page.getByRole("link", { name: "Crear mi tarjeta" })).toHaveAttribute("href", "/crear");
 
   await page.getByLabel("Tu email").fill("alex@example.com");
   const send = page.getByRole("button", { name: "Enviarme un código" });
@@ -110,6 +113,9 @@ test("login: the code screen shows up, can change the email and signs in", async
   await send.click();
   await expect(page.getByText("otro@example.com", { exact: true })).toBeVisible();
 
+  // An incomplete code can't be sent (and can't use up an attempt).
+  await page.getByLabel("Código de 8 cifras").fill("0000000");
+  await expect(page.getByRole("button", { name: "Entrar", exact: true })).toBeDisabled();
   await page.getByLabel("Código de 8 cifras").fill("00000000");
   await page.waitForURL(/\/dashboard$/);
 });

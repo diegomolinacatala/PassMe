@@ -26,7 +26,16 @@ interface LinksEditorProps {
 export function LinksEditor({ links, suggestedEmail, errors, showErrors, onAdd, onUpdate, onRemove, onMove }: LinksEditorProps) {
   // Id of a just-added link whose input should receive focus once it mounts.
   const pendingFocus = useRef<string | null>(null);
+  const addFirst = useRef<HTMLButtonElement>(null);
   const [touched, setTouched] = useState<ReadonlySet<string>>(new Set());
+
+  // Removing a row moves focus to the next one (or the previous), or to "Añadir" if it was the last.
+  function remove(index: number) {
+    const next = links[index + 1] ?? links[index - 1];
+    pendingFocus.current = next?.id ?? null;
+    onRemove(links[index]!.id);
+    if (!next) requestAnimationFrame(() => addFirst.current?.focus());
+  }
 
   const full = links.length >= MAX_LINKS;
   const visibleCount = links.filter((l) => l.visible).length;
@@ -57,7 +66,7 @@ export function LinksEditor({ links, suggestedEmail, errors, showErrors, onAdd, 
                     title="Cambiar tipo"
                   >
                     <LinkIcon kind={link.kind} size={18} />
-                    <span className="sr-only">Tipo de enlace</span>
+                    <span className="sr-only">Tipo</span>
                     <select
                       value={link.kind}
                       onChange={(e) => onUpdate(link.id, { kind: e.target.value as LinkKind })}
@@ -110,7 +119,7 @@ export function LinksEditor({ links, suggestedEmail, errors, showErrors, onAdd, 
                         <input
                           value={link.label ?? ""}
                           onChange={(e) => onUpdate(link.id, { label: e.target.value })}
-                          placeholder={link.kind === "custom" ? "Título (obligatorio)" : `Título (opcional, p. ej. "Portfolio")`}
+                          placeholder={link.kind === "custom" ? "Título (obligatorio)" : "Título (opcional, p. ej. «Portfolio»)"}
                           maxLength={LIMITS.linkLabel}
                           aria-label={`${def.label}: título`}
                           aria-invalid={Boolean(labelError) && showErrors}
@@ -139,7 +148,7 @@ export function LinksEditor({ links, suggestedEmail, errors, showErrors, onAdd, 
                     <IconButton label="Bajar" onClick={() => onMove(link.id, 1)} disabled={index === links.length - 1}>
                       <ChevronDown className="size-4" />
                     </IconButton>
-                    <IconButton label="Eliminar enlace" onClick={() => onRemove(link.id)} danger>
+                    <IconButton label={`Quitar ${def.label}`} onClick={() => remove(index)} danger>
                       <Trash2 className="size-4" />
                     </IconButton>
                   </div>
@@ -150,7 +159,7 @@ export function LinksEditor({ links, suggestedEmail, errors, showErrors, onAdd, 
         </ol>
       ) : (
         <div className="rounded-2xl border border-dashed border-line-strong px-4 py-8 text-center text-sm text-muted">
-          <p>Añade al menos un contacto: es lo que la gente verá al escanear tu QR.</p>
+          <p>Añade al menos un dato de contacto: es lo que la gente verá al escanear tu QR.</p>
           {suggestedEmail ? (
             <button
               type="button"
@@ -165,13 +174,14 @@ export function LinksEditor({ links, suggestedEmail, errors, showErrors, onAdd, 
 
       <div className="mt-5">
         <p className="eyebrow mb-3">
-          Añadir contacto · {links.length}/{MAX_LINKS}
+          Añadir · {links.length}/{MAX_LINKS}
           {links.length > 0 ? ` · ${visibleCount} visibles` : ""}
         </p>
         <div className="flex flex-wrap gap-2">
-          {LINK_KINDS.map((kind) => (
+          {LINK_KINDS.map((kind, i) => (
             <button
               key={kind}
+              ref={i === 0 ? addFirst : undefined}
               type="button"
               disabled={full}
               onClick={() => {

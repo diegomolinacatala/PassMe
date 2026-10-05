@@ -131,22 +131,22 @@ Severidad de origen entre corchetes: **[A]** alta, **[M]** media, **[B]** baja.
 
 Cambios pequeños, de bajo riesgo, sin rediseño. Ninguno necesita migración.
 
-**P1.1 · El botón del código se activa con 6 de 8 cifras** [B] · ONB-13, A11Y-17
+**✅ P1.1 · El botón del código se activa con 6 de 8 cifras** [B] · ONB-13, A11Y-17
 - `src/components/auth/email-code-auth.tsx` (`disabled={code.length < 6}`).
 - Cambiar a `code.length < LOGIN_CODE_LENGTH` (importar de `src/lib/auth/code.ts`).
 - ✔ Con 7 cifras el botón está desactivado; con 8 se envía solo. Un intento incompleto ya no gasta uno de los 5 intentos.
 
-**P1.2 · Los datos de «Déjale tu contacto» y de la propuesta solo viajan por un botón** [A] · SCAN-01, ONB-09, MEET-10
+**✅ P1.2 · Los datos de «Déjale tu contacto» y de la propuesta solo viajan por un botón** [A] · SCAN-01, ONB-09, MEET-10
 - `src/components/card/contact-form.tsx` y `src/components/meetings/meeting-request.tsx`: hoy `rememberDetails(...)` está en el `onClick` de «Crear la mía con estos datos».
 - Llamarlo **en cuanto el estado pasa a `sent`** (un `useEffect` en `SentMessage`). Así cualquier CTA hacia `/crear` (barra superior, bloque oscuro) llega relleno.
 - ✔ Enviar el contacto en `/u/demo` y pulsar el botón de la barra superior: `/crear` muestra nombre, empresa, móvil y email. Igual tras proponer una reunión. Test E2E.
 
-**P1.3 · El editor se desborda en horizontal de 320 a 393 px** [A] · A11Y-03, ONB-12
+**✅ P1.3 · El editor se desborda en horizontal de 320 a 393 px** [A] · A11Y-03, ONB-12
 - `src/components/editor/preview-panel.tsx` (tablist y pase) y el contenedor de `card-editor.tsx`.
 - `min-w-0` + `overflow-hidden` en el `tabpanel` y en el contenedor del pase; el pase escala al ancho disponible (`w-full max-w-[330px]`, sin mínimo intrínseco); pestañas con `flex-1 min-w-0` y textos cortos en móvil: «Apple», «Google», «Al escanear».
 - ✔ `document.documentElement.scrollWidth === clientWidth` en `/dashboard` y `/dashboard?nueva=1` a 320, 360, 375 y 393 px. Test E2E en el proyecto `mobile` (y otro a 320 px).
 
-**P1.4 · La barra de guardar: oculta sin cambios, sin tapar nada, sin cortar el texto** [A] · ONB-07, A11Y-02, A11Y-15, LIFE-17, EDIT-11, A11Y-12
+**✅ P1.4 · La barra de guardar: oculta sin cambios, sin tapar nada, sin cortar el texto** [A] · ONB-07, A11Y-02, A11Y-15, LIFE-17, EDIT-11, A11Y-12
 - `src/components/editor/card-editor.tsx` (`SaveBar`, `fixed inset-x-0 bottom-0 z-30`, `truncate`).
 - No mostrarla con `!dirty && status.kind === "idle"`. Aparece (deslizando desde abajo, 200 ms, respetando movimiento reducido) al primer cambio, mientras guarda, si hay error, y tras «Guardado…» se va a los 3 s. Nunca visible con la bienvenida abierta si no hay cambios.
 - Mientras esté visible: `scroll-padding-bottom` en el `html` del editor (o `scroll-margin-bottom` en los campos) igual a su altura + 16 px, para que un campo enfocado nunca quede debajo (WCAG 2.4.11).
@@ -156,55 +156,55 @@ Cambios pequeños, de bajo riesgo, sin rediseño. Ninguno necesita migración.
 - En escritorio (`lg`), alinear la barra a la columna izquierda para que no pise la derecha.
 - ✔ En `/dashboard` recién cargado no hay barra; al editar un campo aparece; en `?nueva=1` en vertical y en horizontal (852×393) nada tapa el QR; tabulando por todo el editor a 393×666 ningún control enfocado se solapa con la barra; en Windows se lee «Ctrl S».
 
-**P1.5 · Guardar con errores no lleva al error** [A] · EDIT-02, A11Y-14, A11Y-01
+**✅ P1.5 · Guardar con errores no lleva al error** [A] · EDIT-02, A11Y-14, A11Y-01
 - `card-editor.tsx` (función de guardar y mensaje de error).
 - Al fallar la validación: `scrollIntoView({ block: "center" })` + `focus()` del primer `[aria-invalid="true"]`.
 - Texto según el número de errores, sin depender del color: «Falta tu nombre.» (1 error, con el nombre del campo) / «Hay 3 campos por revisar.» + botón «Ver» que salta al siguiente error.
 - ✔ Pulsar «Guardar» desde el final de la página con el nombre vacío deja el campo visible y enfocado, y el mensaje se lee entero a 393 px. Test E2E.
 
-**P1.6 · El foco se pierde en 9 acciones** [A] · A11Y-01
+**✅ P1.6 · El foco se pierde en 9 acciones** [A] · A11Y-01
 - `meeting-response.tsx`: «Proponer otras horas», «No puedo», «Volver», «Cancelar…», «No, mantener». `contact-form.tsx` y `meeting-request.tsx` (envío con errores). `welcome-panel.tsx` (cerrar). `links-editor.tsx` (quitar un dato).
 - Paneles nuevos (`CounterPanel`, `DeclinePanel`): `ref` + `tabIndex={-1}` en su `<h2>` y foco al montarlos (el mismo patrón que `StepWhen`). «Volver» y «No, mantener» devuelven el foco al botón que abrió el panel. Envío con errores: foco al primer `[aria-invalid=true]` (como ya hace `quick-card-form.tsx`). Cerrar la bienvenida: foco al H1 del editor. Quitar un dato: foco a la fila siguiente, o a «Añadir» si era la última.
 - ✔ En las 9 acciones, `document.activeElement !== document.body`. Ampliar `e2e/a11y.spec.ts`.
 
-**P1.7 · Reuniones: «Continuar» sin hora no muestra nada** [A] · MEET-04
+**✅ P1.7 · Reuniones: «Continuar» sin hora no muestra nada** [A] · MEET-04
 - `meeting-request.tsx` + `slot-picker.tsx` (el error se pinta encima de «Duración», fuera de la vista).
 - El botón cuenta lo que hay: sin horas, «Elige al menos una hora» (atenuado, sin `disabled`: al tocarlo hace `scrollIntoView` suave a la tira de días y la resalta); con horas, «Continuar con 2 horas».
 - ✔ Tras tocarlo sin hora, el mensaje o la tira de días quedan visibles en el viewport sin hacer scroll.
 
-**P1.8 · Reuniones: tras un error del servidor la casilla aparece desmarcada (pero sigue marcada)** [M] · MEET-07
+**✅ P1.8 · Reuniones: tras un error del servidor la casilla aparece desmarcada (pero sigue marcada)** [M] · MEET-07
 - `meeting-request.tsx` (y revisar `contact-form.tsx`, que usa el mismo patrón): React 19 resetea el `<form action>` tras la acción y el estado `consent` sigue en `true`.
 - No depender del reset: `onSubmit` con `preventDefault` + `startTransition(() => action(new FormData(form)))`, o mandar el valor como `<input type="hidden">` derivado del estado.
 - ✔ Tras cualquier error devuelto por el servidor, todos los campos y la casilla se ven exactamente como estaban. Test E2E (forzando un error del servidor, p. ej. con el texto «Expo.Pack» antes de P6.5).
 
-**P1.9 · Demo: cancelar una reunión confirmada falla y deja la página sin salida** [M] · MEET-20
+**✅ P1.9 · Demo: cancelar una reunión confirmada falla y deja la página sin salida** [M] · MEET-20
 - `src/app/reunion/actions.ts` (`demoAnswer` parte siempre de la propuesta pendiente) y `src/app/reunion/[id]/[sig]/page.tsx`.
 - Ids demo con estado: `/reunion/demo-confirmada/anfitrion`, `/reunion/demo-confirmada/invitado`, `/reunion/demo-contra/invitado` (Alex propone otras horas), `/reunion/demo-caducada/invitado`, `/reunion/demo-pasada/anfitrion`, reutilizando los datos demo existentes. `demoAnswer` usa el estado del id.
 - ✔ En demo, confirmar y luego cancelar termina en «Reunión cancelada»; las cinco variantes existen y cada una tiene un test E2E.
 
-**P1.10 · El contador de la cabecera no baja al borrar** [M] · EDIT-06
+**✅ P1.10 · El contador de la cabecera no baja al borrar** [M] · EDIT-06
 - `card-editor.tsx` usa `meetings.items.length` y `contacts.requests.length` del servidor; los paneles filtran de forma optimista (`contacts-panel.tsx`, `meetings-panel.tsx`).
 - El panel calcula y pinta su propio contador (o lo sube con un callback). Sin elementos, sin contador.
 - ✔ Al borrar el último contacto recibido no queda «1 en total» junto a «Aún no te ha dejado nadie…».
 
-**P1.11 · Callejones sin salida y respuestas en crudo** [M] · LIFE-11, A11Y-18
+**✅ P1.11 · Callejones sin salida y respuestas en crudo** [M] · LIFE-11, A11Y-18
 - `src/app/wallet/page.tsx` (`Expired`, sin botón): texto «Este QR ya no vale (dura 30 minutos). Entra con tu email en este móvil y añade el pase desde ahí.» + botón «Entrar y añadir el pase» → `/login?next=/dashboard`.
 - `src/app/api/pass/apple/route.ts` y `google/route.ts`: si la petición es una navegación (`Accept` incluye `text/html`), redirigir 401 → `/login?next=/dashboard` y 404/409 → `/dashboard?pase=error` con un aviso legible; JSON solo para `fetch`.
 - `src/app/dashboard/contactos/route.ts`: igual, 401 → `/login?next=/dashboard`.
 - ✔ Ninguna navegación de usuario muestra JSON ni texto plano; `/wallet` caducado tiene una acción.
 
-**P1.12 · Metadatos y 404** [B] · LIFE-19, A11Y-19, SCAN-16
+**✅ P1.12 · Metadatos y 404** [B] · LIFE-19, A11Y-19, SCAN-16
 - `src/app/not-found.tsx`: `metadata.title = "Página no encontrada"`.
 - `src/app/u/[slug]/not-found.tsx`: quitar la etiqueta «Error 404»; título «Esta tarjeta no está disponible» (vale también para una despublicada); botón principal «Ir a PassMe» y enlace secundario «Crear mi tarjeta». Mantener «Pídele que te la enseñe de nuevo».
 - ✔ La 404 de tarjeta no contiene «Error» y tiene dos salidas; la pestaña de la 404 genérica dice «Página no encontrada · PassMe».
 
-**P1.13 · Confirmación tras borrar la cuenta y texto exacto del borrado** [M] · LIFE-08
+**✅ P1.13 · Confirmación tras borrar la cuenta y texto exacto del borrado** [M] · LIFE-08
 - `src/app/page.tsx`: leer `?cuenta=borrada` y mostrar un aviso (`role="status"`): «Tu cuenta y tu tarjeta se han borrado. Gracias por probar PassMe.»
 - `src/components/editor/account-panel.tsx`: texto «Esto no se puede deshacer. Borraremos tu tarjeta, tu foto, tus estadísticas, los contactos que te han dejado y tus reuniones. Tu enlace dejará de funcionar y quedará reservado 90 días. El pase que tengas en la cartera dejará de actualizarse: quítalo desde la app Cartera.» (Comprobar que coincide con `/privacidad` y con `cleanup`/borrado reales.) Si hay contactos recibidos, enlace «Descargar mis contactos» antes del botón.
 - `src/app/dashboard/actions.ts`: el error de configuración («Falta SUPABASE_SECRET_KEY…») no se muestra al usuario; mensaje genérico «No hemos podido borrar la cuenta. Escríbenos y lo hacemos a mano.» y el detalle al log.
 - ✔ Tras borrar, la landing muestra la confirmación; el texto del diálogo coincide con la política.
 
-**P1.14 · Textos con jerga** [B] · EDIT-19, COH-13
+**✅ P1.14 · Textos con jerga** [B] · EDIT-19, COH-13
 - «si está configurado» (`contacts-panel.tsx`) → «Cuando alguien te lo deje, te avisaremos por email y lo verás aquí.»
 - «Lo oculto nunca sale del servidor» (`card-editor.tsx`) → «Lo que ocultes no lo verá nadie.»
 - Errores que nombran una migración (`contacts-panel.tsx`, `meetings-panel.tsx`) → «Esta función aún no está disponible.» (el detalle, al log).
@@ -214,31 +214,31 @@ Cambios pequeños, de bajo riesgo, sin rediseño. Ninguno necesita migración.
 - «Excel (CSV)» → «Descargar para Excel»; «Todos a Contactos (.vcf)» → «Guardar todos en Contactos».
 - ✔ Ningún texto visible menciona servidor, configuración, migraciones, `SETUP.md`, CSV ni `.vcf`.
 
-**P1.15 · vCard: origen, nota con fecha y nombres compuestos** [M] · SCAN-12, ONB-18, SCAN-13
+**✅ P1.15 · vCard: origen, nota con fecha y nombres compuestos** [M] · SCAN-12, ONB-18, SCAN-13
 - `src/components/card/profile-card.tsx`: pasar `source` desde `page.tsx` y construir `/u/<slug>/vcard?src=<source>` cuando no sea `direct` (la ruta ya lo lee).
 - `src/lib/card/vcard.ts`: añadir al final de `NOTE` «Guardado con PassMe el 05/10/2026 · getpassme.com/u/<slug>» (fecha del servidor en `Europe/Madrid`). `splitName`: con 3 palabras o más, las **dos últimas** son apellidos («Ana María» / «López Gil»).
 - `vcard/route.ts`: nombre de archivo con el nombre de la persona (`filename*=UTF-8''Alex%20Rivera.vcf` + respaldo ASCII).
 - ✔ Desde `?src=qr` la descarga cuenta como `qr`; la vCard de «Ana María López Gil» tiene `N:López Gil;Ana María;;;`; tests unitarios en `vcard`.
 
-**P1.16 · Tarjeta sin datos de contacto: el visitante ve un aviso de editor** [M] · SCAN-11
+**✅ P1.16 · Tarjeta sin datos de contacto: el visitante ve un aviso de editor** [M] · SCAN-11
 - `profile-card.tsx`: con `preview=false` no mostrar «Todavía no hay enlaces visibles.»; en la vista previa del editor, «Añade un teléfono o un email para que puedan contactarte.»
 - ✔ Una tarjeta pública sin datos no muestra ningún recuadro vacío.
 
-**P1.17 · Detalles del formulario de `/crear`** [B] · ONB-17, A11Y-20
+**✅ P1.17 · Detalles del formulario de `/crear`** [B] · ONB-17, A11Y-20
 - `quick-card-form.tsx`: `enterKeyHint="next"` en todos los campos menos el último; Enter mueve el foco al siguiente campo sin enviar ni validar; el último envía.
 - `create-flow.tsx`: `scrollTo` con `behavior: "auto"` si `prefers-reduced-motion: reduce`.
 - ✔ Enter en «Nombre» pasa a «Cargo» sin mostrar errores.
 
-**P1.18 · Reuniones: etiqueta repetida y textos sueltos** [B] · EDIT-20, MEET-24
+**✅ P1.18 · Reuniones: etiqueta repetida y textos sueltos** [B] · EDIT-20, MEET-24
 - `meetings-panel.tsx`: dentro del grupo «Te toca responder» no repetir «TE TOCA» en cada fila (solo la fecha); la etiqueta de estado solo en «Anteriores».
 - `src/lib/meetings/schema.ts`: «Sin enlaces, por favor: los veréis en la invitación.» → «Sin enlaces, por favor. Si necesitáis compartir uno, hacedlo respondiendo al email de confirmación.»
 - ✔ Ninguna fila repite el título de su grupo.
 
-**P1.19 · Temas con el nombre cortado** [B] · EDIT-21
+**✅ P1.19 · Temas con el nombre cortado** [B] · EDIT-21
 - `design-field.tsx`: 4 columnas por debajo de 400 px (o nombre en dos líneas).
 - ✔ Los 10 nombres se leen enteros a 393 px.
 
-**P1.20 · Pasada del glosario** [A] · COH-01–04, EDIT-05, SCAN-08, MEET-12, LIFE-14
+**✅ P1.20 · Pasada del glosario** [A] · COH-01–04, EDIT-05, SCAN-08, MEET-12, LIFE-14
 - Aplicar la tabla 3.1 en todo `src/` (componentes, emails en `src/lib/meetings/emails.ts`, `/privacidad` y `/terminos` si nombran las secciones) **salvo** lo que depende de D1 (el verbo de reuniones, que se hace en P6).
 - Incluye: sección 02 del editor → «Cómo contactarte»; «Añadir contacto» → «Añadir»; «Eliminar enlace» → «Quitar»; tipo «Enlace» → «Otra web» (o desaparece con P7.3); «Tipo de enlace» → «Tipo»; estadísticas «Guardaron tu contacto» / «Lo más pulsado»; todos los CTA de crear → «Crear mi tarjeta» / «Crear la mía»; `/login` «Créala en un minuto» → «¿Aún no tienes tarjeta? Crear mi tarjeta»; «Acceso» → «Entrar»; «Retirar propuesta» → «Cancelar propuesta» y su título final «Propuesta cancelada» (no «Reunión cancelada»); los 4 nombres de «otras horas» → «Proponer otras horas»; el pie del invitado según la fase («…ver o cancelar tu propuesta» / «…ver o cancelar la reunión» / nada si está cerrada).
 - Precio: la landing y `/terminos` dicen lo mismo. Landing: «Gratis para siempre». Términos: «Tu tarjeta, tu QR y tu pase son gratis, para siempre. Si en el futuro añadimos funciones de pago, serán opcionales y nunca te cobraremos nada sin que lo aceptes.» (Coherente con «Monetización» de `CLAUDE.md`: tarjeta y pase gratis para siempre.)

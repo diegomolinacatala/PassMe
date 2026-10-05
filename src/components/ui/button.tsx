@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ComponentPropsWithoutRef, ReactNode } from "react";
+import type { ComponentPropsWithoutRef, ComponentPropsWithRef, ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
 type Variant = "ink" | "signal" | "outline" | "ghost" | "danger" | "paper";
@@ -35,7 +35,7 @@ interface CommonProps {
   children: ReactNode;
 }
 
-type ButtonProps = CommonProps & ComponentPropsWithoutRef<"button">;
+type ButtonProps = CommonProps & ComponentPropsWithRef<"button">;
 
 export function Button({ variant, size, className, children, type = "button", ...rest }: ButtonProps) {
   return (

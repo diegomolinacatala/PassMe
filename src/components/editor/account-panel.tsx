@@ -1,12 +1,19 @@
 "use client";
 
-import { LogOut, TriangleAlert } from "lucide-react";
+import { Download, LogOut, TriangleAlert } from "lucide-react";
 import { useState, useTransition } from "react";
 import { deleteAccountAction } from "@/app/dashboard/actions";
 import { Button } from "@/components/ui/button";
 import { INPUT_CLASSES } from "./fields";
 
-export function AccountPanel({ email, demo }: { email: string | null; demo: boolean }) {
+interface AccountPanelProps {
+  email: string | null;
+  demo: boolean;
+  /** Offer to download the contacts people left before they're gone. */
+  hasContacts: boolean;
+}
+
+export function AccountPanel({ email, demo, hasContacts }: AccountPanelProps) {
   const [open, setOpen] = useState(false);
   const [confirmation, setConfirmation] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -42,21 +49,33 @@ export function AccountPanel({ email, demo }: { email: string | null; demo: bool
             type="button"
             onClick={() => setOpen(true)}
             disabled={demo}
-            className="inline-flex items-center gap-2 font-medium text-danger disabled:opacity-40"
+            className="inline-flex min-h-11 items-center gap-2 font-medium text-danger disabled:opacity-40"
           >
-            <TriangleAlert className="size-4" aria-hidden /> Eliminar mi cuenta y mi tarjeta
+            <TriangleAlert className="size-4" aria-hidden /> Borrar mi cuenta y mi tarjeta
           </button>
         ) : (
           <div className="space-y-3">
             <p className="font-medium text-danger">Esto no se puede deshacer.</p>
             <p className="text-muted">
-              Borraremos tu tarjeta, tu foto y tus estadísticas. Los pases que ya estén en carteras dejarán de funcionar.
+              Borraremos tu tarjeta, tu foto, tus estadísticas, los contactos que te han dejado y tus reuniones. Tu enlace dejará
+              de funcionar y quedará reservado 90 días. El pase que tengas en la cartera dejará de actualizarse: quítalo desde la
+              app Cartera.
+            </p>
+            {hasContacts ? (
+              <a
+                href="/dashboard/contactos?format=csv"
+                className="inline-flex min-h-11 items-center gap-1.5 font-medium text-signal-deep underline-offset-4 hover:underline"
+              >
+                <Download className="size-4" aria-hidden /> Descargar mis contactos antes
+              </a>
+            ) : null}
+            <p className="text-muted">
               Escribe <strong className="font-mono text-ink">BORRAR</strong> para confirmar.
             </p>
             <input
               value={confirmation}
               onChange={(e) => setConfirmation(e.target.value)}
-              aria-label="Confirmación"
+              aria-label="Escribe BORRAR para confirmar"
               autoComplete="off"
               className={`${INPUT_CLASSES} h-10 font-mono`}
             />
@@ -72,14 +91,15 @@ export function AccountPanel({ email, demo }: { email: string | null; demo: bool
                 onClick={remove}
                 disabled={pending || confirmation.trim().toUpperCase() !== "BORRAR"}
               >
-                {pending ? "Borrando…" : "Eliminar definitivamente"}
+                {pending ? "Borrando…" : "Borrar mi cuenta"}
               </Button>
               <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>
-                Cancelar
+                No borrar
               </Button>
             </div>
           </div>
         )}
+        {demo ? <p className="mt-2 text-muted">En la demo no se puede borrar la cuenta.</p> : null}
       </div>
     </div>
   );

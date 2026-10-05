@@ -20,7 +20,7 @@ export default async function ConfirmEmailLinkPage({ searchParams }: PageProps<"
     <main className="flex min-h-dvh flex-col px-5 py-6">
       <Logo />
       <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-16 text-center">
-        <p className="eyebrow">Acceso</p>
+        <p className="eyebrow">Entrar</p>
         <h1 className="mt-3 font-display text-5xl leading-[0.95] tracking-tight">
           Un toque y <em className="text-signal">dentro.</em>
         </h1>

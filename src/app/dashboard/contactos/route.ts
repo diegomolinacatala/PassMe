@@ -1,4 +1,5 @@
-import type { NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { isNavigation } from "@/lib/pass/http";
 import { contactRequestsToCsv, contactRequestsToVCard } from "@/lib/card/contact";
 import { listOwnContactRequests } from "@/lib/data/contact-requests";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
@@ -14,7 +15,11 @@ export const runtime = "nodejs";
 export async function GET(request: NextRequest) {
   const supabase = await createServerSupabase();
   const user = supabase ? await getSessionUser(supabase) : null;
-  if (!supabase || !user) return new Response("Inicia sesión", { status: 401 });
+  if (!supabase || !user) {
+    // A followed link goes to the login page; a script gets the status.
+    if (isNavigation(request)) return NextResponse.redirect(new URL("/login?next=/dashboard", request.url), { status: 303 });
+    return new Response("Entra con tu email para descargarlo.", { status: 401 });
+  }
 
   const params = request.nextUrl.searchParams;
   const format = params.get("format") === "csv" ? "csv" : "vcf";
@@ -22,7 +27,10 @@ export async function GET(request: NextRequest) {
 
   const { requests } = await listOwnContactRequests(supabase);
   const selected = id ? requests.filter((r) => r.id === id) : requests;
-  if (id && selected.length === 0) return new Response("Contacto no encontrado", { status: 404 });
+  if (id && selected.length === 0) {
+    if (isNavigation(request)) return NextResponse.redirect(new URL("/dashboard#contactos", request.url), { status: 303 });
+    return new Response("Contacto no encontrado", { status: 404 });
+  }
 
   const date = new Date().toISOString().slice(0, 10);
   const single = selected.length === 1 && id ? selected[0]!.name : null;

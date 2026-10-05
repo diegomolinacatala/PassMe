@@ -84,8 +84,8 @@ export function WalletPanel({ slug, profileUrl, availability, demo, blockedReaso
       ) : null}
 
       <div className="grid gap-2.5">
-        {walletButton(`/api/pass/apple${suffix}`, availability.apple, <AppleWalletGlyph />, "Añadir a Apple Wallet", "Sin configurar")}
-        {walletButton(`/api/pass/google${suffix}`, availability.google, <GoogleWalletGlyph />, "Añadir a Google Wallet", "Sin configurar")}
+        {walletButton(`/api/pass/apple${suffix}`, availability.apple, <AppleWalletGlyph />, "Añadir a Apple Wallet", "No disponible todavía")}
+        {walletButton(`/api/pass/google${suffix}`, availability.google, <GoogleWalletGlyph />, "Añadir a Google Wallet", "No disponible todavía")}
       </div>
 
       {!demo && availability.handoff ? (
@@ -145,7 +145,7 @@ export function WalletPanel({ slug, profileUrl, availability, demo, blockedReaso
           )}
         >
           {copied ? <Check className="size-4" aria-hidden /> : <Copy className="size-4" aria-hidden />}
-          {copied ? "Copiado" : "Copiar enlace"}
+          {copied ? "Enlace copiado" : "Copiar enlace"}
         </button>
         <a
           href={`/u/${encodeURIComponent(slug)}/qr`}

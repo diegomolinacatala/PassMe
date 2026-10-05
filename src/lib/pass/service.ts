@@ -36,7 +36,7 @@ export async function resolvePassOwnerId(handoffToken: string | null): Promise<s
 
   const supabase = await createServerSupabase();
   const user = supabase ? await getSessionUser(supabase) : null;
-  if (!user) throw new PassError(401, "unauthorized", "Inicia sesión para descargar tu pase.");
+  if (!user) throw new PassError(401, "unauthorized", "Entra con tu email para descargar tu pase.");
   return user.id;
 }
 
@@ -49,7 +49,7 @@ export async function assertDemoPassAllowed(): Promise<void> {
   if (!isSupabaseConfigured()) return;
   const supabase = await createServerSupabase();
   const user = supabase ? await getSessionUser(supabase) : null;
-  if (!user) throw new PassError(401, "unauthorized", "Inicia sesión para descargar el pase de ejemplo.");
+  if (!user) throw new PassError(401, "unauthorized", "Entra con tu email para descargar el pase de ejemplo.");
 }
 
 async function loadOwnerCard(profileId: string): Promise<OwnerCard> {

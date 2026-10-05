@@ -16,13 +16,16 @@
   - En esta máquina no hay CLI de `gh`, `vercel` ni `supabase`.
   - El modo automático puede bloquear acciones destructivas de git (p. ej. borrar ramas remotas): déjaselas a Diego.
 
-# Estado actual (05/10/2026)
+# Estado actual (06/10/2026)
 
-**MVP en producción en https://getpassme.com, con todo fusionado en `main`.** Ninguna rama tiene trabajo sin fusionar. La monetización está pensada pero **sin implementar** (ver «Monetización»).
+**MVP en producción en https://getpassme.com.** La monetización está pensada pero **sin implementar** (ver «Monetización»).
 
-**Lo último (05/10/2026): auditoría UX con 6 usuarios simulados → [`docs/ux/AUDITORIA-UX-2026-10-05.md`](docs/ux/AUDITORIA-UX-2026-10-05.md).** Seis personas (onboarding desde un enlace, escanear el QR, reuniones por los dos lados, editor, ciclo de vida y accesibilidad + coherencia) recorrieron el modo demo en móvil y escritorio: 142 hallazgos, sin bloqueantes en el flujo principal. Los informes completos están en `docs/ux/informes/`. El documento los une en **8 PRs ordenados** (P1 arreglos rápidos → P2 «Mi QR» → P3 componentes comunes → P4 crear → P5 tarjeta pública → P6 reuniones → P7 editor → P8 cambios con migración), con glosario único, 8 decisiones para Diego (D1–D8) y criterios de aceptación. Nada implementado todavía.
+**Lo último (05–06/10/2026): implementación de la auditoría UX** ([`docs/ux/AUDITORIA-UX-2026-10-05.md`](docs/ux/AUDITORIA-UX-2026-10-05.md); progreso, decisiones y notas en [`docs/ux/PROGRESO-UX.md`](docs/ux/PROGRESO-UX.md)). Diego no estaba para responder, así que D1–D8 llevan el valor «seguro por defecto» de la auditoría (se pueden cambiar). Las ramas van **apiladas** (cada una sale de la anterior) y hay que fusionarlas **en orden**:
+- P1 `feat/ux-p1-arreglos` — arreglos rápidos (barra de guardar, foco, desbordes, glosario, vCard, demo de reuniones…). Subida; sin migraciones.
 
-**Siguiente paso exacto:** abrir otra conversación y pedirle que implemente `docs/ux/AUDITORIA-UX-2026-10-05.md` empezando por P1 (rama `feat/ux-p1-arreglos`). Ese agente preguntará a Diego las decisiones D1–D8 cuando llegue a los PRs que las usan.
+**Siguiente paso exacto:** Diego revisa y fusiona los PRs en orden, empezando por `https://github.com/diegomolinacatala/PassMe/compare/main...feat/ux-p1-arreglos?expand=1`. Las que lleven migración lo dicen en `docs/ux/PROGRESO-UX.md`: aplicarla en el SQL Editor antes de fusionar.
+
+**Antes (05/10/2026): auditoría UX con 6 usuarios simulados.** 142 hallazgos ordenados en 8 PRs (informes en `docs/ux/informes/`).
 
 **Antes (02/10/2026, PR #6 fusionado y en producción): «Agendar reunión».** Es la opción 3 que eligió Diego: PassMe hace de intermediario por email.
 - Quien escanea pulsa «Agendar reunión» en la tarjeta y propone hasta 3 horas en dos pasos (cuándo y cómo, y luego sus datos).

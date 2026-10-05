@@ -128,6 +128,68 @@ export function TextField({
   );
 }
 
+interface SwitchRowProps {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label: string;
+  description?: string;
+  className?: string;
+}
+
+/**
+ * A setting with its explanation: the whole row is the switch, and its name is
+ * exactly the visible label (the explanation is its description).
+ */
+export function SwitchRow({ checked, onChange, label, description, className }: SwitchRowProps) {
+  const id = useId();
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-labelledby={`${id}-label`}
+      aria-describedby={description ? `${id}-description` : undefined}
+      onClick={() => onChange(!checked)}
+      className={cn("group flex w-full items-start justify-between gap-4 text-left", className)}
+    >
+      <span className="min-w-0">
+        <span id={`${id}-label`} className="block text-sm font-medium text-ink-soft">
+          {label}
+        </span>
+        {description ? (
+          <span id={`${id}-description`} className="mt-1 block max-w-md text-sm text-muted">
+            {description}
+          </span>
+        ) : null}
+      </span>
+      <SwitchTrack checked={checked} />
+    </button>
+  );
+}
+
+/** The visual pill of a switch (the control itself is its parent). */
+function SwitchTrack({ checked, size = "md" }: { checked: boolean; size?: "sm" | "md" }) {
+  const sm = size === "sm";
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        "relative mt-0.5 shrink-0 rounded-full transition-colors duration-300 group-focus-visible:outline-2 group-focus-visible:outline-offset-2 group-focus-visible:outline-signal",
+        sm ? "h-5 w-9" : "h-6 w-11",
+        // Off: a visible outline (≥ 3:1), not a pale fill.
+        checked ? "bg-ink" : "border-2 border-muted bg-transparent",
+      )}
+    >
+      <span
+        className={cn(
+          "absolute top-0.5 left-0.5 rounded-full transition-transform duration-300 ease-[var(--ease-spring)]",
+          checked ? cn("bg-card shadow-sm", sm ? "size-4 translate-x-4" : "size-5 translate-x-5") : cn("bg-muted", sm ? "size-3" : "size-4"),
+        )}
+      />
+    </span>
+  );
+}
+
 interface SwitchProps {
   checked: boolean;
   onChange: (checked: boolean) => void;
@@ -136,8 +198,8 @@ interface SwitchProps {
   size?: "sm" | "md";
 }
 
+/** A bare switch for compact rows; prefer SwitchRow when there's a visible label. */
 export function Switch({ checked, onChange, label, className, size = "md" }: SwitchProps) {
-  const sm = size === "sm";
   return (
     <button
       type="button"
@@ -145,20 +207,9 @@ export function Switch({ checked, onChange, label, className, size = "md" }: Swi
       aria-checked={checked}
       aria-label={label}
       onClick={() => onChange(!checked)}
-      className={cn(
-        "relative shrink-0 rounded-full transition-colors duration-300",
-        sm ? "h-5 w-9" : "h-6 w-11",
-        checked ? "bg-ink" : "bg-line-strong/70",
-        className,
-      )}
+      className={cn("group grid min-h-11 min-w-11 shrink-0 place-items-center", className)}
     >
-      <span
-        className={cn(
-          "absolute top-0.5 left-0.5 rounded-full bg-card shadow-sm transition-transform duration-300 ease-[var(--ease-spring)]",
-          sm ? "size-4" : "size-5",
-          checked && (sm ? "translate-x-4" : "translate-x-5"),
-        )}
-      />
+      <SwitchTrack checked={checked} size={size} />
     </button>
   );
 }

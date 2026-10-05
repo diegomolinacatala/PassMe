@@ -44,7 +44,7 @@ export function DesignField({ value, card, onChange }: DesignFieldProps) {
   return (
     <div className="space-y-9">
       <Group label="Tema" hint={activeTheme ? activeTheme.name : "Personalizado"}>
-        <div role="radiogroup" aria-label="Tema del pase" className="grid grid-cols-5 gap-x-2.5 gap-y-3 sm:gap-x-3">
+        <div role="radiogroup" aria-label="Tema del pase" className="grid grid-cols-4 gap-x-2.5 gap-y-3 min-[400px]:grid-cols-5 sm:gap-x-3">
           {CARD_THEMES.map((theme) => (
             <ThemeSwatch
               key={theme.id}

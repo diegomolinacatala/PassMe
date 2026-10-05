@@ -106,24 +106,61 @@ export function demoMeeting(now: Date): Meeting {
   };
 }
 
-/** What the editor's "Reuniones" panel shows in demo mode: one to answer, one confirmed. */
-export function demoOwnerMeetings(now: Date): Meeting[] {
-  const pending = demoMeeting(now);
-  const later = pending.slots.map((slot) => new Date(new Date(slot).getTime() + 2 * 86_400_000).toISOString());
-  return [
-    pending,
-    {
-      ...pending,
-      id: "demo-confirmada",
-      status: "confirmed",
-      slots: later,
-      confirmedStart: later[0]!,
-      sequence: 1,
-      format: "video",
-      location: "",
-      topic: "Presentación del proyecto",
-      guest: { name: "Jon Etxeberria", email: "jon@example.com", phone: null, company: "Kobalt" },
-    },
-  ];
+/** Sample meetings in every state, at /reunion/<id>/<side> (demo mode only). */
+export const DEMO_MEETING_IDS = ["demo", "demo-confirmada", "demo-contra", "demo-caducada", "demo-pasada"] as const;
+export type DemoMeetingId = (typeof DEMO_MEETING_IDS)[number];
+
+export function isDemoMeetingId(id: string): id is DemoMeetingId {
+  return (DEMO_MEETING_IDS as ReadonlyArray<string>).includes(id);
 }
 
+const DAY_MS = 86_400_000;
+const shiftDays = (iso: string, days: number) => new Date(new Date(iso).getTime() + days * DAY_MS).toISOString();
+
+/**
+ * The sample meeting behind each demo id: the proposal to answer, a confirmed
+ * meeting, the owner's counter-proposal (for the visitor), one whose times
+ * have passed and one that already happened.
+ */
+export function demoMeetingById(id: DemoMeetingId, now: Date): Meeting {
+  const pending = demoMeeting(now);
+  switch (id) {
+    case "demo":
+      return pending;
+    case "demo-confirmada": {
+      const later = pending.slots.map((slot) => shiftDays(slot, 2));
+      return {
+        ...pending,
+        id,
+        status: "confirmed",
+        slots: later,
+        confirmedStart: later[0]!,
+        sequence: 1,
+        format: "video",
+        location: "",
+        topic: "Presentación del proyecto",
+        guest: { name: "Jon Etxeberria", email: "jon@example.com", phone: null, company: "Kobalt" },
+      };
+    }
+    case "demo-contra":
+      return {
+        ...pending,
+        id,
+        proposedBy: "owner",
+        slots: pending.slots.map((slot) => shiftDays(slot, 1)),
+        sequence: 1,
+        responseNote: "Esa mañana no puedo, ¿te va alguna de estas?",
+      };
+    case "demo-caducada":
+      return { ...pending, id, slots: pending.slots.map((slot) => shiftDays(slot, -7)) };
+    case "demo-pasada": {
+      const before = pending.slots.map((slot) => shiftDays(slot, -7));
+      return { ...pending, id, status: "confirmed", slots: before, confirmedStart: before[0]!, sequence: 1 };
+    }
+  }
+}
+
+/** What the editor's "Reuniones" panel shows in demo mode: one to answer, one confirmed. */
+export function demoOwnerMeetings(now: Date): Meeting[] {
+  return [demoMeetingById("demo", now), demoMeetingById("demo-confirmada", now)];
+}

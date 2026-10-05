@@ -53,7 +53,7 @@ export default async function PublicCardPage({ params, searchParams }: PageProps
     >
       <div className="mx-auto w-full max-w-[440px] animate-rise">
         <CreateYoursBar slug={card.slug} />
-        <ProfileCard card={card} />
+        <ProfileCard card={card} source={source} />
 
         {takesMeetings || card.acceptsContactRequests ? (
           <div className="mt-5 space-y-3">

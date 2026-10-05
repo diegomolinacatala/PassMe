@@ -10,8 +10,9 @@ import { isSupabaseConfigured } from "@/lib/env";
 import { verifyMeetingSignature } from "@/lib/meetings/links";
 import { parseClose, parseConfirm, parseCounter } from "@/lib/meetings/schema";
 import { changeMeeting } from "@/lib/meetings/service";
-import { applyChange, type MeetingChange, type MeetingParty } from "@/lib/meetings/state";
-import { DEMO_MEETING_ID, demoMeeting, toMeetingView, type MeetingView } from "@/lib/meetings/view";
+import { applyChange, type MeetingChange, type MeetingParty, type MeetingStatus } from "@/lib/meetings/state";
+import type { Meeting } from "@/lib/meetings/model";
+import { demoMeetingById, isDemoMeetingId, toMeetingView, type DemoMeetingId, type MeetingView } from "@/lib/meetings/view";
 import { clientRateKey } from "@/lib/request";
 
 export type MeetingResponseState =
@@ -55,10 +56,37 @@ function changeFromForm(formData: FormData, format: Parameters<typeof parseConfi
   }
 }
 
-/** Demo mode: the sample proposal answers like a real one, but nothing is stored or sent. */
-function demoAnswer(party: MeetingParty, formData: FormData): MeetingResponseState {
+const STATUSES: ReadonlyArray<MeetingStatus> = ["pending", "confirmed", "declined", "cancelled"];
+const isIso = (value: unknown): value is string => typeof value === "string" && value.length <= 40 && !Number.isNaN(Date.parse(value));
+
+/**
+ * Demo pages keep their state in the browser (nothing is stored), so each answer
+ * carries where the sample meeting stands now: confirming and then cancelling works.
+ */
+function demoState(base: Meeting, raw: FormDataEntryValue | null): Meeting {
+  if (typeof raw !== "string" || raw.length > 2000) return base;
+  try {
+    const value = JSON.parse(raw) as Partial<Record<keyof Meeting, unknown>>;
+    const slots = Array.isArray(value.slots) && value.slots.length > 0 && value.slots.length <= 3 && value.slots.every(isIso) ? value.slots : base.slots;
+    return {
+      ...base,
+      status: STATUSES.includes(value.status as MeetingStatus) ? (value.status as MeetingStatus) : base.status,
+      proposedBy: value.proposedBy === "owner" || value.proposedBy === "guest" ? value.proposedBy : base.proposedBy,
+      slots,
+      confirmedStart: isIso(value.confirmedStart) ? value.confirmedStart : value.confirmedStart === null ? null : base.confirmedStart,
+      location: typeof value.location === "string" ? value.location.slice(0, 700) : base.location,
+      closedBy: value.closedBy === "owner" || value.closedBy === "guest" ? value.closedBy : null,
+      sequence: typeof value.sequence === "number" && Number.isInteger(value.sequence) && value.sequence >= 0 ? Math.min(value.sequence, 50) : base.sequence,
+    };
+  } catch {
+    return base;
+  }
+}
+
+/** Demo mode: the sample meetings answer like real ones, but nothing is stored or sent. */
+function demoAnswer(id: DemoMeetingId, party: MeetingParty, formData: FormData): MeetingResponseState {
   const now = new Date();
-  const meeting = demoMeeting(now);
+  const meeting = demoState(demoMeetingById(id, now), formData.get("demoState"));
   const parsed = changeFromForm(formData, meeting.format);
   if (!parsed.ok) return { status: "error", message: parsed.errors._form ?? "Revisa los campos marcados.", errors: parsed.errors };
   const applied = applyChange(meeting, party, parsed.change, now);
@@ -86,9 +114,9 @@ export async function respondMeetingAction(
   _prev: MeetingResponseState,
   formData: FormData,
 ): Promise<MeetingResponseState> {
-  if (rawId === DEMO_MEETING_ID && !isSupabaseConfigured()) {
+  if (isDemoMeetingId(rawId) && !isSupabaseConfigured()) {
     const party: MeetingParty = signature === "invitado" ? "guest" : "owner";
-    return demoAnswer(party, formData);
+    return demoAnswer(rawId, party, formData);
   }
 
   // One meeting, one rate-limit bucket, whatever the case of the link.

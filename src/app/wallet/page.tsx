@@ -14,8 +14,13 @@ export const metadata: Metadata = { title: "Añadir a la cartera", robots: { ind
 function Expired() {
   return (
     <div className="text-center">
-      <h1 className="font-display text-4xl leading-none">Este enlace ha caducado</h1>
-      <p className="mt-3 text-muted">Vuelve al editor en el ordenador y genera un QR nuevo. Duran 30 minutos.</p>
+      <h1 className="font-display text-4xl leading-none">Este QR ya no vale</h1>
+      <p className="mt-3 text-muted">
+        Dura 30 minutos. Entra con tu email en este móvil y añade el pase desde ahí.
+      </p>
+      <a href="/login?next=/dashboard" className={buttonClasses({ variant: "signal", size: "lg", className: "mt-8 w-full" })}>
+        Entrar y añadir el pase
+      </a>
     </div>
   );
 }
@@ -67,7 +72,7 @@ export default async function WalletHandoffPage({ searchParams }: PageProps<"/wa
             <div className="grid gap-3">
               {isAndroid ? [google, apple] : [apple, google]}
               {!appleReady && !googleReady ? (
-                <p className="text-center text-sm text-muted">Las carteras aún no están configuradas en el servidor.</p>
+                <p className="text-center text-sm text-muted">La cartera no está disponible todavía.</p>
               ) : null}
             </div>
           </>

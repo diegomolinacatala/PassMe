@@ -125,24 +125,19 @@ export function ContactsPanel({ requests, available, enabled, demo }: ContactsPa
     });
   }
 
-  if (!available) {
-    return (
-      <p className="text-sm text-muted">
-        Falta un paso en la base de datos para recibir contactos (migración <code className="font-mono">20260929130000</code>).
-      </p>
-    );
-  }
+  if (!available) return <p className="text-sm text-muted">Esta función aún no está disponible.</p>;
 
   return (
     <div id="contactos" className="scroll-mt-6">
       {list.length === 0 ? (
         <p className="text-sm text-muted">
           {enabled
-            ? "Aún no te ha dejado nadie su contacto. Cuando pase, lo verás aquí (y te avisaremos por email si está configurado)."
-            : "Activa «Deja que te dejen su contacto» en Publicación y quien vea tu tarjeta podrá dejarte el suyo."}
+            ? "Aún no te ha dejado nadie su contacto. Cuando alguien te lo deje, te avisaremos por email y lo verás aquí."
+            : "Activa «Recibir contactos» en Publicación y quien vea tu tarjeta podrá dejarte el suyo."}
         </p>
       ) : (
         <>
+          <p className="-mt-3 mb-4 text-sm text-muted">{list.length === 1 ? "1 en total" : `${list.length} en total`}</p>
           <ul className="divide-y divide-line/80">
             {shown.map((request) => (
               <ContactItem key={request.id} request={request} demo={demo} onDelete={() => remove(request)} />
@@ -159,10 +154,10 @@ export function ContactsPanel({ requests, available, enabled, demo }: ContactsPa
           ) : null}
           <div className="mt-5 flex flex-wrap gap-2">
             <ExportLink href="/dashboard/contactos?format=csv" demo={demo}>
-              <Download className="size-4" aria-hidden /> Excel (CSV)
+              <Download className="size-4" aria-hidden /> Descargar para Excel
             </ExportLink>
             <ExportLink href="/dashboard/contactos?format=vcf" demo={demo}>
-              <UserRoundPlus className="size-4" aria-hidden /> Todos a Contactos (.vcf)
+              <UserRoundPlus className="size-4" aria-hidden /> Guardar todos en Contactos
             </ExportLink>
           </div>
         </>

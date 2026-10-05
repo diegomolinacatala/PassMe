@@ -1,29 +1,15 @@
 import { after, type NextRequest } from "next/server";
 import { recordEventForProfile } from "@/lib/data/events";
 import { createSharedRateLimiter } from "@/lib/data/rate-limits";
-import { log } from "@/lib/log";
 import { PKPASS_CONTENT_TYPE } from "@/lib/pass/apple";
-import {
-  assertDemoPassAllowed,
-  buildApplePassForProfile,
-  buildDemoApplePass,
-  PassError,
-  resolvePassOwnerId,
-} from "@/lib/pass/service";
+import { passErrorResponse, passRateLimited } from "@/lib/pass/http";
+import { assertDemoPassAllowed, buildApplePassForProfile, buildDemoApplePass, resolvePassOwnerId } from "@/lib/pass/service";
 import { clientRateKey } from "@/lib/request";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
 const limiter = createSharedRateLimiter({ name: "pass-apple-ip", limit: 20, windowMs: 60_000 });
-
-function errorResponse(error: unknown): Response {
-  if (error instanceof PassError) {
-    return Response.json({ error: error.code, message: error.message }, { status: error.status });
-  }
-  log.error("apple pass generation failed", {}, error);
-  return Response.json({ error: "internal", message: "No hemos podido generar el pase." }, { status: 500 });
-}
 
 /**
  * GET /api/pass/apple            → the signed-in owner's pass
@@ -32,7 +18,7 @@ function errorResponse(error: unknown): Response {
  */
 export async function GET(request: NextRequest) {
   if (!(await limiter.check(clientRateKey(request.headers))).ok) {
-    return Response.json({ error: "rate_limited" }, { status: 429 });
+    return passRateLimited(request);
   }
 
   try {
@@ -53,6 +39,6 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    return errorResponse(error);
+    return passErrorResponse(request, error, "apple");
   }
 }

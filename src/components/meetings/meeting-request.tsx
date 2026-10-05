@@ -2,7 +2,7 @@
 
 import { ArrowLeft, ArrowRight, CalendarClock, CircleCheck, LoaderCircle } from "lucide-react";
 import Link from "next/link";
-import { useActionState, useEffect, useRef, useState } from "react";
+import { startTransition, useActionState, useEffect, useRef, useState, type FormEvent } from "react";
 import { submitMeetingAction, type MeetingRequestState } from "@/app/u/[slug]/meeting-actions";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { Turnstile } from "@/components/ui/turnstile";
@@ -52,8 +52,12 @@ function SentMessage({ owner, slug, state, slots, timeZone }: {
   timeZone: string;
 }) {
   const heading = useRef<HTMLParagraphElement>(null);
-  useEffect(() => heading.current?.focus(), []);
   const { details } = state;
+  useEffect(() => heading.current?.focus(), []);
+  // Any "create mine" button on the page (top bar, dark block) now starts with these details.
+  useEffect(() => {
+    rememberDetails({ fullName: details.name, email: details.email, phone: details.phone, company: details.company }, slug);
+  }, [details, slug]);
   return (
     <div role="status" className="animate-rise rounded-[24px] border hairline bg-card px-5 py-6 text-center">
       <CircleCheck className="mx-auto size-7 text-ok" aria-hidden />
@@ -76,9 +80,6 @@ function SentMessage({ owner, slug, state, slots, timeZone }: {
         <p className="text-sm text-ink-soft">¿Y si te haces tu propia tarjeta? Ya tenemos tus datos.</p>
         <Link
           href={createPath(slug)}
-          onClick={() =>
-            rememberDetails({ fullName: details.name, email: details.email, phone: details.phone, company: details.company }, slug)
-          }
           className={buttonClasses({ variant: "signal", className: "group mt-3" })}
         >
           Crear la mía con estos datos
@@ -120,7 +121,25 @@ interface StepWhenProps {
 
 function StepWhen({ owner, when, onChange, timeZone, now, errors, onNext }: StepWhenProps) {
   const heading = useRef<HTMLHeadingElement>(null);
+  const picker = useRef<HTMLDivElement>(null);
+  const [flash, setFlash] = useState(false);
   useEffect(() => heading.current?.focus(), []);
+  useEffect(() => {
+    if (!flash) return;
+    const timer = window.setTimeout(() => setFlash(false), 1400);
+    return () => window.clearTimeout(timer);
+  }, [flash]);
+  const count = when.slots.length;
+
+  function next() {
+    if (count > 0) return onNext();
+    onNext();
+    // Nothing picked yet: bring the days back into view and flash them.
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    picker.current?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+    setFlash(true);
+  }
+
   return (
     <div className="animate-rise space-y-5">
       <div>
@@ -131,7 +150,15 @@ function StepWhen({ owner, when, onChange, timeZone, now, errors, onNext }: Step
           Propón hasta tres horas (hora de {timeZoneCity(timeZone)}). {owner} recibe un email y elige una.
         </p>
       </div>
-      <SlotPicker timeZone={timeZone} value={when.slots} onChange={(slots) => onChange({ slots })} now={now} chooser={owner} error={errors.slots} />
+      <div
+        ref={picker}
+        className={cn(
+          "scroll-mt-4 rounded-2xl ring-offset-4 ring-offset-card transition-shadow duration-300",
+          flash && "ring-2 ring-signal",
+        )}
+      >
+        <SlotPicker timeZone={timeZone} value={when.slots} onChange={(slots) => onChange({ slots })} now={now} chooser={owner} error={errors.slots} />
+      </div>
       <Segmented<MeetingDuration>
         label="Duración"
         value={when.duration}
@@ -168,9 +195,9 @@ function StepWhen({ owner, when, onChange, timeZone, now, errors, onNext }: Step
             : `${owner} te llamará: en el siguiente paso deja tu teléfono.`}
         </p>
       )}
-      <Button size="lg" className="group w-full" onClick={onNext}>
-        Continuar
-        <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-0.5" aria-hidden />
+      <Button size="lg" variant={count > 0 ? "signal" : "ink"} className={cn("group w-full", count === 0 && "opacity-60")} onClick={next}>
+        {count === 0 ? "Elige al menos una hora" : `Continuar con ${count} ${count === 1 ? "hora" : "horas"}`}
+        {count > 0 ? <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-0.5" aria-hidden /> : null}
       </Button>
     </div>
   );
@@ -306,6 +333,14 @@ export function MeetingRequest({ slug, ownerName, source, captchaSiteKey }: Meet
   const [edited, setEdited] = useState<ReadonlySet<string>>(new Set());
   const [state, submit, pending] = useActionState<MeetingRequestState, FormData>(submitMeetingAction.bind(null, slug, source), { status: "idle" });
   const owner = firstName(ownerName);
+  const form = useRef<HTMLFormElement>(null);
+
+  // A rejected submission: take the keyboard (and screen reader) to the first field to fix.
+  useEffect(() => {
+    if (state.status !== "error") return;
+    const target = form.current?.querySelector<HTMLElement>('[aria-invalid="true"]') ?? form.current?.querySelector<HTMLElement>("[data-form-error]");
+    target?.focus();
+  }, [state]);
 
   const [handled, setHandled] = useState(state);
   if (handled !== state) {
@@ -325,8 +360,16 @@ export function MeetingRequest({ slug, ownerName, source, captchaSiteKey }: Meet
   if (stepError) errors.slots = stepError;
   const touch = (keys: string[]) => setEdited((prev) => new Set([...prev, ...keys]));
 
+  // Submitting by hand (not via the form action) skips React's automatic form reset,
+  // so after a server error every field and the checkbox look exactly as they were.
+  function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    startTransition(() => submit(formData));
+  }
+
   return (
-    <form action={submit} className="relative animate-rise rounded-[24px] border hairline bg-card px-5 py-5" noValidate>
+    <form ref={form} action={submit} onSubmit={onSubmit} className="relative animate-rise rounded-[24px] border hairline bg-card px-5 py-5" noValidate>
       <div className="mb-4 flex items-center justify-between gap-3">
         <p className="eyebrow">Agendar reunión</p>
         <p className="font-mono text-[11px] tracking-[0.12em] text-muted" aria-hidden>
@@ -379,7 +422,7 @@ export function MeetingRequest({ slug, ownerName, source, captchaSiteKey }: Meet
           <div className="mt-4 space-y-4">
             {captchaSiteKey ? <Turnstile siteKey={captchaSiteKey} action="meeting" resetKey={state} /> : null}
             {state.status === "error" ? (
-              <p role="alert" className="text-sm text-danger">
+              <p role="alert" data-form-error tabIndex={-1} className="text-sm text-danger outline-none">
                 {state.message}
               </p>
             ) : null}

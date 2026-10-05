@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test";
 test.describe("editor (demo mode)", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/dashboard");
-    await expect(page.getByText("Modo demo.", { exact: false })).toBeVisible();
+    await expect(page.getByText("Modo demo:", { exact: false }).first()).toBeVisible();
   });
 
   test("live-updates the wallet preview while typing", async ({ page }) => {
@@ -62,28 +62,43 @@ test.describe("editor (demo mode)", () => {
 
     await page.getByRole("radio", { name: "Editorial" }).click();
     await expect(page.getByRole("radio", { name: "Editorial" })).toHaveAttribute("aria-checked", "true");
-    await expect(page.getByRole("status")).toContainText("Cambios sin guardar");
+    await expect(page.getByRole("status").filter({ hasText: "Cambios sin guardar" })).toBeVisible();
   });
 
-  test("tracks unsaved changes and 'saves' in demo mode", async ({ page }) => {
-    const status = page.getByRole("status");
-    await expect(status).toContainText("Todo guardado");
+  test("the save bar only shows up with something to say", async ({ page }) => {
+    const save = page.getByRole("button", { name: "Guardar", exact: true });
+    // Nothing changed yet: no bar covering the page.
+    await expect(save).toBeHidden();
     await page.getByLabel("Cargo").fill("Head of Design");
-    await expect(status).toContainText("Cambios sin guardar");
-    await status.getByRole("button", { name: "Guardar" }).click();
-    await expect(status).toContainText("Modo demo");
+    await expect(save).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: "Cambios sin guardar" })).toBeVisible();
+    await save.click();
+    await expect(page.getByRole("status").filter({ hasText: "Modo demo" })).toBeVisible();
+    // "Saved" says its piece and the bar slides away.
+    await expect(save).toBeHidden({ timeout: 6000 });
   });
 
-  test("blocks saving with invalid data", async ({ page }) => {
+  test("saving with an error takes you to the field", async ({ page }) => {
     await page.getByLabel("Nombre y apellidos").fill("");
-    await page.getByRole("status").getByRole("button", { name: "Guardar" }).click();
+    await page.keyboard.press("End");
+    await page.mouse.wheel(0, 20000);
+    await page.getByRole("button", { name: "Guardar", exact: true }).click();
     await expect(page.getByText("Tu nombre es obligatorio.")).toBeVisible();
-    await expect(page.getByRole("status")).toContainText("Revisa los campos");
+    await expect(page.getByRole("status").filter({ hasText: "Falta tu nombre." })).toBeVisible();
+    const name = page.getByLabel("Nombre y apellidos");
+    await expect(name).toBeFocused();
+    await expect(name).toBeInViewport();
+  });
+
+  test("shows the platform's save shortcut", async ({ page, browserName }) => {
+    test.skip(browserName !== "chromium");
+    await page.getByLabel("Cargo").fill("Head of Design");
+    await expect(page.getByText(/^(⌘S|Ctrl S)$/)).toHaveAttribute("aria-hidden", "true");
   });
 });
 
 test("login explains the demo code when Supabase is not configured", async ({ page }) => {
   await page.goto("/login");
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Entra en tu tarjeta");
-  await expect(page.getByText(/Modo demo\..*el código es 00000000/)).toBeVisible();
+  await expect(page.getByText(/Modo demo:.*el código es 00000000/)).toBeVisible();
 });

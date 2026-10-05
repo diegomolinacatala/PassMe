@@ -177,7 +177,7 @@ export function parseMeetingRequest(input: unknown, now: Date = new Date()): Par
 
 // --- Answers -----------------------------------------------------------------
 
-const note = paragraph(MEETING_LIMITS.note).refine(noLinks, "Sin enlaces, por favor: los veréis en la invitación.");
+const note = paragraph(MEETING_LIMITS.note).refine(noLinks, "Sin enlaces, por favor. Si necesitáis compartir uno, hacedlo respondiendo al email de confirmación.");
 
 /** Video services whose links can go into an invitation (no lookalike phishing pages). */
 const VIDEO_HOSTS = ["meet.google.com", "zoom.us", "teams.microsoft.com", "teams.live.com", "whereby.com", "meet.jit.si", "webex.com"];

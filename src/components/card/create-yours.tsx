@@ -25,7 +25,7 @@ export function CreateYoursBar({ slug }: { slug: string }) {
         className={buttonClasses({ variant: "ink", size: "sm", className: "pr-4 pl-3 shadow-soft" })}
       >
         <Plus className="size-4" aria-hidden />
-        Crea la tuya gratis
+        Crear la mía
       </Link>
     </nav>
   );

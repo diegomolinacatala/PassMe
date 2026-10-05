@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, LoaderCircle } from "lucide-react";
-import { useId, useRef, type FormEvent, type ReactNode } from "react";
+import { useId, useRef, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { CARD_THEMES } from "@/lib/card/design";
 import { CONTACT_ERROR_KEY, type QuickCardDraft, type QuickTextField } from "@/lib/card/quick";
@@ -71,8 +71,18 @@ export function QuickCardForm({
     requestAnimationFrame(() => formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
   }
 
+  const last = CONTACT.at(-1)!.field;
   const renderField = (def: FieldDef, describedBy?: string) => (
-    <Field key={def.field} def={def} value={draft[def.field]} error={errors[def.field]} describedBy={describedBy} onChange={onChange} onBlur={onBlurField} />
+    <Field
+      key={def.field}
+      def={def}
+      value={draft[def.field]}
+      error={errors[def.field]}
+      describedBy={describedBy}
+      onChange={onChange}
+      onBlur={onBlurField}
+      isLast={def.field === last}
+    />
   );
 
   return (
@@ -124,9 +134,19 @@ interface FieldProps {
   describedBy?: string;
   onChange: (patch: Partial<QuickCardDraft>) => void;
   onBlur: (field: QuickTextField) => void;
+  /** The last text field: Enter submits. Before it, Enter moves on to the next field. */
+  isLast: boolean;
 }
 
-function Field({ def, value, error, describedBy, onChange, onBlur }: FieldProps) {
+/** Enter on a phone's "Siguiente" key goes to the next field instead of submitting half a form. */
+function focusNextField(event: KeyboardEvent<HTMLInputElement>) {
+  if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
+  event.preventDefault();
+  const fields = Array.from(event.currentTarget.form?.querySelectorAll<HTMLInputElement>("input[name]") ?? []);
+  fields[fields.indexOf(event.currentTarget) + 1]?.focus();
+}
+
+function Field({ def, value, error, describedBy, onChange, onBlur, isLast }: FieldProps) {
   const id = useId();
   const described = [error ? `${id}-error` : null, describedBy].filter(Boolean).join(" ") || undefined;
   return (
@@ -146,6 +166,8 @@ function Field({ def, value, error, describedBy, onChange, onBlur }: FieldProps)
         value={value}
         onChange={(e) => onChange({ [def.field]: e.target.value })}
         onBlur={() => onBlur(def.field)}
+        onKeyDown={isLast ? undefined : focusNextField}
+        enterKeyHint={isLast ? "done" : "next"}
         type={def.type ?? "text"}
         inputMode={def.inputMode}
         autoComplete={def.autoComplete}

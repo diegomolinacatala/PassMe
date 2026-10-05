@@ -7,7 +7,7 @@ import { getMeetingRecord, withOwnerEmail } from "@/lib/data/meetings";
 import { isSupabaseConfigured } from "@/lib/env";
 import { verifyMeetingSignature } from "@/lib/meetings/links";
 import type { MeetingParty } from "@/lib/meetings/state";
-import { DEMO_MEETING_ID, demoMeeting, toMeetingView, type MeetingView } from "@/lib/meetings/view";
+import { demoMeetingById, isDemoMeetingId, toMeetingView, type MeetingView } from "@/lib/meetings/view";
 
 export const metadata: Metadata = {
   title: "Reunión",
@@ -37,10 +37,10 @@ function Unavailable({ title, text }: { title: string; text: string }) {
 
 async function loadView(id: string, signature: string): Promise<{ view: MeetingView; demo: boolean } | "invalid" | "gone"> {
   const now = new Date();
-  if (id === DEMO_MEETING_ID && !isSupabaseConfigured()) {
+  if (isDemoMeetingId(id) && !isSupabaseConfigured()) {
     const party: MeetingParty = signature === "invitado" ? "guest" : "owner";
     const owner = { id: "demo", name: DEMO_CARD.fullName, slug: DEMO_CARD.slug, email: "alex@example.com" };
-    return { view: toMeetingView(demoMeeting(now), owner, party, now), demo: true };
+    return { view: toMeetingView(demoMeetingById(id, now), owner, party, now), demo: true };
   }
   const party = verifyMeetingSignature(id.toLowerCase(), signature);
   if (!party) return "invalid";

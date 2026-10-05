@@ -18,7 +18,8 @@ export default function TermsPage() {
     {
       title: "El servicio",
       body: [
-        "PassMe te permite crear una tarjeta de contacto, publicarla en tu enlace (/u/…) y añadirla a Apple Wallet o Google Wallet. Mientras sea una versión inicial el servicio es gratuito; si eso cambia te avisaremos con antelación y nunca se te cobrará nada sin que lo aceptes.",
+        "PassMe te permite crear una tarjeta de contacto, publicarla en tu enlace (/u/…) y añadirla a Apple Wallet o Google Wallet.",
+        "Tu tarjeta, tu QR y tu pase son gratis, para siempre. Si en el futuro añadimos funciones de pago, serán opcionales y nunca te cobraremos nada sin que lo aceptes.",
       ],
     },
     {
@@ -39,14 +40,14 @@ export default function TermsPage() {
       title: "Uso aceptable",
       body: [
         "No uses PassMe para enviar spam, recopilar datos de otras personas sin su permiso, saturar el servicio o saltarte sus medidas de seguridad.",
-        "Podemos retirar tarjetas o suspender cuentas que incumplan estas normas, avisándote cuando sea posible.",
+        "Podemos despublicar tarjetas o suspender cuentas que incumplan estas normas, avisándote cuando sea posible.",
       ],
     },
     {
       title: "Contactos que recibes",
       body: [
-        "Si activas «Te dejo mi contacto», las personas que te dejan sus datos te los confían a ti. Úsalos solo para lo que aceptaron (ponerte en contacto con ellas) y bórralos si te lo piden. Respecto a esos datos, tú eres el responsable y PassMe los guarda en tu nombre.",
-        "Lo mismo con «Agendar reunión»: los datos de quien te propone una reunión son para organizarla. PassMe solo hace de intermediario por email; lo que acordéis y la reunión en sí son cosa vuestra.",
+        "Si activas «Recibir contactos», las personas que te dejan sus datos te los confían a ti. Úsalos solo para lo que aceptaron (ponerte en contacto con ellas) y bórralos si te lo piden. Respecto a esos datos, tú eres el responsable y PassMe los guarda en tu nombre.",
+        "Lo mismo con «Recibir propuestas de reunión»: los datos de quien te propone una reunión son para organizarla. PassMe solo hace de intermediario por email; lo que acordéis y la reunión en sí son cosa vuestra.",
       ],
     },
     {
@@ -64,7 +65,7 @@ export default function TermsPage() {
     {
       title: "Baja",
       body: [
-        "Puedes borrar tu cuenta cuando quieras desde el editor (Cuenta › Eliminar). Se elimina todo lo asociado a ella.",
+        "Puedes borrar tu cuenta cuando quieras desde el editor (Cuenta › Borrar mi cuenta y mi tarjeta). Se borra todo lo asociado a ella.",
         <>Dudas o reclamaciones: {mail}. Estos términos se rigen por la ley española.</>,
       ],
     },

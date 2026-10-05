@@ -155,7 +155,11 @@ export async function deleteAccountAction(confirmation: string): Promise<DeleteA
   }
 
   const admin = createAdminSupabase();
-  if (!admin) return { ok: false, error: "Falta SUPABASE_SECRET_KEY en el servidor." };
+  if (!admin) {
+    // A setup problem, not something the person can fix: details to the log only.
+    log.error("account deletion unavailable: SUPABASE_SECRET_KEY is missing", {});
+    return { ok: false, error: "No hemos podido borrar la cuenta. Escríbenos y lo hacemos a mano." };
+  }
 
   const userId = session.user.id;
   await cleanupAvatars(session.supabase, userId, null);

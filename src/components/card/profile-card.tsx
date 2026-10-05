@@ -17,6 +17,8 @@ interface ProfileCardProps {
   card: PublicCard;
   /** Editor preview: no navigation, no tracking. */
   preview?: boolean;
+  /** How the visitor arrived (?src=…): "Guardar contacto" counts under the same source. */
+  source?: string;
   className?: string;
 }
 
@@ -62,10 +64,10 @@ function Monogram({ name, italic }: { name: string; italic: boolean }) {
  * Styled like the pass: the card's color and motif on the stub, a
  * perforation, and a paper body with the contacts.
  */
-export function ProfileCard({ card, preview = false, className }: ProfileCardProps) {
+export function ProfileCard({ card, preview = false, source = "direct", className }: ProfileCardProps) {
   const name = card.fullName || "Tu nombre";
   const meta = [card.headline, card.company].filter(Boolean).join(" · ");
-  const vcardHref = `/u/${encodeURIComponent(card.slug)}/vcard`;
+  const vcardHref = `/u/${encodeURIComponent(card.slug)}/vcard${source !== "direct" ? `?src=${encodeURIComponent(source)}` : ""}`;
   const design = resolveDesign(card);
   const [first, rest] = editorialLines(name);
 
@@ -192,11 +194,12 @@ export function ProfileCard({ card, preview = false, className }: ProfileCardPro
               );
             })}
           </ul>
-        ) : (
+        ) : preview ? (
+          // Only the owner sees this nudge; visitors just see the card without an empty box.
           <p className="mt-6 rounded-2xl border border-dashed border-line px-4 py-6 text-center text-sm text-muted">
-            Todavía no hay enlaces visibles.
+            Añade un teléfono o un email para que puedan contactarte.
           </p>
-        )}
+        ) : null}
       </div>
     </article>
   );

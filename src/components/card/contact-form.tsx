@@ -2,7 +2,7 @@
 
 import { ArrowRight, CircleCheck, HandHeart, LoaderCircle } from "lucide-react";
 import Link from "next/link";
-import { useActionState, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { startTransition, useActionState, useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { submitContactAction, type ContactFormState, type SentDetails } from "@/app/u/[slug]/actions";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { Turnstile } from "@/components/ui/turnstile";
@@ -50,6 +50,12 @@ function Field({ label, error, optional, children }: FieldProps) {
 function SentMessage({ firstName, slug, demo, details }: { firstName: string; slug: string; demo: boolean; details?: SentDetails }) {
   const heading = useRef<HTMLParagraphElement>(null);
   useEffect(() => heading.current?.focus(), []);
+  // Any "create mine" button on the page (top bar, dark block) now starts with these details.
+  useEffect(() => {
+    if (details) {
+      rememberDetails({ fullName: details.name, email: details.email, phone: details.phone, company: details.company }, slug);
+    }
+  }, [details, slug]);
   return (
     <div role="status" className="animate-rise rounded-[24px] border hairline bg-card px-5 py-5 text-center">
       <CircleCheck className="mx-auto size-7 text-ok" aria-hidden />
@@ -63,14 +69,6 @@ function SentMessage({ firstName, slug, demo, details }: { firstName: string; sl
         <p className="text-sm text-ink-soft">¿Y si te haces tu propia tarjeta? Ya tenemos tus datos.</p>
         <Link
           href={createPath(slug)}
-          onClick={() => {
-            if (details) {
-              rememberDetails(
-                { fullName: details.name, email: details.email, phone: details.phone, company: details.company },
-                slug,
-              );
-            }
-          }}
           className={buttonClasses({ variant: "signal", className: "group mt-3" })}
         >
           Crear la mía con estos datos
@@ -94,6 +92,21 @@ export function ContactForm({ slug, ownerName, source, captchaSiteKey }: Contact
   const firstName = ownerName.split(/\s+/)[0] || ownerName;
   const errors = state.status === "error" ? (state.errors ?? {}) : {};
   const values = state.status === "error" ? state.values : undefined;
+  const form = useRef<HTMLFormElement>(null);
+
+  // A rejected submission: take the keyboard (and screen reader) to the first field to fix.
+  useEffect(() => {
+    if (state.status !== "error") return;
+    const target = form.current?.querySelector<HTMLElement>('[aria-invalid="true"]') ?? form.current?.querySelector<HTMLElement>("[data-form-error]");
+    target?.focus();
+  }, [state]);
+
+  // Submitting by hand skips React's automatic form reset: after an error, what was typed stays.
+  function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    startTransition(() => submit(formData));
+  }
 
   if (state.status === "sent") {
     return <SentMessage firstName={firstName} slug={slug} demo={Boolean(state.demo)} details={state.details} />;
@@ -119,12 +132,14 @@ export function ContactForm({ slug, ownerName, source, captchaSiteKey }: Contact
 
   return (
     <form
+      ref={form}
       action={submit}
+      onSubmit={onSubmit}
       className="relative animate-rise space-y-4 rounded-[24px] border hairline bg-card px-5 py-5"
       noValidate
     >
       <div>
-        <p className="eyebrow">Te dejo mi contacto</p>
+        <h2 className="font-display text-2xl leading-tight">Déjale tu contacto a {firstName}</h2>
         <p className="mt-1 text-sm text-muted">{firstName} recibirá lo que escribas aquí. Nada más.</p>
       </div>
 
@@ -228,14 +243,14 @@ export function ContactForm({ slug, ownerName, source, captchaSiteKey }: Contact
       {captchaSiteKey ? <Turnstile siteKey={captchaSiteKey} action="contact" resetKey={state} /> : null}
 
       {state.status === "error" ? (
-        <p role="alert" className="text-sm text-danger">
+        <p role="alert" data-form-error tabIndex={-1} className="text-sm text-danger outline-none">
           {state.message}
         </p>
       ) : null}
 
       <Button type="submit" size="lg" className="w-full" disabled={pending}>
         {pending ? <LoaderCircle className="size-5 animate-spin" aria-hidden /> : null}
-        Enviar mi contacto
+        {pending ? "Enviando…" : "Dejarle mi contacto"}
       </Button>
     </form>
   );

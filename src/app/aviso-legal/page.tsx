@@ -40,7 +40,7 @@ export default function LegalNoticePage() {
         "Cada persona es responsable de lo que publica en su tarjeta. PassMe no revisa el contenido antes de publicarlo.",
         <>
           Si ves una tarjeta que suplanta a alguien o incluye contenido ilícito, escríbenos a {mail} y actuaremos con rapidez para
-          retirarla.
+          despublicarla.
         </>,
       ],
     },

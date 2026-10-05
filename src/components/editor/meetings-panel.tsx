@@ -72,14 +72,10 @@ function Item({ item, onDelete }: { item: MeetingItem; onDelete?: () => void }) 
           {view.guest.company ? <span className="font-normal text-muted"> · {view.guest.company}</span> : null}
         </p>
         <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-muted">
-          <span
-            className={cn(
-              "font-mono text-[10px] tracking-[0.1em] uppercase",
-              group === "answer" ? "text-signal-deep" : group === "upcoming" ? "text-ok" : "text-muted",
-            )}
-          >
-            {group === "answer" ? "Te toca" : group === "waiting" ? "Esperando" : STAGE_LABEL[view.stage]}
-          </span>
+          {/* Only past meetings say how they ended; the others already sit under their group's title. */}
+          {group === "closed" ? (
+            <span className="font-mono text-[10px] tracking-[0.1em] text-muted uppercase">{STAGE_LABEL[view.stage]}</span>
+          ) : null}
           <span className="tabular-nums">{summary(view)}</span>
         </p>
       </div>
@@ -135,13 +131,7 @@ export function MeetingsPanel({ items, available, enabled, demo }: MeetingsPanel
     });
   }
 
-  if (!available) {
-    return (
-      <p className="text-sm text-muted">
-        Falta un paso en la base de datos para recibir reuniones (migración <code className="font-mono">20261002120000</code>).
-      </p>
-    );
-  }
+  if (!available) return <p className="text-sm text-muted">Esta función aún no está disponible.</p>;
 
   return (
     <div id="reuniones" className="scroll-mt-6">
@@ -149,10 +139,11 @@ export function MeetingsPanel({ items, available, enabled, demo }: MeetingsPanel
         <p className="text-sm text-muted">
           {enabled
             ? "Aún no te han propuesto ninguna. Cuando pase, te llegará un email para confirmarla con un toque y la verás aquí."
-            : "Activa «Deja que te propongan reuniones» en Publicación: quien te escanee podrá proponerte día y hora."}
+            : "Activa «Recibir propuestas de reunión» en Publicación: quien te escanee podrá proponerte día y hora."}
         </p>
       ) : (
         <div className="space-y-5">
+          <p className="-mt-3 text-sm text-muted">{list.length === 1 ? "1 en total" : `${list.length} en total`}</p>
           {GROUPS.map(({ id, title, icon: Icon }) => {
             const group = list.filter((i) => groupOf(i.view) === id).sort(byDate);
             if (group.length === 0) return null;

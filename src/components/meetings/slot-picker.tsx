@@ -42,7 +42,7 @@ function DayStrip({ days, active, marked, isFull, minDate, maxDate, onPick }: Da
         </p>
         <label className="relative inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full px-2 text-sm font-medium text-signal-deep focus-within:ring-2 focus-within:ring-ink/30 hover:bg-signal-wash/60">
           <CalendarPlus className="size-4" aria-hidden />
-          Otra fecha
+          Más adelante
           <input
             type="date"
             min={minDate}
@@ -52,7 +52,7 @@ function DayStrip({ days, active, marked, isFull, minDate, maxDate, onPick }: Da
               if (key >= minDate && key <= maxDate) onPick(key);
             }}
             className="absolute inset-0 cursor-pointer opacity-0"
-            aria-label="Elegir otra fecha"
+            aria-label="Elegir un día más adelante"
           />
         </label>
       </div>
@@ -216,6 +216,12 @@ export function SlotPicker({ timeZone, value, onChange, now, chooser, error }: S
 
   return (
     <div className="space-y-4">
+      {/* Above the days, so it's in view wherever "Continuar" scrolled to. */}
+      {error ? (
+        <p role="alert" className="text-sm text-danger">
+          {error}
+        </p>
+      ) : null}
       <DayStrip
         days={strip}
         active={active.key}
@@ -232,11 +238,6 @@ export function SlotPicker({ timeZone, value, onChange, now, chooser, error }: S
         onToggle={toggle}
       />
       <Proposals value={value} timeZone={timeZone} chooser={chooser} notice={notice} onRemove={(iso) => onChange(value.filter((v) => v !== iso))} />
-      {error ? (
-        <p role="alert" className="text-sm text-danger">
-          {error}
-        </p>
-      ) : null}
     </div>
   );
 }

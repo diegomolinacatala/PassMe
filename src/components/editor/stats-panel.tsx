@@ -43,7 +43,7 @@ export function StatsPanel({ stats, links, demo }: StatsPanelProps) {
   const tiles = [
     { label: "Visitas", value: stats.views },
     { label: "Desde el QR", value: stats.qrViews },
-    { label: "Contactos guardados", value: stats.vcardDownloads },
+    { label: "Guardaron tu contacto", value: stats.vcardDownloads },
     { label: "Añadidos a cartera", value: stats.walletAdds },
   ];
   const topLinks = links
@@ -71,7 +71,7 @@ export function StatsPanel({ stats, links, demo }: StatsPanelProps) {
       </div>
 
       <div className="mt-5">
-        <p className="eyebrow mb-3">Contactos más usados</p>
+        <p className="eyebrow mb-3">Lo más pulsado</p>
         {topLinks.length > 0 ? (
           <ul className="space-y-2.5">
             {topLinks.map(({ link, clicks }) => (
