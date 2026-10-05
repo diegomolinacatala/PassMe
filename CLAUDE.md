@@ -16,11 +16,15 @@
   - En esta máquina no hay CLI de `gh`, `vercel` ni `supabase`.
   - El modo automático puede bloquear acciones destructivas de git (p. ej. borrar ramas remotas): déjaselas a Diego.
 
-# Estado actual (02/10/2026)
+# Estado actual (05/10/2026)
 
 **MVP en producción en https://getpassme.com, con todo fusionado en `main`.** Ninguna rama tiene trabajo sin fusionar. La monetización está pensada pero **sin implementar** (ver «Monetización»).
 
-**Lo último (02/10/2026, PR #6 fusionado y en producción): «Agendar reunión».** Es la opción 3 que eligió Diego: PassMe hace de intermediario por email.
+**Lo último (05/10/2026): auditoría UX con 6 usuarios simulados → [`docs/ux/AUDITORIA-UX-2026-10-05.md`](docs/ux/AUDITORIA-UX-2026-10-05.md).** Seis personas (onboarding desde un enlace, escanear el QR, reuniones por los dos lados, editor, ciclo de vida y accesibilidad + coherencia) recorrieron el modo demo en móvil y escritorio: 142 hallazgos, sin bloqueantes en el flujo principal. Los informes completos están en `docs/ux/informes/`. El documento los une en **8 PRs ordenados** (P1 arreglos rápidos → P2 «Mi QR» → P3 componentes comunes → P4 crear → P5 tarjeta pública → P6 reuniones → P7 editor → P8 cambios con migración), con glosario único, 8 decisiones para Diego (D1–D8) y criterios de aceptación. Nada implementado todavía.
+
+**Siguiente paso exacto:** abrir otra conversación y pedirle que implemente `docs/ux/AUDITORIA-UX-2026-10-05.md` empezando por P1 (rama `feat/ux-p1-arreglos`). Ese agente preguntará a Diego las decisiones D1–D8 cuando llegue a los PRs que las usan.
+
+**Antes (02/10/2026, PR #6 fusionado y en producción): «Agendar reunión».** Es la opción 3 que eligió Diego: PassMe hace de intermediario por email.
 - Quien escanea pulsa «Agendar reunión» en la tarjeta y propone hasta 3 horas en dos pasos (cuándo y cómo, y luego sus datos).
 - Al dueño le llega un email con un botón por hora. Desde un enlace firmado, sin login, confirma con un toque, propone otras horas o dice que no.
 - Los dos reciben la invitación de calendario (`.ics` y enlace a Google Calendar). Cualquiera puede cancelar.
@@ -33,7 +37,7 @@
   - Hay topes de 5 correos al día por dirección, 40 por dueño y uno global (`MEETING_EMAIL_DAILY_BUDGET`, 60 por defecto) para no agotar el cupo de Resend que usan los códigos de acceso.
 - Tests: 303 unitarios y de base de datos, y 106 E2E.
 
-**Siguiente paso exacto:** Diego activa «Deja que te propongan reuniones» en su editor (Publicación → interruptor → Guardar). Luego lo prueba desde otro móvil: proponerse dos horas en `getpassme.com/u/<su-slug>`, confirmar una desde el email y comprobar que les llega la invitación a los dos.
+Pendiente de esa entrega: Diego activa «Deja que te propongan reuniones» en su editor (Publicación → interruptor → Guardar). Luego lo prueba desde otro móvil: proponerse dos horas en `getpassme.com/u/<su-slug>`, confirmar una desde el email y comprobar que les llega la invitación a los dos.
 
 Pendiente de valorar más adelante:
 - Un pase de Wallet para cada reunión, que salga en la pantalla de bloqueo ese día.
