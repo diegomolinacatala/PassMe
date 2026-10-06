@@ -118,3 +118,37 @@ En Google Wallet el arte va en la imagen *hero* (1032×336 px) **sin el nombre**
 - **Motivo de marca** (`BrandMotif`) como textura: detrás de objetos protagonistas, con viñeta, nunca detrás de texto largo.
 - **Marcas de corte** (`.crop-marks`) alrededor de los objetos de escaparate.
 - **Números de sección** en mono (`01`, `02`…) y *eyebrows* en mayúsculas espaciadas.
+
+## 8. Reglas de la interfaz
+
+Los componentes comunes viven en `src/components/ui/`. Úsalos en vez de copiar estilos.
+
+**Botones** (`button.tsx`)
+
+| Variante | Cuándo |
+| --- | --- |
+| `signal` (Naranja) | **La** acción que completa la tarea de la pantalla: «Crear mi tarjeta», «Enviarme un código», «Entrar», «Dejarle mi contacto», «Enviar propuesta», «Confirmar». **Una sola visible a la vez.** |
+| `ink` (Café) | Acción importante secundaria: «Guardar contacto», «Mi QR», «Responder». |
+| `outline` | La alternativa: «Continuar con Google», «Proponer otras horas». |
+| `ghost` / texto | Terciaria: «Volver», «No borrar», «Ver menos». |
+| `danger` | Solo para **confirmar** algo destructivo: «Borrar», «Sí, cancelar reunión». |
+
+- Altura mínima de 44 px en el móvil (`md` y `lg`; `sm` baja a 40 px solo desde 640 px de ancho).
+- El texto puede ocupar dos líneas: los botones tienen altura mínima, no fija.
+- Mientras esperan, dicen qué pasa con un verbo: «Enviando…», «Cancelando…» (`SubmitButton`).
+
+**Campos** (`field.tsx`): `Field` pone la etiqueta (en minúsculas normales, nunca en *eyebrow*), «Opcional» si lo es (solo se marcan los opcionales, sin «*»), la pista y el error con icono; `inputClasses()` da el aspecto: 48 px de alto, texto de 16 px (iOS no hace zoom), borde `field-border` (≥ 3:1 sobre papel y tarjeta) y contorno Naranja al enfocar. Los ejemplos de texto solo enseñan formatos (`tu@email.com`), nunca nombres propios.
+
+**Avisos** (`notice.tsx`): `Notice` con tono `ok`, `error` o `info`: icono + qué ha pasado + qué hacer. Los errores son alertas; el resto, avisos de estado. Sobre Café, texto Papel con icono (nunca Melocotón para un mensaje). Los avisos breves («Enlace copiado») se leen con `announce()`.
+
+**Borrar y quitar**
+
+- Lo **permanente o ajeno** (un contacto recibido, la cuenta) se confirma en el sitio: «Borrar» (`danger`) y «No borrar». La cuenta pide además escribir BORRAR.
+- Lo **propio y recuperable** (un dato de contacto, una reunión de tu lista, una hora propuesta) se quita sin preguntar y deja «Teléfono quitado · Deshacer» 6 segundos (`UndoNotice`).
+- Nunca `window.confirm`.
+
+**Grupos de opciones** (`choice.ts`): colores, motivos, letras y segmentados son radios nativos (una parada de tabulador y flechas para moverse); las pestañas de la vista previa siguen el patrón ARIA de pestañas.
+
+**Escala** (`globals.css`): texto en `rem` para que siga la letra del sistema (`text-mark` 12 px mínimo para las marcas en mono, `text-small`, `text-body`, `text-lead`); radios `rounded-control` (12 px), `rounded-panel` (24 px), `rounded-object` (28 px) y `rounded-pass`; sombras `shadow-soft`, `shadow-object`, `shadow-press-ink`, `shadow-press-signal`, `shadow-focus-ring`, `shadow-hairline` y `shadow-inset`. Nada de tamaños en píxeles sueltos (salvo el arte del pase, que dibuja Satori).
+
+**Iconos** (solo `lucide-react`): `ArrowUpRight` para lo que se abre fuera (y «(se abre en otra pestaña)» para lectores de pantalla), `Trash2` para borrar o quitar, `TriangleAlert` solo para advertencias, `CircleAlert` para errores.

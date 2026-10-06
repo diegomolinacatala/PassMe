@@ -18,7 +18,7 @@ interface QuickActionsProps {
 }
 
 const PILL =
-  "inline-flex min-h-11 max-w-full flex-wrap items-center gap-x-1.5 rounded-full border border-line bg-card/70 px-4 py-1.5 text-sm transition-colors hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal";
+  "inline-flex min-h-11 max-w-full flex-wrap items-center gap-x-1.5 rounded-full border border-field-border bg-card/70 px-4 py-1.5 text-sm transition-colors hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal";
 
 /**
  * On phones, right under the editor's title: this phone's one wallet button

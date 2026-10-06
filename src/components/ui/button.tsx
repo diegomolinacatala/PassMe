@@ -2,27 +2,35 @@ import Link from "next/link";
 import type { ComponentPropsWithoutRef, ComponentPropsWithRef, ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
+/**
+ * The button rule (docs/BRAND.md § 8): `signal` is THE action that completes the
+ * screen's task, one visible at a time; `ink` an important secondary one;
+ * `outline` an alternative; `ghost` a tertiary one; `danger` only to confirm
+ * something destructive.
+ */
 export type Variant = "ink" | "signal" | "outline" | "ghost" | "danger" | "paper";
 export type Size = "sm" | "md" | "lg";
 
+// `btn-<variant>` carries no style: it lets tests check the rule (one signal per screen).
 const VARIANTS: Record<Variant, string> = {
-  ink: "bg-ink text-paper shadow-[0_1px_0_rgb(255_255_255/0.12)_inset,0_6px_16px_-8px_rgb(34_27_23/0.6)] hover:bg-ink-soft",
-  signal:
-    "bg-signal-strong text-white shadow-[0_1px_0_rgb(255_255_255/0.25)_inset,0_8px_20px_-10px_rgb(194_78_28/0.7)] hover:bg-signal-deep",
-  outline: "border border-ink/80 text-ink hover:bg-ink hover:text-paper",
-  ghost: "text-ink hover:bg-ink/[0.06]",
-  danger: "border border-danger/40 text-danger hover:bg-danger hover:text-white",
-  paper: "bg-card text-ink shadow-soft hover:bg-white",
+  ink: "btn-ink bg-ink text-paper shadow-press-ink hover:bg-ink-soft",
+  signal: "btn-signal bg-signal-strong text-white shadow-press-signal hover:bg-signal-deep",
+  outline: "btn-outline border border-ink/80 text-ink hover:bg-ink hover:text-paper",
+  ghost: "btn-ghost text-ink hover:bg-ink/[0.06]",
+  danger: "btn-danger border border-danger text-danger hover:bg-danger hover:text-white",
+  paper: "btn-paper bg-card text-ink shadow-soft hover:bg-white",
 };
 
+// Minimum heights, not fixed ones: a long label (or a large system font) wraps to two lines.
+// `sm` is 44 px on phones and 40 px from the `sm` breakpoint up.
 const SIZES: Record<Size, string> = {
-  sm: "h-9 px-3.5 text-sm gap-1.5 rounded-full",
-  md: "h-11 px-5 text-[0.95rem] gap-2 rounded-full",
-  lg: "h-14 px-7 text-base gap-2.5 rounded-full",
+  sm: "min-h-11 sm:min-h-10 px-3.5 py-1.5 text-sm gap-1.5 rounded-full",
+  md: "min-h-11 px-5 py-2 text-body gap-2 rounded-full",
+  lg: "min-h-14 px-7 py-3 text-body gap-2.5 rounded-full",
 };
 
 const BASE =
-  "inline-flex select-none items-center justify-center font-medium whitespace-nowrap transition-[background-color,color,transform,box-shadow] duration-200 ease-[var(--ease-out-expo)] active:translate-y-px disabled:pointer-events-none disabled:opacity-50";
+  "inline-flex select-none items-center justify-center text-center font-medium leading-tight whitespace-normal text-balance transition-[background-color,color,transform,box-shadow] duration-200 ease-[var(--ease-out-expo)] active:translate-y-px disabled:pointer-events-none disabled:opacity-50";
 
 export function buttonClasses({ variant = "ink", size = "md", className }: { variant?: Variant; size?: Size; className?: string } = {}) {
   return cn(BASE, VARIANTS[variant], SIZES[size], className);

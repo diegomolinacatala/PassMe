@@ -5,7 +5,7 @@ import { useEffect, useId, useState } from "react";
 import { checkSlugAction, type SlugCheckResult } from "@/app/dashboard/actions";
 import { checkSlug, SLUG_ERRORS, SLUG_MAX_LENGTH } from "@/lib/card/slug";
 import { cn } from "@/lib/cn";
-import { INPUT_CLASSES } from "./fields";
+import { inputClasses } from "@/components/ui/field";
 
 const DEBOUNCE_MS = 450;
 
@@ -67,8 +67,9 @@ export function SlugField({ value, savedValue, siteHost, demo, serverError, sugg
         Enlace de tu tarjeta
       </label>
       <div className="relative">
-        <span className="pointer-events-none absolute inset-y-0 left-3.5 flex items-center font-mono text-sm text-muted">
-          {siteHost}/u/
+        {/* With a large system font the prefix may not fit: it's cut with "…" rather than pushing the page sideways. */}
+        <span className="pointer-events-none absolute inset-y-0 left-3.5 flex max-w-[calc(65%-0.875rem)] items-center font-mono text-sm text-muted">
+          <span className="truncate">{siteHost}/u/</span>
         </span>
         <input
           id={id}
@@ -80,8 +81,9 @@ export function SlugField({ value, savedValue, siteHost, demo, serverError, sugg
           spellCheck={false}
           aria-invalid={status === "error" || Boolean(serverError)}
           aria-describedby={`${id}-msg`}
-          className={cn(INPUT_CLASSES, "h-11 pr-10 font-mono text-sm")}
-          style={{ paddingLeft: `calc(0.875rem + ${siteHost.length + 3}ch)` }}
+          className={inputClasses({ className: "pr-10 font-mono" })}
+          // The prefix is text-sm (0.875 of the input's size): its width in the input's ch, capped like the prefix.
+          style={{ paddingLeft: `min(calc(0.875rem + ${((siteHost.length + 3) * 0.875).toFixed(2)}ch + 2px), 65%)` }}
         />
         <span className="absolute inset-y-0 right-3 flex items-center" aria-hidden="true">
           {status === "checking" ? <LoaderCircle className="size-4 animate-spin text-muted" /> : null}

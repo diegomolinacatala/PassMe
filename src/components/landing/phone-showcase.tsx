@@ -33,12 +33,12 @@ export function PhoneShowcase({ card, googleWallet }: { card: PublicCard; google
               <span className="absolute inset-0 animate-ping rounded-full bg-signal/60" />
               <span className="relative size-3 rounded-full bg-signal" />
             </span>
-            <span className="font-mono text-[11px] tracking-[0.14em] text-ink uppercase">×2</span>
+            <span className="eyebrow text-ink">×2</span>
           </span>
 
           <div className="relative overflow-hidden rounded-[42px] bg-paper-deep px-3.5 pt-3 pb-8">
             {/* Status bar + dynamic island */}
-            <div className="flex items-center justify-between px-3 pt-1 text-[12px] font-semibold text-ink">
+            <div className="flex items-center justify-between px-3 pt-1 text-mark font-semibold text-ink">
               <span>9:41</span>
               <span className="h-[26px] w-[92px] rounded-full bg-ink" aria-hidden="true" />
               <span className="flex items-center gap-1" aria-hidden="true">
@@ -46,7 +46,7 @@ export function PhoneShowcase({ card, googleWallet }: { card: PublicCard; google
               </span>
             </div>
 
-            <p className="mt-5 px-1 text-[11px] font-semibold tracking-wide text-ink/75 uppercase">Cartera</p>
+            <p className="mt-5 px-1 text-mark font-semibold tracking-wide text-ink/75 uppercase">Cartera</p>
 
             <div className="relative mt-2">
               <WalletPass card={card} style="apple" className="max-w-none" />
@@ -57,7 +57,7 @@ export function PhoneShowcase({ card, googleWallet }: { card: PublicCard; google
               />
             </div>
 
-            <p className="mt-4 text-center text-[11px] text-ink/75">Acerca el QR a la cámara</p>
+            <p className="mt-4 text-center text-mark text-ink/75">Acerca el QR a la cámara</p>
           </div>
         </div>
       </div>

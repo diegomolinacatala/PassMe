@@ -2,6 +2,8 @@
 
 import { CalendarPlus, X } from "lucide-react";
 import { useId, useMemo, useState } from "react";
+import { InlineError } from "@/components/ui/field";
+import { undoKey, UndoNotice, type UndoItem } from "@/components/ui/undo-notice";
 import { cn } from "@/lib/cn";
 import { HORIZON_DAYS, MAX_SLOTS } from "@/lib/meetings/schema";
 import { dateKey, formatDay, formatSlotShort, pickerDay, TIME_GROUPS, timeKey, upcomingDays, zonedTimeToUtc, type PickerDay } from "@/lib/meetings/time";
@@ -69,12 +71,12 @@ function DayStrip({ days, active, marked, isFull, minDate, maxDate, onPick }: Da
               onClick={() => onPick(day.key)}
               className={cn(
                 "relative flex h-[4.5rem] w-14 shrink-0 snap-start flex-col items-center justify-center rounded-2xl border transition-[background-color,border-color,color,transform] duration-200 active:scale-95 disabled:opacity-35",
-                selected ? "border-ink bg-ink text-paper" : "border-line bg-card text-ink hover:border-ink",
+                selected ? "border-ink bg-ink text-paper" : "border-field-border bg-card text-ink hover:border-ink",
               )}
             >
-              <span className={cn("font-mono text-[10px] tracking-[0.08em] uppercase", selected ? "text-paper/70" : "text-muted")}>{day.label}</span>
+              <span className={cn("font-mono text-mark uppercase", selected ? "text-paper/70" : "text-muted")}>{day.label}</span>
               <span className="font-display text-2xl leading-none">{day.day}</span>
-              <span className={cn("text-[11px]", selected ? "text-paper/70" : "text-muted")}>{day.month}</span>
+              <span className={cn("text-mark", selected ? "text-paper/70" : "text-muted")}>{day.month}</span>
               {marked.has(day.key) ? (
                 <span className={cn("absolute top-1.5 right-1.5 size-1.5 rounded-full", selected ? "bg-glow" : "bg-signal")} aria-hidden />
               ) : null}
@@ -103,7 +105,7 @@ function TimeGrid({ day, isSelected, isPast, onToggle }: TimeGridProps) {
       <div className="space-y-3">
         {TIME_GROUPS.map((group) => (
           <div key={group.label} role="group" aria-label={`${group.label}, ${day.long}`}>
-            <p className="mb-1.5 font-mono text-[10px] tracking-[0.14em] text-muted uppercase">{group.label}</p>
+            <p className="eyebrow mb-1.5">{group.label}</p>
             <div className="grid grid-cols-4 gap-1.5">
               {group.times.map((time) => {
                 const selected = isSelected(time);
@@ -116,10 +118,10 @@ function TimeGrid({ day, isSelected, isPast, onToggle }: TimeGridProps) {
                     disabled={isPast(time) && !selected}
                     onClick={() => onToggle(time)}
                     className={cn(
-                      "h-11 rounded-xl border font-mono text-[0.9rem] tabular-nums transition-[background-color,border-color,color,transform] duration-200 active:scale-95 disabled:pointer-events-none disabled:opacity-30",
+                      "h-11 rounded-xl border font-mono text-body tabular-nums transition-[background-color,border-color,color,transform] duration-200 active:scale-95 disabled:pointer-events-none disabled:opacity-30",
                       selected
-                        ? "border-signal-strong bg-signal-strong text-white shadow-[0_6px_14px_-8px_rgb(194_78_28/0.8)]"
-                        : "border-line bg-card text-ink hover:border-ink",
+                        ? "border-signal-strong bg-signal-strong text-white shadow-press-signal"
+                        : "border-field-border bg-card text-ink hover:border-ink",
                     )}
                   >
                     {time}
@@ -148,7 +150,7 @@ function Proposals({ value, timeZone, chooser, notice, onRemove }: ProposalsProp
     <div className="rounded-2xl border border-dashed border-line-strong px-3.5 py-3" aria-live="polite">
       <div className="flex items-baseline justify-between gap-3">
         <p className="text-sm font-medium text-ink-soft">Tus propuestas</p>
-        <p className="font-mono text-[11px] text-muted tabular-nums">
+        <p className="font-mono text-mark text-muted tabular-nums">
           {value.length}/{MAX_SLOTS}
         </p>
       </div>
@@ -172,7 +174,7 @@ function Proposals({ value, timeZone, chooser, notice, onRemove }: ProposalsProp
         </ul>
       )}
       {value.length > 0 && value.length < MAX_SLOTS ? <p className="mt-2 text-xs text-muted">Añadir otra opción le pone más fácil decir que sí.</p> : null}
-      {notice ? <p className="mt-2 text-xs text-signal-deep">{notice}</p> : null}
+      {notice ? <p className="mt-2 text-sm text-signal-deep">{notice}</p> : null}
     </div>
   );
 }
@@ -189,6 +191,8 @@ export function SlotPicker({ timeZone, value, onChange, now, chooser, error }: S
   const [activeKey, setActiveKey] = useState(() => (isPastOn(days[0]!.key, LAST_TIME) ? days[1]!.key : days[0]!.key));
   const [extraDay, setExtraDay] = useState<PickerDay | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // A time removed from its pill can come back with one tap.
+  const [undo, setUndo] = useState<(UndoItem & { iso: string }) | null>(null);
 
   const strip = extraDay && !days.some((d) => d.key === extraDay.key) ? [...days, extraDay] : days;
   const active = strip.find((d) => d.key === activeKey) ?? strip[0]!;
@@ -217,11 +221,7 @@ export function SlotPicker({ timeZone, value, onChange, now, chooser, error }: S
   return (
     <div className="space-y-4">
       {/* Above the days, so it's in view wherever "Continuar" scrolled to. */}
-      {error ? (
-        <p role="alert" className="text-sm text-danger">
-          {error}
-        </p>
-      ) : null}
+      {error ? <InlineError live>{error}</InlineError> : null}
       <DayStrip
         days={strip}
         active={active.key}
@@ -237,7 +237,26 @@ export function SlotPicker({ timeZone, value, onChange, now, chooser, error }: S
         isPast={(time) => isPastOn(active.key, time)}
         onToggle={toggle}
       />
-      <Proposals value={value} timeZone={timeZone} chooser={chooser} notice={notice} onRemove={(iso) => onChange(value.filter((v) => v !== iso))} />
+      <Proposals
+        value={value}
+        timeZone={timeZone}
+        chooser={chooser}
+        notice={notice}
+        onRemove={(iso) => {
+          setNotice(null);
+          onChange(value.filter((v) => v !== iso));
+          setUndo({ key: undoKey(iso), message: `${formatSlotShort(iso, timeZone)} quitada`, iso });
+        }}
+      />
+      <UndoNotice
+        item={undo}
+        onUndo={() => {
+          if (undo && !value.includes(undo.iso) && value.length < MAX_SLOTS) onChange([...value, undo.iso].sort());
+          setUndo(null);
+        }}
+        onExpire={() => setUndo(null)}
+        className="mt-0"
+      />
     </div>
   );
 }

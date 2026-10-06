@@ -65,7 +65,7 @@ export default async function MyQrPage() {
         </div>
 
         <div className="flex w-full max-w-sm flex-col items-center gap-4 text-center landscape:max-lg:w-auto">
-          <p className="text-[0.95rem] text-ink-soft">Sube el brillo para que se lea a la primera</p>
+          <p className="text-body text-ink-soft">Sube el brillo para que se lea a la primera</p>
           <p className="font-mono text-xs tracking-wide text-muted [overflow-wrap:anywhere]">{prettyProfileUrl(card.slug)}</p>
           <ShareLinkButton url={profileUrl(card.slug, "share")} title={`${card.fullName} · PassMe`} variant="outline" />
           {hint ? <HomeScreenHint text={hint} /> : null}

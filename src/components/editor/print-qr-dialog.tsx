@@ -35,7 +35,7 @@ export function PrintQrDialog({ slug, qrUrl, triggerClassName }: PrintQrDialogPr
         onClick={(e) => {
           if (e.target === e.currentTarget) dialog.current?.close();
         }}
-        className="m-auto w-[min(92vw,26rem)] rounded-[28px] bg-card p-0 text-ink shadow-object backdrop:bg-ink/55 backdrop:backdrop-blur-[2px] max-sm:mb-0 max-sm:w-full max-sm:max-w-none max-sm:rounded-b-none"
+        className="m-auto w-[min(92vw,26rem)] rounded-object bg-card p-0 text-ink shadow-object backdrop:bg-ink/55 backdrop:backdrop-blur-[2px] max-sm:mb-0 max-sm:w-full max-sm:max-w-none max-sm:rounded-b-none"
       >
         <div className="p-6">
           <div className="flex items-start justify-between gap-4">

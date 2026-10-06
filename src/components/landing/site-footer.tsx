@@ -31,7 +31,7 @@ export function SiteFooter({ googleWallet }: { googleWallet: boolean }) {
             Aviso legal
           </Link>
         </nav>
-        <p className="font-mono text-[11px] tracking-[0.14em] text-muted uppercase">© {new Date().getFullYear()} PassMe</p>
+        <p className="eyebrow">© {new Date().getFullYear()} PassMe</p>
       </div>
     </footer>
   );

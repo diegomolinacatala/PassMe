@@ -323,13 +323,13 @@ La prioridad nº 1 del proyecto. Origen: ONB-02, ONB-04, ONB-08, EDIT-01, EDIT-1
 
 Base para P4–P7: si se hace antes, los PRs siguientes usan los componentes nuevos y no vuelven a inventar estilos. Origen: COH-05–08, COH-12, COH-14, A11Y-04, A11Y-05, A11Y-06, A11Y-07, A11Y-08, A11Y-11, A11Y-12, A11Y-16.
 
-**P3.1 · Regla de botones (documentarla en `docs/BRAND.md`)** [M] · COH-06
+**✅ P3.1 · Regla de botones (documentarla en `docs/BRAND.md`)** [M] · COH-06
 - `signal` = **la** acción que completa la tarea de la pantalla, **una sola** visible a la vez. `ink` = acción importante secundaria. `outline` = alternativa. `ghost`/texto = terciaria. `danger` = solo al confirmar algo destructivo.
 - Alturas: mínimo 44 px en móvil (`h-11`); `sm` de 36–40 px solo en escritorio.
 - Aplicarlo a los envíos que hoy van en `ink` cuando son la acción principal («Enviarme un código» en `/crear`, «Entrar», «Dejarle mi contacto», «Continuar», «Enviar respuesta»), y al revés.
 - ✔ En cada pantalla se ve como mucho un botón `signal`.
 
-**P3.2 · Un único campo de formulario** [M] · COH-07, A11Y-04, A11Y-05, A11Y-13
+**✅ P3.2 · Un único campo de formulario** [M] · COH-07, A11Y-04, A11Y-05, A11Y-13
 - `src/components/ui/field.tsx` que exporte `Field` (etiqueta, «Opcional», pista, error con icono) e `inputClasses({ size })`. Sustituye a `INPUT_CLASSES` (`fields.tsx`), `INPUT` (`quick-card-form.tsx`, `email-code-auth.tsx`, `contact-form.tsx`) y `MEETING_INPUT` (`form-bits.tsx`).
 - h-12, `text-base` (evita el zoom de iOS), etiqueta en minúsculas normales (no `.eyebrow` en el login), error en `text-sm`.
 - **Borde con contraste ≥ 3:1**: token nuevo `--color-field-border` (≈ `#8f8473`; verificar ≥ 3:1 sobre `card` y `paper`).
@@ -338,36 +338,36 @@ Base para P4–P7: si se hace antes, los PRs siguientes usan los componentes nue
 - Ejemplos de texto (placeholders): quitar los nombres propios en nombre, cargo y empresa («Alex Rivera», «Product Designer», «Estudio Norte»); dejar solo los de formato (`tu@email.com`, `linkedin.com/in/tu-perfil`). Si hace falta una pista, va como ayuda bajo el campo.
 - ✔ `rg "border-line bg-" src/components` devuelve una sola definición; todo borde de control mide ≥ 3:1.
 
-**P3.3 · Estados visibles: interruptores, segmentados y pestañas** [A] · A11Y-04
+**✅ P3.3 · Estados visibles: interruptores, segmentados y pestañas** [A] · A11Y-04
 - Interruptor apagado: borde de 2 px `muted` y fondo transparente; encendido, `bg-ink` (hoy 1,60:1).
 - Opción elegida de `Segmented` (`form-bits.tsx`) y pestañas de la vista previa: `bg-ink text-paper` (como el día elegido del calendario), no una sombra sobre `card`.
 - Borde del botón `danger` con ≥ 3:1.
 - ✔ Medido con un script de contraste (puedes partir de `docs/ux/informes/06-…` anexo E): todos los estados ≥ 3:1.
 
-**P3.4 · Avisos: `Notice`, `InlineError`, `SubmitButton` y una región viva global** [M] · COH-08, A11Y-12
+**✅ P3.4 · Avisos: `Notice`, `InlineError`, `SubmitButton` y una región viva global** [M] · COH-08, A11Y-12
 - `<Notice tone="ok|error|info">`: caja con icono y «qué ha pasado + qué hacer», `role` según el tono. Sobre fondo oscuro, `text-paper` + icono (no `text-glow`).
 - `<InlineError>` para campos.
 - Un `SubmitButton` único que siempre muestra «<Verbo>ndo…» (hoy «Enviar mi contacto», «Sí, cancelar» y «Continuar con Google» solo muestran un círculo).
 - Una región `<p role="status" class="sr-only">` en el layout, con un helper `announce(text)` para «Enlace copiado» y demás avisos breves (hoy solo cambia un `aria-label`).
 - ✔ Los mensajes del anexo B del informe 06 usan uno de estos componentes; al copiar el enlace desde cualquier pantalla, VoiceOver dice «Enlace copiado» una vez.
 
-**P3.5 · Borrar y quitar: dos patrones, sin `window.confirm`** [A] · COH-05, A11Y-11, EDIT-10
+**✅ P3.5 · Borrar y quitar: dos patrones, sin `window.confirm`** [A] · COH-05, A11Y-11, EDIT-10
 - **Permanente o ajeno** (contacto recibido, cuenta): confirmación en línea con dos botones, «Borrar» (`danger`) y «No borrar». Escribir «BORRAR» solo para la cuenta (ya existe).
 - **Propio y recuperable** (dato de contacto, reunión de la lista, hora propuesta): sin confirmar y con un aviso «Teléfono quitado · Deshacer» durante 6 s (`role="status"`).
 - Eliminar `window.confirm` (`contacts-panel.tsx`, `meetings-panel.tsx`).
 - ✔ `rg "window.confirm|confirm\(" src` = 0; cada acción destructiva sigue uno de los dos patrones; quitar un dato se deshace en 1 toque.
 
-**P3.6 · Escala: texto en `rem`, radios y sombras con tokens** [M] · COH-12, A11Y-06, SCAN-04
+**✅ P3.6 · Escala: texto en `rem`, radios y sombras con tokens** [M] · COH-12, A11Y-06, SCAN-04
 - Tokens en `src/app/globals.css`: `--text-mark` (0.75rem, mono en mayúsculas, **mínimo 12 px**), `--text-small` (0.875rem), `--text-body` (1rem), `--text-lead` (1.125rem); radios `--radius-control` (12px), `--radius-panel` (24px), `--radius-object` (28px); sombras `press-ink`, `press-signal`, `focus-ring`.
 - Sustituir las 41 clases `text-[10px]`/`[11px]`/`[12px]` por la clase `.eyebrow` o `--text-mark` (que escalan con la letra del sistema), y las 24 copias a mano de `.eyebrow` por la clase. Quitar los radios y sombras arbitrarios salvo el arte del pase (`pass-art.tsx` va inline por Satori: **no lo toques**).
 - Botones: permitir dos líneas (`whitespace-normal text-balance` con `min-h` en vez de `h`).
 - ✔ `rg "text-\[\d+px\]" src` = 0 (fuera de `pass-art.tsx`); `rg "rounded-\[" src` ≤ 3; con `html{font-size:200%}` a 390 px ninguna ruta tiene scroll horizontal.
 
-**P3.7 · Grupos de opciones con flechas** [M] · A11Y-08
+**✅ P3.7 · Grupos de opciones con flechas** [M] · A11Y-08
 - Colores (`quick-card-form.tsx`, `design-field.tsx`), motivos, letras, `Segmented`, pestañas de la vista previa: usar `<input type="radio" class="sr-only">` dentro de `<label>` (como ya hace `meeting-response.tsx`), que da las flechas gratis; las pestañas, patrón ARIA de pestañas con `tabIndex` móvil.
 - ✔ En `/crear`, ≤ 11 tabulaciones hasta «Crear mi tarjeta» y la flecha derecha cambia de color.
 
-**P3.8 · Regiones, encabezados e iconos** [M] · A11Y-07, A11Y-16, COH-14
+**✅ P3.8 · Regiones, encabezados e iconos** [M] · A11Y-07, A11Y-16, COH-14
 - `/dashboard`: envolver el editor en `<main id="contenido">`; la bienvenida va dentro de `main`, después del H1, como `<section>` con H2 (o su título es el H1 con `?nueva=1`).
 - Formulario de reunión: `<section aria-labelledby>` con un H2 visible (hoy es una `p.eyebrow`) y los pasos en H3.
 - Nombres accesibles sin símbolos: flechas «↗», «↓», «→» con `aria-hidden`; «Cambiar» suelto → «Cambiar email» / «Cambiar horas»; `target=_blank` con «(se abre en otra pestaña)» en `sr-only`.

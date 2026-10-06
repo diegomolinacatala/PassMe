@@ -1,9 +1,10 @@
 "use client";
 
-import { CircleCheck, LoaderCircle, TriangleAlert } from "lucide-react";
+import { CircleAlert, CircleCheck, LoaderCircle, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition, type ReactNode } from "react";
 import { saveCardAction } from "@/app/dashboard/actions";
 import { Button } from "@/components/ui/button";
+import { InlineError } from "@/components/ui/field";
 import { describeErrors } from "@/lib/card/save-errors";
 import { LIMITS, type FieldErrors } from "@/lib/card/schema";
 import type { OwnerCard } from "@/lib/card/types";
@@ -21,6 +22,7 @@ import { LinksEditor } from "./links-editor";
 import { MeetingsPanel, type MeetingItem } from "./meetings-panel";
 import { PendingNotices } from "./pending-notices";
 import { PreviewPanel } from "./preview-panel";
+import { WelcomeContext } from "./welcome-panel";
 import { QuickActions } from "./quick-actions";
 import { SlugField } from "./slug-field";
 import { StatsPanel } from "./stats-panel";
@@ -94,7 +96,18 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, pla
   const [serverResult, setServerResult] = useState<{ draft: CardDraft; errors: FieldErrors } | null>(null);
   const [status, setStatus] = useState<SaveStatus>({ kind: "idle" });
   const [saving, startSaving] = useTransition();
-  const root = useRef<HTMLDivElement>(null);
+  const root = useRef<HTMLElement>(null);
+  const [welcomeOpen, setWelcomeOpen] = useState(true);
+  const welcomeContext = useMemo(
+    () => ({
+      onDismiss: () => {
+        setWelcomeOpen(false);
+        // Once the title is back to an H1 (a new element), it takes the focus.
+        requestAnimationFrame(() => document.getElementById("editor-title")?.focus());
+      },
+    }),
+    [],
+  );
   // Bumped on every save that fails validation: the effect below takes the person to the field.
   const [errorJump, setErrorJump] = useState(0);
 
@@ -180,6 +193,7 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, pla
       onBlur={() => touch(field)}
       error={fieldError(field)}
       maxLength={max}
+      optional={!extra.required}
       {...extra}
     />
   );
@@ -190,20 +204,26 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, pla
       ? "Tienes cambios sin guardar: guarda para que el pase los incluya."
       : null;
 
+  // With the welcome on top, its title is the page's H1 and the editor's an H2 (until it closes).
+  const EditorHeading = welcome && welcomeOpen ? "h2" : "h1";
   return (
-    <div ref={root} className="mx-auto max-w-[1240px] px-4 pb-36 sm:px-8">
-      {welcome ? <div className="pt-6 sm:pt-10">{welcome}</div> : null}
+    <main id="contenido" ref={root} className="mx-auto max-w-[1240px] px-4 pb-36 sm:px-8">
+      {welcome && welcomeOpen ? (
+        <div className="pt-6 sm:pt-10">
+          <WelcomeContext value={welcomeContext}>{welcome}</WelcomeContext>
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-end justify-between gap-4 pt-6 pb-8 sm:pt-10">
         <div>
           <p className="eyebrow">{demo ? "Editor · modo demo" : "Editor"}</p>
-          <h1 id="editor-title" tabIndex={-1} className="mt-2 font-display text-[length:var(--text-title)] leading-none tracking-tight outline-none">
+          <EditorHeading id="editor-title" tabIndex={-1} className="mt-2 font-display text-title leading-none tracking-tight outline-none">
             Tu tarjeta, <em className="text-signal">a tu manera.</em>
-          </h1>
+          </EditorHeading>
         </div>
         <span
           className={cn(
-            "inline-flex items-center gap-2 rounded-full px-3 py-1.5 font-mono text-[11px] tracking-[0.12em] uppercase",
-            savedPublished && savedName ? "bg-ok/10 text-ok" : "bg-paper-deep text-muted",
+            "eyebrow inline-flex items-center gap-2 rounded-full px-3 py-1.5",
+            savedPublished && savedName ? "bg-ok/10 text-ink-soft" : "bg-paper-deep text-muted",
           )}
         >
           <span className={cn("size-1.5 rounded-full", savedPublished && savedName ? "bg-ok" : "bg-muted")} />
@@ -248,20 +268,19 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, pla
                 onChange={(path, url) => editor.setAvatar(path, url)}
               />
               {serverErrors.avatarPath ? (
-                <p className="text-sm text-danger" role="alert">
+                <InlineError live>
                   {serverErrors.avatarPath}
-                </p>
+                </InlineError>
               ) : null}
               {textField("fullName", "Nombre y apellidos", LIMITS.fullName, {
-                placeholder: "Alex Rivera",
                 autoComplete: "name",
                 required: true,
               })}
               <div className="grid gap-5 sm:grid-cols-2">
-                {textField("headline", "Cargo", LIMITS.headline, { placeholder: "Product Designer", autoComplete: "organization-title" })}
-                {textField("company", "Empresa", LIMITS.company, { placeholder: "Estudio Norte", autoComplete: "organization" })}
+                {textField("headline", "Cargo", LIMITS.headline, { autoComplete: "organization-title" })}
+                {textField("company", "Empresa", LIMITS.company, { autoComplete: "organization" })}
                 {textField("location", "Ubicación", LIMITS.location, { placeholder: "Valencia, ES" })}
-                {textField("pronouns", "Pronombres", LIMITS.pronouns, { placeholder: "Opcional", hint: "Se muestran como una etiqueta." })}
+                {textField("pronouns", "Pronombres", LIMITS.pronouns, { hint: "Se muestran como una etiqueta." })}
               </div>
               {textField("bio", "Sobre ti", LIMITS.bio, {
                 multiline: true,
@@ -283,6 +302,7 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, pla
               onAdd={editor.addLink}
               onUpdate={editor.updateLink}
               onRemove={editor.removeLink}
+              onRestore={editor.restoreLink}
               onMove={editor.moveLink}
             />
           </Section>
@@ -347,7 +367,7 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, pla
           Desktop: the column scrolls on its own (it's taller than the screen), so the
           preview stays in reach and the lower panels don't wait for the page's end.
         */}
-        <aside className="space-y-6 lg:sticky lg:top-6 lg:-mx-3 lg:max-h-[calc(100dvh-1.5rem)] lg:overflow-y-auto lg:overscroll-contain lg:px-3 lg:pb-28 lg:[scrollbar-width:thin]">
+        <aside className="min-w-0 space-y-6 lg:sticky lg:top-6 lg:-mx-3 lg:max-h-[calc(100dvh-1.5rem)] lg:overflow-y-auto lg:overscroll-contain lg:px-3 lg:pb-28 lg:[scrollbar-width:thin]">
           <div className="hidden lg:block">
             <PreviewPanel card={preview} />
           </div>
@@ -395,7 +415,7 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, pla
         onSave={save}
         onNextError={() => focusInvalid(root.current, document.activeElement)}
       />
-    </div>
+    </main>
   );
 }
 
@@ -480,12 +500,12 @@ function SaveBar({ dirty, saving, status, errorCount, onSave, onNextError }: Sav
       <div className="mx-auto max-w-[1240px] lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-8 lg:px-2 xl:gap-12">
         <div
           className={cn(
-            "flex items-center gap-3 rounded-[28px] border py-2 pr-2 pl-5 shadow-object backdrop-blur-md transition-colors duration-300 max-lg:mx-auto max-lg:max-w-[640px]",
+            "flex items-center gap-3 rounded-object border py-2 pr-2 pl-5 shadow-object backdrop-blur-md transition-colors duration-300 max-lg:mx-auto max-lg:max-w-[640px]",
             visible && "pointer-events-auto",
-            tone === "dirty" ? "border-ink bg-ink text-paper" : "border-line bg-card/90 text-ink",
+            tone === "dirty" ? "border-ink bg-ink text-paper" : "hairline bg-card/90 text-ink",
           )}
         >
-          {tone === "error" ? <TriangleAlert className="size-4 shrink-0 text-danger" aria-hidden /> : null}
+          {tone === "error" ? <CircleAlert className="size-4 shrink-0 text-danger" aria-hidden /> : null}
           {tone === "warn" ? <TriangleAlert className="size-4 shrink-0 text-signal-deep" aria-hidden /> : null}
           {tone === "ok" ? <CircleCheck className="size-4 shrink-0 text-ok" aria-hidden /> : null}
           {tone === "dirty" ? <span className="size-2 shrink-0 animate-pulse rounded-full bg-signal" aria-hidden /> : null}
@@ -498,7 +518,7 @@ function SaveBar({ dirty, saving, status, errorCount, onSave, onNextError }: Sav
             </Button>
           ) : null}
           {shortcut ? (
-            <span className="hidden font-mono text-[10px] tracking-widest opacity-60 sm:inline" aria-hidden>
+            <span className="hidden font-mono text-mark tracking-widest opacity-60 sm:inline" aria-hidden>
               {shortcut}
             </span>
           ) : null}

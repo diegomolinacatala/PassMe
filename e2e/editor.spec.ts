@@ -42,12 +42,12 @@ test.describe("editor (demo mode)", () => {
 
   test("changes the card theme, motif, variation and typeface", async ({ page }) => {
     await page.getByRole("radio", { name: "Café" }).click();
-    await expect(page.getByRole("radio", { name: "Café" })).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByRole("radio", { name: "Café" })).toBeChecked();
     const pass = page.getByLabel(/Vista previa del pase de Apple Wallet/).locator("visible=true");
     await expect(pass).toHaveCSS("background-color", "rgb(62, 44, 35)");
 
     await page.getByRole("radio", { name: "Corriente" }).click();
-    await expect(page.getByRole("radio", { name: "Corriente" })).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByRole("radio", { name: "Corriente" })).toBeChecked();
 
     // Variations re-roll the motif and can be undone; no number is ever shown.
     const previous = page.getByRole("button", { name: "Volver a la variación anterior" });
@@ -61,7 +61,7 @@ test.describe("editor (demo mode)", () => {
     await expect(page.getByRole("button", { name: "Otra variación" })).toBeDisabled();
 
     await page.getByRole("radio", { name: "Editorial" }).click();
-    await expect(page.getByRole("radio", { name: "Editorial" })).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByRole("radio", { name: "Editorial" })).toBeChecked();
     await expect(page.getByRole("status").filter({ hasText: "Cambios sin guardar" })).toBeVisible();
   });
 

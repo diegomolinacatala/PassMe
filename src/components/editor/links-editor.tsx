@@ -3,13 +3,20 @@
 import { ChevronDown, ChevronUp, Eye, EyeOff, Plus, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { LinkIcon } from "@/components/card/link-icon";
+import { InlineError, inputClasses } from "@/components/ui/field";
+import { undoKey, UndoNotice, type UndoItem } from "@/components/ui/undo-notice";
 import { getLinkKind, LINK_KINDS, type LinkKind } from "@/lib/card/links";
 import { LIMITS, MAX_LINKS, type FieldErrors } from "@/lib/card/schema";
 import type { CardLink } from "@/lib/card/types";
 import { cn } from "@/lib/cn";
-import { INPUT_CLASSES } from "./fields";
 
 const LABELLED_KINDS: ReadonlySet<LinkKind> = new Set(["custom", "website", "booking"]);
+/** Kinds whose label is feminine in Spanish ("Web quitada"). */
+const FEMININE_KINDS: ReadonlySet<LinkKind> = new Set(["website", "custom"]);
+
+function removedMessage(kind: LinkKind): string {
+  return `${getLinkKind(kind).label} ${FEMININE_KINDS.has(kind) ? "quitada" : "quitado"}`;
+}
 
 interface LinksEditorProps {
   links: CardLink[];
@@ -20,21 +27,35 @@ interface LinksEditorProps {
   onAdd: (kind: LinkKind) => string;
   onUpdate: (id: string, patch: Partial<Omit<CardLink, "id">>) => void;
   onRemove: (id: string) => void;
+  /** Puts a removed link back where it was ("Deshacer"). */
+  onRestore: (link: CardLink, index: number) => void;
   onMove: (id: string, direction: -1 | 1) => void;
 }
 
-export function LinksEditor({ links, suggestedEmail, errors, showErrors, onAdd, onUpdate, onRemove, onMove }: LinksEditorProps) {
+export function LinksEditor({ links, suggestedEmail, errors, showErrors, onAdd, onUpdate, onRemove, onRestore, onMove }: LinksEditorProps) {
   // Id of a just-added link whose input should receive focus once it mounts.
   const pendingFocus = useRef<string | null>(null);
   const addFirst = useRef<HTMLButtonElement>(null);
   const [touched, setTouched] = useState<ReadonlySet<string>>(new Set());
+  // Your own detail, easy to get back: no confirmation, "Teléfono quitado · Deshacer" instead.
+  const [undo, setUndo] = useState<(UndoItem & { link: CardLink; index: number }) | null>(null);
 
   // Removing a row moves focus to the next one (or the previous), or to "Añadir" if it was the last.
   function remove(index: number) {
+    const link = links[index]!;
     const next = links[index + 1] ?? links[index - 1];
     pendingFocus.current = next?.id ?? null;
-    onRemove(links[index]!.id);
+    onRemove(link.id);
+    setUndo({ key: undoKey(link.id), message: removedMessage(link.kind), link, index });
     if (!next) requestAnimationFrame(() => addFirst.current?.focus());
+  }
+
+  // Back in the same place, with the focus on its field.
+  function restore() {
+    if (!undo) return;
+    pendingFocus.current = undo.link.id;
+    onRestore(undo.link, undo.index);
+    setUndo(null);
   }
 
   const full = links.length >= MAX_LINKS;
@@ -82,7 +103,7 @@ export function LinksEditor({ links, suggestedEmail, errors, showErrors, onAdd, 
 
                   <div className="min-w-0 flex-1 space-y-2">
                     <div>
-                      <p className="mb-1 font-mono text-[10px] tracking-[0.14em] text-muted uppercase">
+                      <p className="eyebrow mb-1">
                         {def.label}
                         {!link.visible ? " · oculto" : ""}
                       </p>
@@ -105,12 +126,12 @@ export function LinksEditor({ links, suggestedEmail, errors, showErrors, onAdd, 
                         maxLength={LIMITS.linkValue}
                         aria-label={`${def.label}: valor`}
                         aria-invalid={showValueError}
-                        className={cn(INPUT_CLASSES, "h-10")}
+                        className={inputClasses({ size: "sm" })}
                       />
                       {showValueError ? (
-                        <p className="mt-1 text-xs text-danger" role="alert">
+                        <InlineError live className="mt-1">
                           {valueError}
-                        </p>
+                        </InlineError>
                       ) : null}
                     </div>
 
@@ -123,12 +144,12 @@ export function LinksEditor({ links, suggestedEmail, errors, showErrors, onAdd, 
                           maxLength={LIMITS.linkLabel}
                           aria-label={`${def.label}: título`}
                           aria-invalid={Boolean(labelError) && showErrors}
-                          className={cn(INPUT_CLASSES, "h-9 text-sm")}
+                          className={inputClasses({ size: "sm" })}
                         />
                         {labelError && showErrors ? (
-                          <p className="mt-1 text-xs text-danger" role="alert">
+                          <InlineError live className="mt-1">
                             {labelError}
-                          </p>
+                          </InlineError>
                         ) : null}
                       </div>
                     ) : null}
@@ -164,13 +185,15 @@ export function LinksEditor({ links, suggestedEmail, errors, showErrors, onAdd, 
             <button
               type="button"
               onClick={() => onUpdate(onAdd("email"), { value: suggestedEmail })}
-              className="mt-4 inline-flex h-9 items-center gap-2 rounded-full bg-ink px-4 font-medium text-paper transition-colors hover:bg-ink-soft"
+              className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-full bg-ink px-4 font-medium text-paper transition-colors hover:bg-ink-soft"
             >
               <Plus className="size-4" aria-hidden /> Añadir {suggestedEmail}
             </button>
           ) : null}
         </div>
       )}
+
+      <UndoNotice item={undo} onUndo={restore} onExpire={() => setUndo(null)} />
 
       <div className="mt-5">
         <p className="eyebrow mb-3">
@@ -187,7 +210,7 @@ export function LinksEditor({ links, suggestedEmail, errors, showErrors, onAdd, 
               onClick={() => {
                 pendingFocus.current = onAdd(kind);
               }}
-              className="group inline-flex h-9 items-center gap-1.5 rounded-full border border-line bg-card pr-3.5 pl-2.5 text-sm transition-[border-color,background-color,transform] duration-200 hover:-translate-y-px hover:border-ink disabled:opacity-40"
+              className="group inline-flex min-h-11 items-center gap-1.5 rounded-full border border-field-border bg-card py-1 pr-3.5 pl-2.5 text-sm transition-[border-color,background-color,transform] duration-200 hover:-translate-y-px hover:border-ink disabled:opacity-40"
             >
               <Plus className="size-3.5 text-muted transition-colors group-hover:text-signal" aria-hidden />
               <LinkIcon kind={kind} size={15} />

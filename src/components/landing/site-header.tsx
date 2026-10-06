@@ -13,9 +13,9 @@ const NAV_LINK = "rounded-full px-3 py-2 text-sm text-ink-soft transition-colors
 export function SiteHeader({ ctaHref, signedIn }: SiteHeaderProps) {
   return (
     <header className="relative z-20">
-      <div className="mx-auto flex h-20 max-w-[1240px] items-center justify-between gap-2 px-5 sm:px-8">
+      <div className="mx-auto flex min-h-20 max-w-[1240px] flex-wrap items-center justify-between gap-2 px-5 py-3 sm:px-8">
         <Logo />
-        <nav aria-label="Principal" className="flex items-center gap-1 sm:gap-2">
+        <nav aria-label="Principal" className="flex flex-wrap items-center justify-end gap-1 sm:gap-2">
           <Link href="#como-funciona" className={`hidden md:inline-flex ${NAV_LINK}`}>
             Cómo funciona
           </Link>
@@ -35,7 +35,7 @@ export function SiteHeader({ ctaHref, signedIn }: SiteHeaderProps) {
               <Link href="/login" className={`inline-flex min-h-11 items-center ${NAV_LINK}`}>
                 Entrar
               </Link>
-              <LinkButton href={ctaHref} size="sm" className="ml-1 h-11 px-4 sm:h-9 sm:px-3.5">
+              <LinkButton href={ctaHref} size="sm" className="ml-1 px-4 sm:px-3.5">
                 <span className="min-[400px]:hidden">Crear</span>
                 <span className="max-[399px]:hidden">Crear mi tarjeta</span>
               </LinkButton>

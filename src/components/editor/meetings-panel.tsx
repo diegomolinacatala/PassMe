@@ -1,10 +1,14 @@
 "use client";
 
 import { ArrowUpRight, CalendarCheck2, CalendarClock, Hourglass, Trash2 } from "lucide-react";
-import { useOptimistic, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { deleteMeetingAction } from "@/app/dashboard/actions";
 import { buttonClasses } from "@/components/ui/button";
+import { InlineError } from "@/components/ui/field";
+import { NEW_TAB_SUFFIX } from "@/components/ui/new-tab-hint";
+import { undoKey, UndoNotice, type UndoItem } from "@/components/ui/undo-notice";
 import { cn } from "@/lib/cn";
+import { firstName } from "@/lib/meetings/model";
 import { formatSlotShort } from "@/lib/meetings/time";
 import { needsOwnerAnswer } from "@/lib/pending";
 import type { MeetingStage } from "@/lib/meetings/state";
@@ -59,15 +63,16 @@ function byDate(a: MeetingItem, b: MeetingItem): number {
 }
 
 const ICON_BUTTON =
-  "grid size-9 place-items-center rounded-full text-ink-soft transition-colors hover:bg-danger/10 hover:text-danger disabled:pointer-events-none";
+  "grid size-11 shrink-0 place-items-center rounded-full sm:size-10 text-ink-soft transition-colors hover:bg-danger/10 hover:text-danger disabled:pointer-events-none";
 
 function Item({ item, onDelete }: { item: MeetingItem; onDelete?: () => void }) {
   const { view, href } = item;
   const group = groupOf(view);
   const label = group === "answer" ? "Responder" : "Ver";
   return (
-    <li className={cn("flex items-center gap-3 rounded-2xl px-3 py-3", group === "answer" && "bg-signal-wash/70")}>
-      <div className="min-w-0 flex-1">
+    <li className={cn("flex flex-wrap items-center gap-3 rounded-2xl px-3 py-3", group === "answer" && "bg-signal-wash/70")}>
+      {/* Name and actions share a line; with a large font, the actions drop below. */}
+      <div className="min-w-0 flex-[1_1_8rem]">
         <p className="truncate font-medium">
           {view.guest.name}
           {view.guest.company ? <span className="font-normal text-muted"> · {view.guest.company}</span> : null}
@@ -75,7 +80,7 @@ function Item({ item, onDelete }: { item: MeetingItem; onDelete?: () => void }) 
         <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-muted">
           {/* Only past meetings say how they ended; the others already sit under their group's title. */}
           {group === "closed" ? (
-            <span className="font-mono text-[10px] tracking-[0.1em] text-muted uppercase">{STAGE_LABEL[view.stage]}</span>
+            <span className="eyebrow">{STAGE_LABEL[view.stage]}</span>
           ) : null}
           <span className="tabular-nums">{summary(view)}</span>
         </p>
@@ -85,8 +90,8 @@ function Item({ item, onDelete }: { item: MeetingItem; onDelete?: () => void }) 
           href={href}
           target="_blank"
           rel="noopener noreferrer"
-          className={buttonClasses({ variant: group === "answer" ? "signal" : "outline", size: "sm", className: "shrink-0" })}
-          aria-label={`${label}: reunión con ${view.guest.name}`}
+          className={buttonClasses({ variant: group === "answer" ? "ink" : "outline", size: "sm", className: "shrink-0" })}
+          aria-label={`${label}: reunión con ${view.guest.name}${NEW_TAB_SUFFIX}`}
         >
           {label}
           <ArrowUpRight className="size-3.5" aria-hidden />
@@ -112,30 +117,55 @@ export function MeetingsPanel({ items, available, enabled, demo }: MeetingsPanel
   const [showClosed, setShowClosed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
-  const [visible, removeOptimistic] = useOptimistic(items, (list, id: string) => list.filter((i) => i.view.id !== id));
   const [removed, setRemoved] = useState<ReadonlySet<string>>(new Set());
-  const list = visible.filter((i) => !removed.has(i.view.id));
+  // Your own list, nobody is told: no confirmation, but "Deshacer" for a few seconds before it's final.
+  const [undo, setUndo] = useState<(UndoItem & { id: string }) | null>(null);
+  const waiting = useRef<string | null>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const list = items.filter((i) => !removed.has(i.view.id));
   const closed = list.filter((i) => groupOf(i.view) === "closed");
 
-  function remove(item: MeetingItem) {
-    if (!window.confirm(`¿Quitar la reunión con ${item.view.guest.name} de tu lista? No le avisaremos.`)) return;
-    setError(null);
-    if (demo) {
-      setRemoved((prev) => new Set(prev).add(item.view.id));
-      return;
-    }
-    startTransition(async () => {
-      removeOptimistic(item.view.id);
-      const result = await deleteMeetingAction(item.view.id);
-      if (result.ok) setRemoved((prev) => new Set(prev).add(item.view.id));
-      else setError(result.error);
+  const unhide = (id: string) =>
+    setRemoved((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
     });
+
+  function commit(id: string) {
+    waiting.current = null;
+    if (demo) return;
+    startTransition(async () => {
+      const result = await deleteMeetingAction(id);
+      if (!result.ok) {
+        unhide(id);
+        setError(result.error);
+      }
+    });
+  }
+
+  // Leaving the page during the countdown still removes it.
+  useEffect(
+    () => () => {
+      if (waiting.current && !demo) void deleteMeetingAction(waiting.current);
+    },
+    [demo],
+  );
+
+  function remove(item: MeetingItem) {
+    setError(null);
+    if (waiting.current) commit(waiting.current);
+    waiting.current = item.view.id;
+    setRemoved((prev) => new Set(prev).add(item.view.id));
+    // The row is gone: keep the keyboard in the panel, not on <body>.
+    requestAnimationFrame(() => panel.current?.focus());
+    setUndo({ key: undoKey(item.view.id), id: item.view.id, message: `Reunión con ${firstName(item.view.guest.name)} quitada` });
   }
 
   if (!available) return <p className="text-sm text-muted">Esta función aún no está disponible.</p>;
 
   return (
-    <div id="reuniones" className="scroll-mt-6">
+    <div id="reuniones" ref={panel} tabIndex={-1} className="scroll-mt-6 outline-none">
       {list.length === 0 ? (
         <p className="text-sm text-muted">
           {enabled
@@ -150,7 +180,7 @@ export function MeetingsPanel({ items, available, enabled, demo }: MeetingsPanel
             if (group.length === 0) return null;
             return (
               <div key={id}>
-                <p className="mb-1.5 flex items-center gap-1.5 font-mono text-[10px] tracking-[0.14em] text-muted uppercase">
+                <p className="eyebrow mb-1.5 flex items-center gap-1.5">
                   <Icon className="size-3.5" aria-hidden />
                   {title}
                 </p>
@@ -184,10 +214,22 @@ export function MeetingsPanel({ items, available, enabled, demo }: MeetingsPanel
           ) : null}
         </div>
       )}
+      <UndoNotice
+        item={undo}
+        onUndo={() => {
+          if (undo) unhide(undo.id);
+          waiting.current = null;
+          setUndo(null);
+        }}
+        onExpire={() => {
+          if (undo && waiting.current === undo.id) commit(undo.id);
+          setUndo(null);
+        }}
+      />
       {error ? (
-        <p role="alert" className="mt-3 text-sm text-danger">
+        <InlineError live className="mt-3">
           {error}
-        </p>
+        </InlineError>
       ) : null}
     </div>
   );

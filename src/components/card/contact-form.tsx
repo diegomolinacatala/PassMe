@@ -1,49 +1,23 @@
 "use client";
 
-import { ArrowRight, CircleCheck, HandHeart, LoaderCircle } from "lucide-react";
+import { ArrowRight, CircleCheck, HandHeart } from "lucide-react";
 import Link from "next/link";
-import { startTransition, useActionState, useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { startTransition, useActionState, useEffect, useRef, useState, type FormEvent } from "react";
 import { submitContactAction, type ContactFormState, type SentDetails } from "@/app/u/[slug]/actions";
-import { Button, buttonClasses } from "@/components/ui/button";
+import { buttonClasses } from "@/components/ui/button";
+import { Field, InlineError, inputClasses } from "@/components/ui/field";
+import { Notice } from "@/components/ui/notice";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { Turnstile } from "@/components/ui/turnstile";
 import { CONTACT_LIMITS } from "@/lib/card/contact";
 import { rememberDetails } from "@/lib/card/draft-storage";
 import { createPath, parseVia } from "@/lib/card/quick";
-import { cn } from "@/lib/cn";
-
-const INPUT =
-  "w-full rounded-xl border border-line bg-paper/60 px-3.5 text-[0.95rem] text-ink placeholder:text-muted/60 outline-none transition-[border-color,box-shadow] duration-200 hover:border-line-strong focus:border-ink focus:bg-card focus:shadow-[0_0_0_4px_rgb(20_20_20/0.06)] aria-[invalid=true]:border-danger";
 
 interface ContactFormProps {
   slug: string;
   ownerName: string;
   source: string;
   captchaSiteKey: string | null;
-}
-
-interface FieldProps {
-  label: string;
-  error?: string;
-  optional?: boolean;
-  children: (props: { id: string; "aria-invalid": boolean; "aria-describedby"?: string }) => ReactNode;
-}
-
-function Field({ label, error, optional, children }: FieldProps) {
-  const id = useId();
-  return (
-    <div>
-      <label htmlFor={id} className="mb-1.5 flex items-baseline justify-between text-sm font-medium text-ink-soft">
-        {label}
-        {optional ? <span className="font-mono text-[10px] tracking-wide text-muted uppercase">Opcional</span> : null}
-      </label>
-      {children({ id, "aria-invalid": Boolean(error), "aria-describedby": error ? `${id}-error` : undefined })}
-      {error ? (
-        <p id={`${id}-error`} className="mt-1.5 text-xs text-danger">
-          {error}
-        </p>
-      ) : null}
-    </div>
-  );
 }
 
 /** Confirmation that takes focus, so screen readers announce it and keyboard users aren't lost. */
@@ -70,7 +44,7 @@ function SentMessage({
     }
   }, [details, slug, via]);
   return (
-    <div role="status" className="animate-rise rounded-[24px] border hairline bg-card px-5 py-5 text-center">
+    <div role="status" className="animate-rise rounded-panel border hairline bg-card px-5 py-5 text-center">
       <CircleCheck className="mx-auto size-7 text-ok" aria-hidden />
       <p ref={heading} tabIndex={-1} className="mt-2 font-display text-2xl leading-tight outline-none">
         {firstName} ya tiene <em className="text-signal">tu contacto.</em>
@@ -93,7 +67,7 @@ function SentMessage({
 }
 
 /**
- * "Te dejo mi contacto": the visitor leaves their details for the card owner.
+ * "Déjale tu contacto": the visitor leaves their details for the card owner.
  * Collapsed by default so the card stays the star of the page.
  */
 export function ContactForm({ slug, ownerName, source, captchaSiteKey }: ContactFormProps) {
@@ -130,7 +104,7 @@ export function ContactForm({ slug, ownerName, source, captchaSiteKey }: Contact
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="group flex w-full items-center gap-4 rounded-[24px] border border-dashed border-line-strong bg-card/60 px-5 py-4 text-left transition-colors duration-300 hover:border-ink hover:bg-card"
+        className="group flex w-full items-center gap-4 rounded-panel border border-dashed border-line-strong bg-card/60 px-5 py-4 text-left transition-colors duration-300 hover:border-ink hover:bg-card"
       >
         <span className="grid size-11 shrink-0 place-items-center rounded-full bg-signal-wash text-signal-deep transition-transform duration-500 group-hover:-rotate-6">
           <HandHeart className="size-5" aria-hidden />
@@ -148,7 +122,7 @@ export function ContactForm({ slug, ownerName, source, captchaSiteKey }: Contact
       ref={form}
       action={submit}
       onSubmit={onSubmit}
-      className="relative animate-rise space-y-4 rounded-[24px] border hairline bg-card px-5 py-5"
+      className="relative animate-rise space-y-4 rounded-panel border hairline bg-card px-5 py-5"
       noValidate
     >
       <div>
@@ -167,7 +141,7 @@ export function ContactForm({ slug, ownerName, source, captchaSiteKey }: Contact
             defaultValue={values?.name}
             maxLength={CONTACT_LIMITS.name}
             autoComplete="name"
-            className={cn(INPUT, "h-11")}
+            className={inputClasses()}
           />
         )}
       </Field>
@@ -182,7 +156,7 @@ export function ContactForm({ slug, ownerName, source, captchaSiteKey }: Contact
               defaultValue={values?.email}
               maxLength={CONTACT_LIMITS.email}
               autoComplete="email"
-              className={cn(INPUT, "h-11")}
+              className={inputClasses()}
             />
           )}
         </Field>
@@ -196,7 +170,7 @@ export function ContactForm({ slug, ownerName, source, captchaSiteKey }: Contact
               defaultValue={values?.phone}
               maxLength={CONTACT_LIMITS.phone}
               autoComplete="tel"
-              className={cn(INPUT, "h-11")}
+              className={inputClasses()}
             />
           )}
         </Field>
@@ -209,7 +183,7 @@ export function ContactForm({ slug, ownerName, source, captchaSiteKey }: Contact
             defaultValue={values?.company}
             maxLength={CONTACT_LIMITS.company}
             autoComplete="organization"
-            className={cn(INPUT, "h-11")}
+            className={inputClasses()}
           />
         )}
       </Field>
@@ -222,7 +196,7 @@ export function ContactForm({ slug, ownerName, source, captchaSiteKey }: Contact
             defaultValue={values?.message}
             maxLength={CONTACT_LIMITS.message}
             placeholder="Nos conocimos en…"
-            className={cn(INPUT, "resize-y py-2.5")}
+            className={inputClasses({ size: "multiline" })}
           />
         )}
       </Field>
@@ -251,20 +225,19 @@ export function ContactForm({ slug, ownerName, source, captchaSiteKey }: Contact
           </a>
         </span>
       </label>
-      {errors.consent ? <p className="-mt-2 text-xs text-danger">{errors.consent}</p> : null}
+      {errors.consent ? <InlineError className="-mt-2">{errors.consent}</InlineError> : null}
 
       {captchaSiteKey ? <Turnstile siteKey={captchaSiteKey} action="contact" resetKey={state} /> : null}
 
       {state.status === "error" ? (
-        <p role="alert" data-form-error tabIndex={-1} className="text-sm text-danger outline-none">
-          {state.message}
-        </p>
+        <div data-form-error tabIndex={-1} className="outline-none">
+          <Notice tone="error">{state.message}</Notice>
+        </div>
       ) : null}
 
-      <Button type="submit" size="lg" className="w-full" disabled={pending}>
-        {pending ? <LoaderCircle className="size-5 animate-spin" aria-hidden /> : null}
-        {pending ? "Enviando…" : "Dejarle mi contacto"}
-      </Button>
+      <SubmitButton pending={pending} pendingLabel="Enviando…">
+        Dejarle mi contacto
+      </SubmitButton>
     </form>
   );
 }

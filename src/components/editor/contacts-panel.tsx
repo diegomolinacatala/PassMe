@@ -1,8 +1,10 @@
 "use client";
 
 import { Download, Mail, Phone, Trash2, UserRoundPlus } from "lucide-react";
-import { useOptimistic, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useOptimistic, useRef, useState, useTransition, type ReactNode } from "react";
 import { deleteContactRequestAction } from "@/app/dashboard/actions";
+import { Button } from "@/components/ui/button";
+import { InlineError } from "@/components/ui/field";
 import { contactEmailHref, contactPhoneHref, type ContactRequest } from "@/lib/card/contact";
 import { cn } from "@/lib/cn";
 
@@ -19,9 +21,9 @@ const COLLAPSED_COUNT = 4;
 const SOURCE_LABEL: Record<ContactRequest["source"], string> = { qr: "QR", share: "Enlace", direct: "Web" };
 const dateFormat = new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short" });
 const ICON_BUTTON =
-  "grid size-9 place-items-center rounded-full text-ink-soft transition-colors hover:bg-ink/[0.06] hover:text-ink disabled:pointer-events-none";
+  "grid size-11 sm:size-10 place-items-center rounded-full text-ink-soft transition-colors hover:bg-ink/[0.06] hover:text-ink disabled:pointer-events-none";
 const EXPORT_BUTTON =
-  "inline-flex h-9 items-center gap-1.5 rounded-full border border-ink/80 px-3.5 text-sm font-medium transition-colors hover:bg-ink hover:text-paper disabled:pointer-events-none disabled:opacity-40";
+  "inline-flex min-h-11 sm:min-h-10 items-center gap-1.5 rounded-full border border-ink/80 px-3.5 text-sm font-medium transition-colors hover:bg-ink hover:text-paper disabled:pointer-events-none disabled:opacity-40";
 
 /** Download link; a disabled button in demo mode (nothing is stored there). */
 function ExportLink({ href, demo, children }: { href: string; demo: boolean; children: ReactNode }) {
@@ -39,8 +41,42 @@ function ExportLink({ href, demo, children }: { href: string; demo: boolean; chi
   );
 }
 
-function ContactItem({ request, demo, onDelete }: { request: ContactRequest; demo: boolean; onDelete: () => void }) {
+interface ContactItemProps {
+  request: ContactRequest;
+  demo: boolean;
+  /** The inline "¿Borrar…?" is open for this contact. */
+  confirming: boolean;
+  onAskDelete: () => void;
+  onCancelDelete: () => void;
+  onDelete: () => void;
+}
+
+/**
+ * Someone else's data, gone for good: deleting asks once, in place, with
+ * "Borrar" and "No borrar" (the safe one gets the focus).
+ */
+function DeleteConfirm({ name, onCancel, onConfirm }: { name: string; onCancel: () => void; onConfirm: () => void }) {
+  const keep = useRef<HTMLButtonElement>(null);
+  useEffect(() => keep.current?.focus(), []);
+  return (
+    <div role="group" aria-label={`Borrar el contacto de ${name}`} className="mt-3 rounded-2xl bg-danger-wash px-4 py-3">
+      <p className="text-sm text-danger">¿Borrar el contacto de {name}? No se puede deshacer.</p>
+      <div className="mt-2.5 flex flex-wrap gap-2">
+        <Button variant="danger" size="sm" onClick={onConfirm}>
+          <Trash2 className="size-4" aria-hidden />
+          Borrar
+        </Button>
+        <Button ref={keep} variant="ghost" size="sm" onClick={onCancel}>
+          No borrar
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ContactItem({ request, demo, confirming, onAskDelete, onCancelDelete, onDelete }: ContactItemProps) {
   const exportHref = `/dashboard/contactos?format=vcf&id=${encodeURIComponent(request.id)}`;
+  const trash = useRef<HTMLButtonElement>(null);
   return (
     <li className="py-4 first:pt-0 last:pb-0">
       <div className="flex items-start justify-between gap-3">
@@ -68,8 +104,10 @@ function ContactItem({ request, demo, onDelete }: { request: ContactRequest; dem
             </a>
           )}
           <button
+            ref={trash}
             type="button"
-            onClick={onDelete}
+            onClick={onAskDelete}
+            aria-expanded={confirming}
             className={cn(ICON_BUTTON, "hover:bg-danger/10 hover:text-danger")}
             aria-label={`Borrar el contacto de ${request.name}`}
             title="Borrar"
@@ -97,6 +135,16 @@ function ContactItem({ request, demo, onDelete }: { request: ContactRequest; dem
           {request.message}
         </p>
       ) : null}
+      {confirming ? (
+        <DeleteConfirm
+          name={request.name}
+          onConfirm={onDelete}
+          onCancel={() => {
+            onCancelDelete();
+            requestAnimationFrame(() => trash.current?.focus());
+          }}
+        />
+      ) : null}
     </li>
   );
 }
@@ -107,12 +155,16 @@ export function ContactsPanel({ requests, available, enabled, demo }: ContactsPa
   const [, startTransition] = useTransition();
   const [visible, removeOptimistic] = useOptimistic(requests, (list, id: string) => list.filter((r) => r.id !== id));
   const [removed, setRemoved] = useState<ReadonlySet<string>>(new Set());
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const panel = useRef<HTMLDivElement>(null);
   const list = visible.filter((r) => !removed.has(r.id));
   const shown = expanded ? list : list.slice(0, COLLAPSED_COUNT);
 
   function remove(request: ContactRequest) {
-    if (!window.confirm(`¿Borrar el contacto de ${request.name}? No se puede deshacer.`)) return;
+    setConfirming(null);
     setError(null);
+    // The row is going away: keep the keyboard in the panel, not on <body>.
+    requestAnimationFrame(() => panel.current?.focus());
     if (demo) {
       setRemoved((prev) => new Set(prev).add(request.id));
       return;
@@ -128,7 +180,7 @@ export function ContactsPanel({ requests, available, enabled, demo }: ContactsPa
   if (!available) return <p className="text-sm text-muted">Esta función aún no está disponible.</p>;
 
   return (
-    <div id="contactos" className="scroll-mt-6">
+    <div id="contactos" ref={panel} tabIndex={-1} className="scroll-mt-6 outline-none">
       {list.length === 0 ? (
         <p className="text-sm text-muted">
           {enabled
@@ -140,7 +192,15 @@ export function ContactsPanel({ requests, available, enabled, demo }: ContactsPa
           <p className="-mt-3 mb-4 text-sm text-muted">{list.length === 1 ? "1 en total" : `${list.length} en total`}</p>
           <ul className="divide-y divide-line/80">
             {shown.map((request) => (
-              <ContactItem key={request.id} request={request} demo={demo} onDelete={() => remove(request)} />
+              <ContactItem
+                key={request.id}
+                request={request}
+                demo={demo}
+                confirming={confirming === request.id}
+                onAskDelete={() => setConfirming(request.id)}
+                onCancelDelete={() => setConfirming(null)}
+                onDelete={() => remove(request)}
+              />
             ))}
           </ul>
           {list.length > COLLAPSED_COUNT ? (
@@ -163,9 +223,9 @@ export function ContactsPanel({ requests, available, enabled, demo }: ContactsPa
         </>
       )}
       {error ? (
-        <p role="alert" className="mt-3 text-sm text-danger">
+        <InlineError live className="mt-3">
           {error}
-        </p>
+        </InlineError>
       ) : null}
       <p className="mt-5 text-xs text-muted">
         Solo tú ves estos datos. Úsalos para lo que la persona aceptó: ponerte en contacto con ella.

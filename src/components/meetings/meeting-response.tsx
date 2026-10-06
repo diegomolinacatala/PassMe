@@ -1,9 +1,14 @@
 "use client";
 
-import { ArrowLeft, CalendarCheck2, CalendarClock, CalendarX2, Check, CircleCheck, Clock, Download, LoaderCircle, Mail, Phone, Undo2 } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, CalendarCheck2, CalendarClock, CalendarX2, Check, Clock, Download, Mail, Phone, Undo2 } from "lucide-react";
 import { useActionState, useEffect, useRef, useState, type ReactNode } from "react";
 import { respondMeetingAction, type MeetingResponseState } from "@/app/reunion/actions";
 import { Button, buttonClasses } from "@/components/ui/button";
+import { CHOICE_FOCUS } from "@/components/ui/choice";
+import { Field, inputClasses } from "@/components/ui/field";
+import { NewTabHint } from "@/components/ui/new-tab-hint";
+import { Notice } from "@/components/ui/notice";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { contactEmailHref, contactPhoneHref } from "@/lib/card/contact";
 import type { FieldErrors } from "@/lib/card/schema";
 import { cn } from "@/lib/cn";
@@ -12,7 +17,6 @@ import { MEETING_LIMITS } from "@/lib/meetings/schema";
 import type { MeetingAction } from "@/lib/meetings/state";
 import { addMinutes, formatDay, formatTime, timeZoneCity } from "@/lib/meetings/time";
 import { viewGoogleCalendarUrl, type MeetingView } from "@/lib/meetings/view";
-import { Field, MEETING_INPUT } from "./form-bits";
 import { FORMAT_ICONS, useClientNow } from "./shared";
 import { SlotPicker } from "./slot-picker";
 
@@ -42,7 +46,7 @@ const DONE_MESSAGES: Record<MeetingAction, (other: string) => string> = {
 };
 
 function Panel({ children, className }: { children: ReactNode; className?: string }) {
-  return <section className={cn("rounded-[24px] border hairline bg-card px-5 py-5", className)}>{children}</section>;
+  return <section className={cn("rounded-panel border hairline bg-card px-5 py-5", className)}>{children}</section>;
 }
 
 function otherName(view: MeetingView): string {
@@ -83,25 +87,17 @@ function Title({ view }: { view: MeetingView }) {
 }
 
 function StatusBanner({ state, other }: { state: MeetingResponseState; other: string }) {
-  const ref = useRef<HTMLParagraphElement>(null);
+  const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (state.status !== "idle") ref.current?.focus();
   }, [state]);
   if (state.status === "idle") return null;
   const error = state.status === "error";
   return (
-    <p
-      ref={ref}
-      tabIndex={-1}
-      role={error ? "alert" : "status"}
-      className={cn("flex items-start gap-2.5 rounded-2xl px-4 py-3 text-sm outline-none", error ? "bg-danger-wash text-danger" : "bg-ok/10 text-ok")}
-    >
-      {error ? null : <CircleCheck className="mt-0.5 size-4 shrink-0" aria-hidden />}
-      <span>
-        {error ? state.message : DONE_MESSAGES[state.action](other)}
-        {state.status === "done" && state.demo ? " (Modo demo: no se ha enviado nada.)" : ""}
-      </span>
-    </p>
+    <Notice ref={ref} focusable tone={error ? "error" : "ok"}>
+      {error ? state.message : DONE_MESSAGES[state.action](other)}
+      {state.status === "done" && state.demo ? " (Modo demo: no se ha enviado nada.)" : ""}
+    </Notice>
   );
 }
 
@@ -141,7 +137,7 @@ function Person({ view }: { view: MeetingView }) {
 function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex gap-3 py-2.5">
-      <dt className="w-20 shrink-0 font-mono text-[10px] tracking-[0.12em] text-muted uppercase">{label}</dt>
+      <dt className="eyebrow w-20 shrink-0">{label}</dt>
       <dd className="min-w-0 break-words">{children}</dd>
     </div>
   );
@@ -174,7 +170,7 @@ function Summary({ view }: { view: MeetingView }) {
       </dl>
       {view.responseNote ? (
         <blockquote className="mt-4 border-l-2 border-glow pl-3 text-sm text-ink-soft">
-          <p className="font-mono text-[10px] tracking-[0.12em] text-muted uppercase">{noteByMe ? "Tu nota" : otherName(view)}</p>
+          <p className="eyebrow">{noteByMe ? "Tu nota" : otherName(view)}</p>
           <p className="mt-0.5 whitespace-pre-line">{view.responseNote}</p>
         </blockquote>
       ) : null}
@@ -209,19 +205,10 @@ function NoteField({
           onChange={(e) => onChange(e.target.value)}
           maxLength={MEETING_LIMITS.note}
           placeholder={placeholder}
-          className={cn(MEETING_INPUT, "resize-y py-2.5")}
+          className={inputClasses({ size: "multiline" })}
         />
       )}
     </Field>
-  );
-}
-
-function SubmitButton({ pending, children, variant = "signal", icon }: { pending: boolean; children: ReactNode; variant?: "signal" | "ink"; icon?: ReactNode }) {
-  return (
-    <Button type="submit" variant={variant} size="lg" className="w-full" disabled={pending} aria-busy={pending}>
-      {pending ? <LoaderCircle className="size-5 animate-spin" aria-hidden /> : icon}
-      {children}
-    </Button>
   );
 }
 
@@ -283,8 +270,9 @@ function ConfirmPanel({
                 <label
                   key={slot}
                   className={cn(
-                    "flex min-h-16 cursor-pointer items-center gap-3.5 rounded-2xl border px-4 py-3 transition-[background-color,border-color,box-shadow] duration-200 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ink/40",
-                    checked ? "border-ink bg-paper shadow-soft" : "border-line bg-card hover:border-ink",
+                    "flex min-h-16 cursor-pointer items-center gap-3.5 rounded-2xl border px-4 py-3 transition-[background-color,border-color,box-shadow] duration-200",
+                    CHOICE_FOCUS,
+                    checked ? "border-ink bg-paper shadow-soft" : "border-field-border bg-card hover:border-ink",
                   )}
                 >
                   <input type="radio" name="slot" value={slot} checked={checked} onChange={() => onSelect(slot)} className="sr-only" />
@@ -323,14 +311,14 @@ function ConfirmPanel({
                 onChange={(e) => setLocation(e.target.value)}
                 maxLength={view.format === "video" ? MEETING_LIMITS.videoLink : MEETING_LIMITS.location}
                 placeholder={view.format === "video" ? "https://meet.google.com/…" : "Café Central, Madrid"}
-                className={cn(MEETING_INPUT, "h-11")}
+                className={inputClasses()}
               />
             )}
           </Field>
         )}
 
-        <SubmitButton pending={pending} icon={<CalendarCheck2 className="size-5" aria-hidden />}>
-          {pending ? "Confirmando…" : selected ? `Confirmar ${formatTime(selected, view.timeZone)}` : "Confirmar"}
+        <SubmitButton pending={pending} pendingLabel="Confirmando…" icon={<CalendarCheck2 className="size-5" aria-hidden />}>
+          {selected ? `Confirmar ${formatTime(selected, view.timeZone)}` : "Confirmar"}
         </SubmitButton>
         <p className="text-center text-xs text-muted">
           {view.party === "owner" ? `${other} recibirá la invitación con tu email para que podáis hablar.` : "Os enviamos la invitación a los dos."}
@@ -384,8 +372,8 @@ function CounterPanel({ view, act, pending, errors, onBack }: PanelProps & { onB
           <div className="h-72 animate-pulse rounded-2xl bg-paper-deep/60" aria-hidden />
         )}
         <NoteField label={`Un mensaje para ${other}`} placeholder="Esa semana no puedo, ¿te va alguna de estas?" value={note} onChange={setNote} error={errors.note} />
-        <SubmitButton pending={pending} icon={<CalendarClock className="size-5" aria-hidden />}>
-          {pending ? "Enviando…" : slots.length > 1 ? `Enviar ${slots.length} horas` : "Enviar hora"}
+        <SubmitButton pending={pending} pendingLabel="Enviando…" icon={<CalendarClock className="size-5" aria-hidden />}>
+          {slots.length > 1 ? `Enviar ${slots.length} horas` : "Enviar hora"}
         </SubmitButton>
       </form>
       <BackButton onClick={onBack} />
@@ -407,8 +395,8 @@ function DeclinePanel({ view, act, pending, errors, onBack }: PanelProps & { onB
           <p className="mt-1 text-sm text-muted">Le avisamos a {otherName(view)} con un mensaje amable. Si quieres, añade una nota.</p>
         </div>
         <NoteField label="Nota" placeholder="Gracias, pero estas semanas voy muy liado." value={note} onChange={setNote} error={errors.note} />
-        <SubmitButton pending={pending} variant="ink">
-          {pending ? "Enviando…" : "Enviar respuesta"}
+        <SubmitButton pending={pending} pendingLabel="Enviando…">
+          Enviar respuesta
         </SubmitButton>
       </form>
       <BackButton onClick={onBack} />
@@ -451,10 +439,9 @@ function CancelBlock({ open, onOpen, onClose, act, pending, label, error }: Canc
         <Button variant="ghost" onClick={keep}>
           No, mantener
         </Button>
-        <Button type="submit" variant="danger" disabled={pending} aria-busy={pending}>
-          {pending ? <LoaderCircle className="size-4 animate-spin" aria-hidden /> : null}
+        <SubmitButton pending={pending} pendingLabel="Cancelando…" variant="danger" size="md">
           Sí, {label.toLowerCase()}
-        </Button>
+        </SubmitButton>
       </div>
     </form>
   );
@@ -489,6 +476,8 @@ function ConfirmedPanel({ view, icsHref, cancel }: { view: MeetingView; icsHref:
         {google ? (
           <a href={google} target="_blank" rel="noopener noreferrer" className={buttonClasses({ variant: "ink" })}>
             Google Calendar
+            <ArrowUpRight className="size-4" aria-hidden />
+            <NewTabHint />
           </a>
         ) : null}
         <a href={icsHref} className={buttonClasses({ variant: "outline" })} download>

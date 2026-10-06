@@ -1,20 +1,20 @@
 "use client";
 
-import { Check, LoaderCircle } from "lucide-react";
+import { Check } from "lucide-react";
 import { useId, useRef, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
-import { Button } from "@/components/ui/button";
+import { CHOICE_FOCUS, CHOICE_INPUT } from "@/components/ui/choice";
+import { Field as FieldShell, InlineError, inputClasses } from "@/components/ui/field";
+import { Notice } from "@/components/ui/notice";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { CARD_THEMES } from "@/lib/card/design";
 import { CONTACT_ERROR_KEY, type QuickCardDraft, type QuickTextField } from "@/lib/card/quick";
 import { LIMITS, type FieldErrors } from "@/lib/card/schema";
 import { cn } from "@/lib/cn";
 
-const INPUT =
-  "h-12 w-full rounded-xl border border-line bg-card px-3.5 text-base text-ink placeholder:text-muted/60 outline-none transition-[border-color,box-shadow] duration-200 hover:border-line-strong focus:border-ink focus:shadow-[0_0_0_4px_rgb(20_20_20/0.06)] aria-[invalid=true]:border-danger";
-
 interface FieldDef {
   field: QuickTextField;
   label: string;
-  placeholder: string;
+  placeholder?: string;
   autoComplete: string;
   type?: "text" | "email" | "tel" | "url";
   inputMode?: "text" | "email" | "tel" | "url";
@@ -23,9 +23,9 @@ interface FieldDef {
 }
 
 const WHO: FieldDef[] = [
-  { field: "fullName", label: "Nombre y apellidos", placeholder: "Alex Rivera", autoComplete: "name", maxLength: LIMITS.fullName, required: true },
-  { field: "headline", label: "Cargo", placeholder: "Product Designer", autoComplete: "organization-title", maxLength: LIMITS.headline },
-  { field: "company", label: "Empresa", placeholder: "Estudio Norte", autoComplete: "organization", maxLength: LIMITS.company },
+  { field: "fullName", label: "Nombre y apellidos", autoComplete: "name", maxLength: LIMITS.fullName, required: true },
+  { field: "headline", label: "Cargo", autoComplete: "organization-title", maxLength: LIMITS.headline },
+  { field: "company", label: "Empresa", autoComplete: "organization", maxLength: LIMITS.company },
 ];
 
 const CONTACT: FieldDef[] = [
@@ -100,9 +100,9 @@ export function QuickCardForm({
         </p>
         {CONTACT.map((def) => renderField(def, errors[CONTACT_ERROR_KEY] ? contactErrorId : undefined))}
         {errors[CONTACT_ERROR_KEY] ? (
-          <p id={contactErrorId} role="alert" className="text-sm text-danger">
+          <InlineError id={contactErrorId} live>
             {errors[CONTACT_ERROR_KEY]}
-          </p>
+          </InlineError>
         ) : null}
       </fieldset>
 
@@ -112,15 +112,10 @@ export function QuickCardForm({
       </fieldset>
 
       <div className="space-y-3">
-        {formError ? (
-          <p role="alert" className="rounded-xl bg-danger-wash px-3.5 py-2.5 text-sm text-danger">
-            {formError}
-          </p>
-        ) : null}
-        <Button type="submit" variant="signal" size="lg" className="w-full" disabled={busy} aria-busy={busy}>
-          {busy ? <LoaderCircle className="size-5 animate-spin" aria-hidden /> : null}
-          {busy ? busyLabel : submitLabel}
-        </Button>
+        {formError ? <Notice tone="error">{formError}</Notice> : null}
+        <SubmitButton pending={busy} pendingLabel={busyLabel}>
+          {submitLabel}
+        </SubmitButton>
         {footnote ? <div className="text-center text-xs leading-relaxed text-muted">{footnote}</div> : null}
       </div>
     </form>
@@ -147,49 +142,36 @@ function focusNextField(event: KeyboardEvent<HTMLInputElement>) {
 }
 
 function Field({ def, value, error, describedBy, onChange, onBlur, isLast }: FieldProps) {
-  const id = useId();
-  const described = [error ? `${id}-error` : null, describedBy].filter(Boolean).join(" ") || undefined;
+  // Only optional fields are marked; the contact ones are "at least one", said above them.
+  const optional = !def.required && def.type === undefined;
   return (
-    <div>
-      <label htmlFor={id} className="mb-1.5 flex items-baseline justify-between text-sm font-medium text-ink-soft">
-        <span>
-          {def.label}
-          {def.required ? <span className="text-signal-deep"> *</span> : null}
-        </span>
-        {!def.required && def.type === undefined ? (
-          <span className="font-mono text-[10px] tracking-wide text-muted uppercase">Opcional</span>
-        ) : null}
-      </label>
-      <input
-        id={id}
-        name={def.field}
-        value={value}
-        onChange={(e) => onChange({ [def.field]: e.target.value })}
-        onBlur={() => onBlur(def.field)}
-        onKeyDown={isLast ? undefined : focusNextField}
-        enterKeyHint={isLast ? "done" : "next"}
-        type={def.type ?? "text"}
-        inputMode={def.inputMode}
-        autoComplete={def.autoComplete}
-        autoCapitalize={def.type ? "none" : "words"}
-        autoCorrect="off"
-        spellCheck={false}
-        maxLength={def.maxLength}
-        placeholder={def.placeholder}
-        required={def.required}
-        aria-invalid={Boolean(error)}
-        aria-describedby={described}
-        className={INPUT}
-      />
-      {error ? (
-        <p id={`${id}-error`} className="mt-1.5 text-sm text-danger">
-          {error}
-        </p>
-      ) : null}
-    </div>
+    <FieldShell label={def.label} optional={optional} error={error} describedBy={describedBy}>
+      {(props) => (
+        <input
+          {...props}
+          name={def.field}
+          value={value}
+          onChange={(e) => onChange({ [def.field]: e.target.value })}
+          onBlur={() => onBlur(def.field)}
+          onKeyDown={isLast ? undefined : focusNextField}
+          enterKeyHint={isLast ? "done" : "next"}
+          type={def.type ?? "text"}
+          inputMode={def.inputMode}
+          autoComplete={def.autoComplete}
+          autoCapitalize={def.type ? "none" : "words"}
+          autoCorrect="off"
+          spellCheck={false}
+          maxLength={def.maxLength}
+          placeholder={def.placeholder}
+          required={def.required}
+          className={inputClasses()}
+        />
+      )}
+    </FieldShell>
   );
 }
 
+/** Native radios: one Tab stop, and the arrow keys go through the colors. */
 function ThemePicker({ value, onChange }: { value: string; onChange: (theme: string) => void }) {
   const selected = CARD_THEMES.find((t) => t.id === value) ?? CARD_THEMES[0]!;
   return (
@@ -198,24 +180,29 @@ function ThemePicker({ value, onChange }: { value: string; onChange: (theme: str
         {CARD_THEMES.map((theme) => {
           const active = theme.id === selected.id;
           return (
-            <button
+            <label
               key={theme.id}
-              type="button"
-              role="radio"
-              aria-checked={active}
-              aria-label={theme.name}
               title={theme.name}
-              onClick={() => onChange(theme.id)}
               className={cn(
-                "relative grid size-10 place-items-center rounded-full shadow-[inset_0_0_0_1px_rgb(34_27_23/0.14)] transition-transform duration-300 ease-[var(--ease-spring)] hover:-translate-y-0.5",
+                "relative grid size-11 place-items-center rounded-full shadow-hairline transition-transform duration-300 ease-[var(--ease-spring)] hover:-translate-y-0.5",
                 active && "ring-2 ring-ink ring-offset-2 ring-offset-paper",
+                CHOICE_FOCUS,
               )}
               style={{ backgroundColor: theme.background }}
             >
+              <input
+                type="radio"
+                name="theme"
+                value={theme.id}
+                checked={active}
+                onChange={() => onChange(theme.id)}
+                aria-label={theme.name}
+                className={CHOICE_INPUT}
+              />
               <span className="grid size-4 place-items-center rounded-full" style={{ backgroundColor: theme.detail }}>
                 {active ? <Check className="size-3" style={{ color: theme.background }} aria-hidden /> : null}
               </span>
-            </button>
+            </label>
           );
         })}
       </div>

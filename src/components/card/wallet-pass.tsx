@@ -61,10 +61,10 @@ export function WalletPass({ card, style = "apple", className }: WalletPassProps
 
   // Apple shows the bare code (no altText); Google prints the short URL under it.
   const qr = (
-    <div className="mx-auto w-fit rounded-xl bg-white p-2.5 shadow-[0_1px_2px_rgb(0_0_0/0.15)]">
+    <div className="mx-auto w-fit rounded-xl bg-white p-2.5 shadow-sm">
       <QrCode value={profileUrl(slug, "qr")} label="Código QR de la tarjeta" className="size-[112px] text-ink" quietZone={1} />
       {style === "google" ? (
-        <p className="mt-1.5 max-w-[112px] truncate text-center font-mono text-[9px] leading-none text-black/60">
+        <p className="mt-1.5 max-w-[112px] truncate text-center font-mono text-mark leading-none text-black/60">
           {prettyProfileUrl(slug)}
         </p>
       ) : null}
@@ -76,10 +76,10 @@ export function WalletPass({ card, style = "apple", className }: WalletPassProps
       <dl className={cn("grid gap-3", fields.length === 1 ? "grid-cols-1" : fields.length === 2 ? "grid-cols-2" : "grid-cols-3")}>
         {fields.map((field) => (
           <div key={field.label} className="min-w-0">
-            <dt className="text-[10px] font-semibold tracking-[0.08em] uppercase" style={{ color: design.label }}>
+            <dt className="text-mark font-semibold tracking-[0.08em] uppercase" style={{ color: design.label }}>
               {field.label}
             </dt>
-            <dd className="truncate text-[14px] leading-snug">{field.value}</dd>
+            <dd className="truncate text-small leading-snug">{field.value}</dd>
           </div>
         ))}
       </dl>
@@ -88,7 +88,7 @@ export function WalletPass({ card, style = "apple", className }: WalletPassProps
   if (style === "google") {
     return (
       <div
-        className={cn("w-full max-w-[340px] overflow-hidden rounded-[24px] shadow-object", className)}
+        className={cn("w-full max-w-[340px] overflow-hidden rounded-panel shadow-object", className)}
         style={{ backgroundColor: design.background, color: design.foreground }}
         aria-label={`Vista previa del pase de Google Wallet de ${name}`}
       >
@@ -115,13 +115,13 @@ export function WalletPass({ card, style = "apple", className }: WalletPassProps
 
   return (
     <div
-      className={cn("w-full max-w-[340px] overflow-hidden rounded-[16px] shadow-object", className)}
+      className={cn("w-full max-w-[340px] overflow-hidden rounded-2xl shadow-object", className)}
       style={{ backgroundColor: design.background, color: design.foreground }}
       aria-label={`Vista previa del pase de Apple Wallet de ${name}`}
     >
       <div className="flex items-center gap-2 px-3.5 pt-3 pb-2.5">
         <Mark className="size-7" cutout={design.background} style={{ color: design.label }} />
-        <span className="truncate text-[15px] font-medium tracking-tight">{card.company || "PassMe"}</span>
+        <span className="truncate text-body font-medium tracking-tight">{card.company || "PassMe"}</span>
       </div>
       {art("strip")}
       {fieldRow ? <div className="px-3.5 pt-3">{fieldRow}</div> : null}

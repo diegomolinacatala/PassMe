@@ -20,7 +20,7 @@ function initials(name: string): string {
 }
 
 const ITEM =
-  "flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-[0.95rem] text-ink transition-colors hover:bg-ink/[0.05] focus-visible:bg-ink/[0.05] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-signal";
+  "flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-body text-ink transition-colors hover:bg-ink/[0.05] focus-visible:bg-ink/[0.05] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-signal";
 
 /**
  * The owner's initials in the editor header, opening a small menu: their card,
@@ -71,7 +71,7 @@ export function AccountMenu({ name, slug, shareUrl }: AccountMenuProps) {
         aria-controls={panelId}
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          "grid size-11 place-items-center rounded-full border border-ink/15 bg-card font-mono text-[13px] font-medium tracking-wider text-ink transition-colors hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal",
+          "grid size-11 place-items-center rounded-full border border-ink/15 bg-card font-mono text-small font-medium tracking-wider text-ink transition-colors hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal",
           open && "border-ink bg-ink text-paper",
         )}
       >

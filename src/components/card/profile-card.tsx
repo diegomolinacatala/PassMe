@@ -73,7 +73,7 @@ export function ProfileCard({ card, preview = false, source = "direct", classNam
 
   return (
     <article
-      className={cn("relative overflow-hidden rounded-[28px] bg-card shadow-object", className)}
+      className={cn("relative overflow-hidden rounded-object bg-card shadow-object", className)}
       style={cardCssVars(design.background, design.detail)}
       aria-label={`Tarjeta de contacto de ${name}`}
     >
@@ -90,12 +90,12 @@ export function ProfileCard({ card, preview = false, source = "direct", classNam
           style={{ position: "absolute", right: 0, bottom: 0, zIndex: -1, maxWidth: "none" }}
         />
         <div className="flex items-center justify-between gap-3">
-          <span className="inline-flex items-center gap-1.5 font-mono text-[10px] tracking-[0.16em] text-[var(--card-label)] uppercase">
+          <span className="eyebrow inline-flex items-center gap-1.5 text-[var(--card-label)]">
             <Mark className="size-4" cutout="var(--card-bg)" />
             Tarjeta de contacto
           </span>
           {card.pronouns ? (
-            <span className="rounded-full border border-current/25 bg-[var(--card-bg)] px-2 py-0.5 font-mono text-[10px] tracking-wide">
+            <span className="rounded-full border border-current/25 bg-[var(--card-bg)] px-2 py-0.5 font-mono text-mark tracking-wide">
               {card.pronouns}
             </span>
           ) : null}
@@ -113,7 +113,7 @@ export function ProfileCard({ card, preview = false, source = "direct", classNam
                 name
               )}
             </h1>
-            {meta ? <p className="mt-2 text-[0.95rem] leading-snug opacity-90">{meta}</p> : null}
+            {meta ? <p className="mt-2 text-body leading-snug opacity-90">{meta}</p> : null}
           </div>
           <Avatar
             name={name}
@@ -133,14 +133,14 @@ export function ProfileCard({ card, preview = false, source = "direct", classNam
 
       <div className="px-5 pt-6 pb-6">
         {card.location ? (
-          <p className="flex items-center gap-1.5 px-1 font-mono text-[11px] tracking-wide text-muted uppercase">
+          <p className="eyebrow flex items-center gap-1.5 px-1">
             <MapPin className="size-3.5" aria-hidden />
             {card.location}
           </p>
         ) : null}
 
         {card.bio ? (
-          <p className="mt-3 px-1 text-[0.95rem] leading-relaxed whitespace-pre-line text-ink-soft">{card.bio}</p>
+          <p className="mt-3 px-1 text-body leading-relaxed whitespace-pre-line text-ink-soft">{card.bio}</p>
         ) : null}
 
         <div className="mt-5 grid grid-cols-[1fr_auto] gap-2">
@@ -169,10 +169,10 @@ export function ProfileCard({ card, preview = false, source = "direct", classNam
                     <LinkIcon kind={link.kind} size={19} />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block font-mono text-[10px] tracking-[0.14em] text-muted uppercase">
+                    <span className="eyebrow block">
                       {linkTitle(link)}
                     </span>
-                    <span className="block truncate text-[0.98rem]">{linkDisplay(link.kind, link.value)}</span>
+                    <span className="block truncate text-body">{linkDisplay(link.kind, link.value)}</span>
                   </span>
                   <ArrowUpRight
                     className="size-4 shrink-0 text-muted transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-ink"

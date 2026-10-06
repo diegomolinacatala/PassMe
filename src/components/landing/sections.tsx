@@ -27,7 +27,7 @@ export function ContactMarquee() {
   const items = [...CONTACT_KINDS, ...CONTACT_KINDS];
   return (
     <div className="relative overflow-hidden bg-ink py-4" aria-hidden="true">
-      <div className="flex w-max animate-marquee gap-8 font-mono text-[12px] tracking-[0.18em] text-paper/80 uppercase">
+      <div className="flex w-max animate-marquee gap-8 font-mono text-mark tracking-[0.18em] text-paper/80 uppercase">
         {items.map((item, i) => (
           <span key={`${item}-${i}`} className="flex items-center gap-8">
             {item}
@@ -73,7 +73,7 @@ export function HowItWorks({ googleWallet }: { googleWallet: boolean }) {
           </h2>
         </div>
 
-        <ol className="mt-16 grid gap-px overflow-hidden rounded-[28px] border hairline bg-ink/10 md:grid-cols-3">
+        <ol className="mt-16 grid gap-px overflow-hidden rounded-object border hairline bg-ink/10 md:grid-cols-3">
           {steps(googleWallet).map((step) => (
             <li key={step.n} className="group relative bg-paper p-8 transition-colors duration-500 hover:bg-card sm:p-10">
               <span className="font-display text-[5.5rem] leading-none text-muted transition-colors duration-500 group-hover:text-signal">
@@ -145,7 +145,7 @@ export function PrivacySection() {
         </div>
 
         <div className="lg:col-span-5 lg:col-start-8">
-          <div className="rounded-[28px] border border-paper/12 bg-paper/[0.04] p-3 sm:p-4" aria-label="Ejemplo de contactos visibles y ocultos">
+          <div className="rounded-object border border-paper/12 bg-paper/[0.04] p-3 sm:p-4" aria-label="Ejemplo de contactos visibles y ocultos">
             <p className="eyebrow px-3 pt-2 pb-4 text-paper/60">Tus datos de contacto</p>
             <ul className="space-y-2">
               {PRIVACY_ROWS.map((row) => (
@@ -159,7 +159,7 @@ export function PrivacySection() {
                     <LinkIcon kind={row.kind} size={17} />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className={`block font-mono text-[10px] tracking-[0.14em] uppercase ${row.visible ? "text-muted" : ""}`}>{row.label}</span>
+                    <span className={`eyebrow block ${row.visible ? "" : "text-inherit"}`}>{row.label}</span>
                     <span className={`block truncate text-sm ${row.visible ? "" : "line-through decoration-paper/30"}`}>
                       {row.value}
                     </span>
@@ -204,7 +204,7 @@ export function AlwaysUpdated({ card, googleWallet }: { card: PublicCard; google
             Edita tu cargo, tu foto, tus enlaces o el diseño entero y el pase se actualiza solo en todas las carteras
             donde esté. Nada de reimprimir, nada de volver a enviar.
           </p>
-          <p className="mt-8 inline-flex items-center gap-2 font-mono text-[12px] tracking-[0.12em] text-muted uppercase">
+          <p className="eyebrow mt-8 inline-flex items-center gap-2">
             <RefreshCw className="size-4 text-signal" aria-hidden />
             {googleWallet ? "Actualización automática en Apple y Google Wallet" : "Actualización automática en Apple Wallet"}
           </p>
@@ -229,7 +229,7 @@ export function AlwaysUpdated({ card, googleWallet }: { card: PublicCard; google
 export function FinalCta({ ctaHref, googleWallet }: { ctaHref: string; googleWallet: boolean }) {
   return (
     <section aria-labelledby="cta-title" className="px-5 pb-24 sm:px-8">
-      <div className="relative isolate mx-auto max-w-[1240px] overflow-hidden rounded-[36px] bg-glow px-6 py-20 text-center text-ink sm:px-12 sm:py-28">
+      <div className="relative isolate mx-auto max-w-[1240px] overflow-hidden rounded-object bg-glow px-6 py-20 text-center text-ink sm:px-12 sm:py-28">
         <BrandMotif
           color={BRAND.signal}
           pattern="persiana"

@@ -33,7 +33,7 @@ export function LegalPage({ title, intro, sections }: LegalPageProps) {
       <div className="mt-12 space-y-12">
         {sections.map((section, index) => (
           <section key={section.title} id={section.id} className="scroll-mt-8">
-            <p className="font-mono text-[11px] tracking-[0.16em] text-signal-deep">{String(index + 1).padStart(2, "0")}</p>
+            <p className="eyebrow text-signal-deep">{String(index + 1).padStart(2, "0")}</p>
             <h2 className="mt-1 font-display text-3xl leading-none">{section.title}</h2>
             <ul className="mt-4 space-y-3 leading-relaxed text-ink-soft">
               {section.body.map((paragraph, i) => (

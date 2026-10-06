@@ -1,10 +1,10 @@
 "use client";
 
-import { Download, LogOut, TriangleAlert } from "lucide-react";
+import { Download, LogOut, Trash2 } from "lucide-react";
 import { useState, useTransition } from "react";
 import { deleteAccountAction } from "@/app/dashboard/actions";
 import { Button } from "@/components/ui/button";
-import { INPUT_CLASSES } from "./fields";
+import { InlineError, inputClasses } from "@/components/ui/field";
 
 interface AccountPanelProps {
   email: string | null;
@@ -60,7 +60,7 @@ export function AccountPanel({ email, demo, hasContacts }: AccountPanelProps) {
             disabled={demo}
             className="inline-flex min-h-11 items-center gap-2 font-medium text-danger disabled:opacity-40"
           >
-            <TriangleAlert className="size-4" aria-hidden /> Borrar mi cuenta y mi tarjeta
+            <Trash2 className="size-4" aria-hidden /> Borrar mi cuenta y mi tarjeta
           </button>
         ) : (
           <div className="space-y-3">
@@ -86,12 +86,12 @@ export function AccountPanel({ email, demo, hasContacts }: AccountPanelProps) {
               onChange={(e) => setConfirmation(e.target.value)}
               aria-label="Escribe BORRAR para confirmar"
               autoComplete="off"
-              className={`${INPUT_CLASSES} h-10 font-mono`}
+              className={inputClasses({ size: "sm", className: "font-mono" })}
             />
             {error ? (
-              <p className="text-danger" role="alert">
+              <InlineError live>
                 {error}
-              </p>
+              </InlineError>
             ) : null}
             <div className="flex gap-2">
               <Button

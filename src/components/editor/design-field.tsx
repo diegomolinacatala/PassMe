@@ -3,6 +3,7 @@
 import { Check, Dices, Pipette, Undo2, WandSparkles } from "lucide-react";
 import { useId, useState, type CSSProperties, type ReactNode } from "react";
 import { initials } from "@/components/card/avatar";
+import { CHOICE_FOCUS, CHOICE_INPUT } from "@/components/ui/choice";
 import { containerUnit, CSS_FONTS, editorialLines, PassArt } from "@/components/card/pass-art";
 import { cardPalette, contrastRatio, parseHex, toHex } from "@/lib/card/colors";
 import {
@@ -129,20 +130,23 @@ function Group({ label, hint, children }: { label: string; hint?: string; childr
   );
 }
 
+/** One option of a group: an invisible native radio over the whole label (arrow keys, one Tab stop). */
+function Choice({ name, label, selected, onSelect, className, children }: { name: string; label: string; selected: boolean; onSelect: () => void; className?: string; children: ReactNode }) {
+  return (
+    <label className={cn("group relative flex min-w-0 flex-col text-left", CHOICE_FOCUS, className)}>
+      <input type="radio" name={name} checked={selected} onChange={onSelect} aria-label={label} className={CHOICE_INPUT} />
+      {children}
+    </label>
+  );
+}
+
 function ThemeSwatch({ theme, selected, onSelect }: { theme: CardTheme; selected: boolean; onSelect: () => void }) {
   const fg = toHex(cardPalette(theme.background).foreground);
   return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={selected}
-      aria-label={theme.name}
-      onClick={onSelect}
-      className="group flex min-w-0 flex-col items-stretch gap-1.5 text-left"
-    >
+    <Choice name="design-theme" label={theme.name} selected={selected} onSelect={onSelect} className="items-stretch gap-1.5 rounded-xl">
       <span
         className={cn(
-          "relative block aspect-[5/4] overflow-hidden rounded-xl shadow-[inset_0_0_0_1px_rgb(34_27_23/0.12)] transition-transform duration-300 ease-[var(--ease-spring)] group-hover:-translate-y-0.5",
+          "relative block aspect-[5/4] overflow-hidden rounded-xl shadow-hairline transition-transform duration-300 ease-[var(--ease-spring)] group-hover:-translate-y-0.5",
           selected && "ring-2 ring-ink ring-offset-2 ring-offset-card",
         )}
         style={{ backgroundColor: theme.background, color: fg }}
@@ -165,10 +169,10 @@ function ThemeSwatch({ theme, selected, onSelect }: { theme: CardTheme; selected
           </span>
         ) : null}
       </span>
-      <span className={cn("truncate font-mono text-[10px] tracking-[0.1em] uppercase", selected ? "text-ink" : "text-muted")}>
+      <span className={cn("eyebrow truncate", selected && "text-ink")} aria-hidden>
         {theme.name}
       </span>
-    </button>
+    </Choice>
   );
 }
 
@@ -184,17 +188,10 @@ interface MotifOptionProps {
 /** The owner's own card, drawn with this motif. */
 function MotifOption({ kind, selected, design, name, avatarUrl, onSelect }: MotifOptionProps) {
   return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={selected}
-      aria-label={PATTERN_LABELS[kind].name}
-      onClick={onSelect}
-      className="group flex min-w-0 flex-col gap-2 text-left"
-    >
+    <Choice name="design-motif" label={PATTERN_LABELS[kind].name} selected={selected} onSelect={onSelect} className="gap-2 rounded-xl">
       <span
         className={cn(
-          "block overflow-hidden rounded-xl shadow-[inset_0_0_0_1px_rgb(34_27_23/0.12)] transition-transform duration-300 ease-[var(--ease-spring)] group-hover:-translate-y-0.5",
+          "block overflow-hidden rounded-xl shadow-hairline transition-transform duration-300 ease-[var(--ease-spring)] group-hover:-translate-y-0.5",
           selected ? "ring-2 ring-ink ring-offset-2 ring-offset-card" : "opacity-90 group-hover:opacity-100",
         )}
         style={{ containerType: "inline-size" }}
@@ -213,11 +210,11 @@ function MotifOption({ kind, selected, design, name, avatarUrl, onSelect }: Moti
       </span>
       <span className="flex items-center gap-1.5">
         {selected ? <Check className="size-3.5 text-ink" aria-hidden /> : null}
-        <span className={cn("truncate font-mono text-[10px] tracking-[0.1em] uppercase", selected ? "text-ink" : "text-muted")}>
+        <span className={cn("eyebrow truncate", selected && "text-ink")} aria-hidden>
           {PATTERN_LABELS[kind].name}
         </span>
       </span>
-    </button>
+    </Choice>
   );
 }
 
@@ -243,7 +240,7 @@ function VariationControl({ seed, enabled, onChange }: VariationControlProps) {
             : "Este motivo es siempre igual: prueba Arco, Corriente o Persiana para tirar los dados."}
         </p>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
           disabled={!enabled || previous === undefined}
@@ -254,7 +251,7 @@ function VariationControl({ seed, enabled, onChange }: VariationControlProps) {
           }}
           aria-label="Volver a la variación anterior"
           title="Anterior"
-          className="grid size-10 place-items-center rounded-full border border-line-strong text-ink-soft transition-colors hover:border-ink hover:text-ink disabled:pointer-events-none disabled:opacity-40"
+          className="grid size-11 place-items-center rounded-full border border-field-border text-ink-soft transition-colors hover:border-ink hover:text-ink disabled:pointer-events-none disabled:opacity-40"
         >
           <Undo2 className="size-4" aria-hidden />
         </button>
@@ -265,7 +262,7 @@ function VariationControl({ seed, enabled, onChange }: VariationControlProps) {
             setHistory((h) => [...h.slice(-(MAX_SEED_HISTORY - 1)), seed]);
             onChange(randomPatternSeed());
           }}
-          className="inline-flex h-10 items-center gap-2 rounded-full border border-ink/80 px-4 text-sm font-medium text-ink transition-colors hover:bg-ink hover:text-paper disabled:pointer-events-none disabled:opacity-40"
+          className="inline-flex min-h-11 items-center gap-2 rounded-full border border-ink/80 px-4 text-sm font-medium text-ink transition-colors hover:bg-ink hover:text-paper disabled:pointer-events-none disabled:opacity-40"
         >
           <Dices className="size-4" aria-hidden />
           Otra variación
@@ -300,17 +297,10 @@ function TypefaceOption({ typeface, selected, design, name, onSelect }: Typeface
   const [first, rest] = editorialLines(name);
   const surname = rest.split(" ")[0] ?? "";
   return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={selected}
-      aria-label={TYPEFACE_LABELS[typeface].name}
-      onClick={onSelect}
-      className="group flex min-w-0 flex-col gap-1.5 text-left"
-    >
+    <Choice name="design-typeface" label={TYPEFACE_LABELS[typeface].name} selected={selected} onSelect={onSelect} className="gap-1.5 rounded-xl">
       <span
         className={cn(
-          "flex h-16 items-center overflow-hidden rounded-xl px-3 shadow-[inset_0_0_0_1px_rgb(34_27_23/0.12)] transition-transform duration-300 ease-[var(--ease-spring)] group-hover:-translate-y-0.5",
+          "flex h-16 items-center overflow-hidden rounded-xl px-3 shadow-hairline transition-transform duration-300 ease-[var(--ease-spring)] group-hover:-translate-y-0.5",
           selected && "ring-2 ring-ink ring-offset-2 ring-offset-card",
         )}
         style={{ backgroundColor: design.background, color: design.foreground }}
@@ -326,10 +316,10 @@ function TypefaceOption({ typeface, selected, design, name, onSelect }: Typeface
           )}
         </span>
       </span>
-      <span className={cn("truncate font-mono text-[10px] tracking-[0.1em] uppercase", selected ? "text-ink" : "text-muted")}>
+      <span className={cn("eyebrow truncate", selected && "text-ink")} aria-hidden>
         {TYPEFACE_LABELS[typeface].name}
       </span>
-    </button>
+    </Choice>
   );
 }
 
@@ -346,11 +336,11 @@ function InkPicker({ label, hex, onChange, isAuto, onAuto, warning }: InkPickerP
   const id = useId();
   const current = hex.toUpperCase();
   return (
-    <div className="rounded-2xl border border-line bg-card px-3 py-2.5">
-      <div className="flex items-center gap-3">
+    <div className="rounded-2xl border hairline bg-card px-3 py-2.5">
+      <div className="flex flex-wrap items-center gap-3">
         <label
           htmlFor={id}
-          className="relative grid size-10 shrink-0 cursor-pointer place-items-center rounded-full shadow-[inset_0_0_0_1px_rgb(34_27_23/0.15)] focus-within:ring-2 focus-within:ring-signal focus-within:ring-offset-2"
+          className="relative grid size-10 shrink-0 cursor-pointer place-items-center rounded-full shadow-hairline focus-within:ring-2 focus-within:ring-signal focus-within:ring-offset-2"
           style={{ backgroundColor: current, color: toHex(cardPalette(current).foreground) }}
         >
           <Pipette className="size-4" aria-hidden />
@@ -365,7 +355,7 @@ function InkPicker({ label, hex, onChange, isAuto, onAuto, warning }: InkPickerP
         </label>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-ink">{label}</p>
-          <p className="font-mono text-[11px] tracking-wide text-muted uppercase">{isAuto ? `Auto · ${current}` : current}</p>
+          <p className="eyebrow">{isAuto ? `Auto · ${current}` : current}</p>
         </div>
         {onAuto ? (
           <button
@@ -374,7 +364,7 @@ function InkPicker({ label, hex, onChange, isAuto, onAuto, warning }: InkPickerP
             aria-pressed={isAuto}
             title="Elegir el detalle automáticamente"
             className={cn(
-              "inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors",
+              "inline-flex min-h-11 items-center gap-1.5 rounded-full px-3.5 text-sm font-medium transition-colors sm:min-h-10",
               isAuto ? "bg-ink text-paper" : "border border-line-strong text-ink-soft hover:border-ink hover:text-ink",
             )}
           >

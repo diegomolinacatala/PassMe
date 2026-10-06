@@ -1,10 +1,13 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, CalendarClock, CircleCheck, LoaderCircle } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarClock, CircleCheck } from "lucide-react";
 import Link from "next/link";
 import { startTransition, useActionState, useEffect, useRef, useState, type FormEvent } from "react";
 import { submitMeetingAction, type MeetingRequestState } from "@/app/u/[slug]/meeting-actions";
 import { Button, buttonClasses } from "@/components/ui/button";
+import { Field, InlineError, inputClasses } from "@/components/ui/field";
+import { Notice } from "@/components/ui/notice";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { Turnstile } from "@/components/ui/turnstile";
 import { rememberDetails } from "@/lib/card/draft-storage";
 import { createPath, parseVia } from "@/lib/card/quick";
@@ -13,7 +16,7 @@ import { cn } from "@/lib/cn";
 import { firstName, formatDuration } from "@/lib/meetings/model";
 import { DEFAULT_DURATION, FORMAT_LABELS, MEETING_DURATIONS, MEETING_LIMITS, type MeetingDuration, type MeetingFormat } from "@/lib/meetings/schema";
 import { formatSlotShort, localTimeZone, timeZoneCity } from "@/lib/meetings/time";
-import { Field, MEETING_INPUT, Segmented } from "./form-bits";
+import { Segmented } from "./form-bits";
 import { FORMAT_ICONS } from "./shared";
 import { SlotPicker } from "./slot-picker";
 
@@ -61,14 +64,14 @@ function SentMessage({ owner, slug, source, state, slots, timeZone }: {
     rememberDetails({ fullName: details.name, email: details.email, phone: details.phone, company: details.company }, slug, via);
   }, [details, slug, via]);
   return (
-    <div role="status" className="animate-rise rounded-[24px] border hairline bg-card px-5 py-6 text-center">
+    <div role="status" className="animate-rise rounded-panel border hairline bg-card px-5 py-6 text-center">
       <CircleCheck className="mx-auto size-7 text-ok" aria-hidden />
       <p ref={heading} tabIndex={-1} className="mt-2 font-display text-2xl leading-tight outline-none">
         Propuesta enviada a <em className="text-signal">{owner}.</em>
       </p>
       <ul className="mt-3 flex flex-wrap justify-center gap-1.5">
         {slots.map((iso) => (
-          <li key={iso} className="rounded-full bg-paper-deep px-3 py-1 font-mono text-[12px] text-ink-soft tabular-nums">
+          <li key={iso} className="rounded-full bg-paper-deep px-3 py-1 font-mono text-mark text-ink-soft tabular-nums">
             {formatSlotShort(iso, timeZone)}
           </li>
         ))}
@@ -97,7 +100,7 @@ function CollapsedCta({ owner, onOpen }: { owner: string; onOpen: () => void }) 
     <button
       type="button"
       onClick={onOpen}
-      className="group flex w-full items-center gap-4 rounded-[24px] border border-ink/80 bg-card px-5 py-4 text-left shadow-soft transition-[background-color,transform] duration-300 hover:bg-white active:translate-y-px"
+      className="group flex w-full items-center gap-4 rounded-panel border border-ink/80 bg-card px-5 py-4 text-left shadow-soft transition-[background-color,transform] duration-300 hover:bg-white active:translate-y-px"
     >
       <span className="grid size-11 shrink-0 place-items-center rounded-full bg-ink text-paper transition-transform duration-500 group-hover:-rotate-6">
         <CalendarClock className="size-5" aria-hidden />
@@ -186,7 +189,7 @@ function StepWhen({ owner, when, onChange, timeZone, now, errors, onNext }: Step
               onChange={(e) => onChange({ location: e.target.value })}
               maxLength={MEETING_LIMITS.location}
               placeholder="Café Central, Madrid"
-              className={cn(MEETING_INPUT, "h-11")}
+              className={inputClasses()}
             />
           )}
         </Field>
@@ -236,7 +239,7 @@ function StepWho({ owner, ownerFullName, when, who, onChange, timeZone, errors, 
 
       <div className="flex items-start justify-between gap-3 rounded-2xl bg-paper-deep/70 px-3.5 py-3">
         <div className="min-w-0 text-sm">
-          <p className="flex flex-wrap gap-x-2 gap-y-1 font-mono text-[12px] text-ink tabular-nums">
+          <p className="flex flex-wrap gap-x-2 gap-y-1 font-mono text-mark text-ink tabular-nums">
             {when.slots.map((iso) => (
               <span key={iso}>{formatSlotShort(iso, timeZone)}</span>
             ))}
@@ -253,16 +256,16 @@ function StepWho({ owner, ownerFullName, when, who, onChange, timeZone, errors, 
           className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-full px-2.5 text-sm font-medium text-signal-deep hover:bg-signal-wash/60"
         >
           <ArrowLeft className="size-3.5" aria-hidden />
-          Cambiar
+          Cambiar horas
         </button>
       </div>
 
       <Field label="Nombre" error={errors.name}>
-        {(props) => <input {...props} {...text("name")} required maxLength={MEETING_LIMITS.name} autoComplete="name" className={cn(MEETING_INPUT, "h-11")} />}
+        {(props) => <input {...props} {...text("name")} required maxLength={MEETING_LIMITS.name} autoComplete="name" className={inputClasses()} />}
       </Field>
       <Field label="Email" error={errors.email} hint="Aquí te llegará la invitación cuando confirme.">
         {(props) => (
-          <input {...props} {...text("email")} type="email" inputMode="email" required maxLength={MEETING_LIMITS.email} autoComplete="email" className={cn(MEETING_INPUT, "h-11")} />
+          <input {...props} {...text("email")} type="email" inputMode="email" required maxLength={MEETING_LIMITS.email} autoComplete="email" className={inputClasses()} />
         )}
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -276,17 +279,17 @@ function StepWho({ owner, ownerFullName, when, who, onChange, timeZone, errors, 
               required={when.format === "phone"}
               maxLength={MEETING_LIMITS.phone}
               autoComplete="tel"
-              className={cn(MEETING_INPUT, "h-11")}
+              className={inputClasses()}
             />
           )}
         </Field>
         <Field label="Empresa" optional error={errors.company}>
-          {(props) => <input {...props} {...text("company")} maxLength={MEETING_LIMITS.company} autoComplete="organization" className={cn(MEETING_INPUT, "h-11")} />}
+          {(props) => <input {...props} {...text("company")} maxLength={MEETING_LIMITS.company} autoComplete="organization" className={inputClasses()} />}
         </Field>
       </div>
       <Field label="¿De qué queréis hablar?" optional error={errors.topic}>
         {(props) => (
-          <input {...props} {...text("topic")} maxLength={MEETING_LIMITS.topic} placeholder="Nos conocimos en… / Me gustaría hablar de…" className={cn(MEETING_INPUT, "h-11")} />
+          <input {...props} {...text("topic")} maxLength={MEETING_LIMITS.topic} placeholder="Nos conocimos en… / Me gustaría hablar de…" className={inputClasses()} />
         )}
       </Field>
 
@@ -315,7 +318,7 @@ function StepWho({ owner, ownerFullName, when, who, onChange, timeZone, errors, 
           </a>
         </span>
       </label>
-      {errors.consent ? <p className="-mt-2 text-xs text-danger">{errors.consent}</p> : null}
+      {errors.consent ? <InlineError className="-mt-2">{errors.consent}</InlineError> : null}
     </div>
   );
 }
@@ -371,71 +374,74 @@ export function MeetingRequest({ slug, ownerName, source, captchaSiteKey }: Meet
   }
 
   return (
-    <form ref={form} action={submit} onSubmit={onSubmit} className="relative animate-rise rounded-[24px] border hairline bg-card px-5 py-5" noValidate>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <p className="eyebrow">Agendar reunión</p>
-        <p className="font-mono text-[11px] tracking-[0.12em] text-muted" aria-hidden>
-          {step}/2
-        </p>
-      </div>
+    <section aria-labelledby="agendar-reunion">
+      <form ref={form} action={submit} onSubmit={onSubmit} className="relative animate-rise rounded-panel border hairline bg-card px-5 py-5" noValidate>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 id="agendar-reunion" className="eyebrow">
+            Agendar reunión con {owner}
+          </h2>
+          <p className="eyebrow" aria-hidden>
+            {step}/2
+          </p>
+        </div>
 
-      {/* Step 1's choices travel with the form whichever step is on screen. */}
-      {when.slots.map((iso) => (
-        <input key={iso} type="hidden" name="slot" value={iso} />
-      ))}
-      <input type="hidden" name="duration" value={when.duration} />
-      <input type="hidden" name="format" value={when.format} />
-      <input type="hidden" name="location" value={when.format === "in_person" ? when.location : ""} />
-      <input type="hidden" name="timeZone" value={open.timeZone} />
+        {/* Step 1's choices travel with the form whichever step is on screen. */}
+        {when.slots.map((iso) => (
+          <input key={iso} type="hidden" name="slot" value={iso} />
+        ))}
+        <input type="hidden" name="duration" value={when.duration} />
+        <input type="hidden" name="format" value={when.format} />
+        <input type="hidden" name="location" value={when.format === "in_person" ? when.location : ""} />
+        <input type="hidden" name="timeZone" value={open.timeZone} />
 
-      {step === 1 ? (
-        <StepWhen
-          owner={owner}
-          when={when}
-          onChange={(patch) => {
-            setWhen((prev) => ({ ...prev, ...patch }));
-            touch(Object.keys(patch));
-            if (patch.slots?.length) setStepError(null);
-          }}
-          timeZone={open.timeZone}
-          now={open.now}
-          errors={errors}
-          onNext={() => {
-            if (when.slots.length === 0) return setStepError("Elige al menos una hora.");
-            setStepError(null);
-            setStep(2);
-          }}
-        />
-      ) : (
-        <>
-          <StepWho
+        {step === 1 ? (
+          <StepWhen
             owner={owner}
-            ownerFullName={ownerName}
             when={when}
-            who={who}
             onChange={(patch) => {
-              setWho((prev) => ({ ...prev, ...patch }));
+              setWhen((prev) => ({ ...prev, ...patch }));
               touch(Object.keys(patch));
+              if (patch.slots?.length) setStepError(null);
             }}
             timeZone={open.timeZone}
+            now={open.now}
             errors={errors}
-            onBack={() => setStep(1)}
+            onNext={() => {
+              if (when.slots.length === 0) return setStepError("Elige al menos una hora.");
+              setStepError(null);
+              setStep(2);
+            }}
           />
-          <div className="mt-4 space-y-4">
-            {captchaSiteKey ? <Turnstile siteKey={captchaSiteKey} action="meeting" resetKey={state} /> : null}
-            {state.status === "error" ? (
-              <p role="alert" data-form-error tabIndex={-1} className="text-sm text-danger outline-none">
-                {state.message}
-              </p>
-            ) : null}
-            <Button type="submit" variant="signal" size="lg" className="w-full" disabled={pending} aria-busy={pending}>
-              {pending ? <LoaderCircle className="size-5 animate-spin" aria-hidden /> : <CalendarClock className="size-5" aria-hidden />}
-              {pending ? "Enviando…" : "Enviar propuesta"}
-            </Button>
-            <p className="text-center text-xs text-muted">Tus datos solo los ve {owner}. No te apuntamos a nada.</p>
-          </div>
-        </>
-      )}
-    </form>
+        ) : (
+          <>
+            <StepWho
+              owner={owner}
+              ownerFullName={ownerName}
+              when={when}
+              who={who}
+              onChange={(patch) => {
+                setWho((prev) => ({ ...prev, ...patch }));
+                touch(Object.keys(patch));
+              }}
+              timeZone={open.timeZone}
+              errors={errors}
+              onBack={() => setStep(1)}
+            />
+            <div className="mt-4 space-y-4">
+              {captchaSiteKey ? <Turnstile siteKey={captchaSiteKey} action="meeting" resetKey={state} /> : null}
+              {state.status === "error" ? (
+                <div data-form-error tabIndex={-1} className="outline-none">
+                  <Notice tone="error">{state.message}</Notice>
+                </div>
+              ) : null}
+              <SubmitButton pending={pending} pendingLabel="Enviando…" icon={<CalendarClock className="size-5" aria-hidden />}>
+                Enviar propuesta
+              </SubmitButton>
+              <p className="text-center text-xs text-muted">Tus datos solo los ve {owner}. No te apuntamos a nada.</p>
+            </div>
+          </>
+        )}
+      </form>
+    </section>
   );
 }

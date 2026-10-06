@@ -3,6 +3,7 @@
 import { Check, Share } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { buttonClasses } from "@/components/ui/button";
+import { NewTabHint } from "@/components/ui/new-tab-hint";
 import { announce } from "@/lib/announce";
 
 type TrackKind = "view" | "link_click";
@@ -63,6 +64,7 @@ export function TrackedLink({ href, slug, linkId, className, children }: Tracked
       }}
     >
       {children}
+      {isHttp ? <NewTabHint /> : null}
     </a>
   );
 }

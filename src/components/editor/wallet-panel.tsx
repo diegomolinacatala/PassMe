@@ -7,6 +7,7 @@ import { QrCode } from "@/components/card/qr-code";
 import { ShareLinkButton } from "@/components/ui/share-link-button";
 import { AddToWalletButton, GoogleWalletSoon, passHref, QrShortcutButton } from "@/components/wallet/add-to-wallet-button";
 import { phoneWalletAction, type Platform } from "@/lib/platform";
+import { InlineError } from "@/components/ui/field";
 import { PrintQrDialog } from "./print-qr-dialog";
 
 export interface WalletAvailability {
@@ -82,15 +83,15 @@ function Handoff({ blocked }: { blocked: boolean }) {
             {pending ? <LoaderCircle className="size-5 animate-spin" aria-hidden /> : <Smartphone className="size-5" aria-hidden />}
           </span>
           <span className="flex-1">
-            <span className="block text-[0.95rem] font-medium">¿Estás en el ordenador?</span>
+            <span className="block text-body font-medium">¿Estás en el ordenador?</span>
             <span className="block text-sm text-muted">Genera un QR, escanéalo con tu móvil y añade el pase desde ahí.</span>
           </span>
         </button>
       )}
       {error ? (
-        <p className="mt-2 text-sm text-danger" role="alert">
+        <InlineError live className="mt-2">
           {error}
-        </p>
+        </InlineError>
       ) : null}
     </div>
   );

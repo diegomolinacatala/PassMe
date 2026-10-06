@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 import { Avatar } from "@/components/card/avatar";
 import { AVATAR_SIZE_PX, newAvatarPath } from "@/lib/card/avatar";
 import { AVATAR_BUCKET } from "@/lib/env";
+import { InlineError } from "@/components/ui/field";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 
 const MAX_INPUT_BYTES = 15 * 1024 * 1024;
@@ -115,9 +116,9 @@ export function AvatarField({ userId, name, url, demo, onChange }: AvatarFieldPr
         </div>
         <p className="text-xs text-muted">Cuadrada, se recorta sola. Aparece en el pase y al guardar tu contacto.</p>
         {error ? (
-          <p className="text-sm text-danger" role="alert">
+          <InlineError live>
             {error}
-          </p>
+          </InlineError>
         ) : null}
       </div>
       <input

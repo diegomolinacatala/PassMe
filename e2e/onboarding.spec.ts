@@ -109,7 +109,7 @@ test("login: the code screen shows up, can change the email and signs in", async
   await send.click();
   await expect(page.getByText("¡Código enviado!")).toBeVisible();
 
-  await page.getByRole("button", { name: "Cambiar" }).click();
+  await page.getByRole("button", { name: "Cambiar email" }).click();
   await expect(page.getByLabel("Tu email")).toHaveValue("alex@example.com");
   await page.getByLabel("Tu email").fill("otro@example.com");
   await send.click();

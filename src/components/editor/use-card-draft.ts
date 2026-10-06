@@ -114,6 +114,7 @@ type Action =
   | { type: "addLink"; kind: LinkKind; id: string }
   | { type: "updateLink"; id: string; patch: Partial<Omit<CardLink, "id">> }
   | { type: "removeLink"; id: string }
+  | { type: "restoreLink"; link: CardLink; index: number }
   | { type: "moveLink"; id: string; direction: -1 | 1 }
   | { type: "reset"; draft: CardDraft };
 
@@ -150,6 +151,12 @@ function reducer(state: State, action: Action): State {
       };
     case "removeLink":
       return { ...state, draft: { ...draft, links: draft.links.filter((l) => l.id !== action.id) } };
+    case "restoreLink": {
+      if (draft.links.length >= MAX_LINKS || draft.links.some((l) => l.id === action.link.id)) return state;
+      const links = [...draft.links];
+      links.splice(Math.min(Math.max(action.index, 0), links.length), 0, action.link);
+      return { ...state, draft: { ...draft, links } };
+    }
     case "moveLink": {
       const index = draft.links.findIndex((l) => l.id === action.id);
       const target = index + action.direction;
@@ -188,6 +195,7 @@ export function useCardDraft(initial: CardDraft) {
       },
       updateLink: (id: string, patch: Partial<Omit<CardLink, "id">>) => dispatch({ type: "updateLink", id, patch }),
       removeLink: (id: string) => dispatch({ type: "removeLink", id }),
+      restoreLink: (link: CardLink, index: number) => dispatch({ type: "restoreLink", link, index }),
       moveLink: (id: string, direction: -1 | 1) => dispatch({ type: "moveLink", id, direction }),
       markSaved: (draft: CardDraft) => dispatch({ type: "reset", draft }),
     }),

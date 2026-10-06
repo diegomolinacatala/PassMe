@@ -26,6 +26,8 @@
   --color-ok: #1f7a4d;
   --color-danger: #b42318;
   --color-danger-wash: #fde8e6;
+  /* Borders of form controls: ≥ 3:1 on card, paper and paper-deep (WCAG 1.4.11). Checked in tests/design-tokens.test.ts. */
+  --color-field-border: #8a7f6e;
 
   --font-display: var(--font-instrument-serif), "Iowan Old Style", Georgia, serif;
   --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
@@ -34,12 +36,31 @@
   --text-hero: clamp(3.1rem, 1.4rem + 6.4vw, 7.25rem);
   --text-display: clamp(2.4rem, 1.4rem + 3.6vw, 4.5rem);
   --text-title: clamp(1.75rem, 1.3rem + 1.6vw, 2.6rem);
+  /* Text scale in rem, so it follows the reader's font size. mark: mono caps labels (.eyebrow), never under 12 px. */
+  --text-mark: max(0.75rem, 12px);
+  --text-mark--line-height: 1.4;
+  --text-small: 0.875rem;
+  --text-small--line-height: 1.45;
+  --text-body: 1rem;
+  --text-body--line-height: 1.5;
+  --text-lead: 1.125rem;
+  --text-lead--line-height: 1.55;
 
+  /* Radii: control (fields, chips), panel (forms, sections), object (cards, dark blocks), pass. */
+  --radius-control: 12px;
+  --radius-panel: 24px;
+  --radius-object: 28px;
   --radius-pass: 22px;
   --shadow-object: 0 1px 0 rgb(255 255 255 / 0.35) inset, 0 30px 60px -28px rgb(34 27 23 / 0.55),
     0 12px 24px -12px rgb(34 27 23 / 0.25);
   --shadow-soft: 0 1px 2px rgb(34 27 23 / 0.06), 0 8px 24px -12px rgb(34 27 23 / 0.18);
   --shadow-press: 0 1px 0 rgb(34 27 23 / 0.9);
+  --shadow-press-ink: 0 1px 0 rgb(255 255 255 / 0.12) inset, 0 6px 16px -8px rgb(34 27 23 / 0.6);
+  --shadow-press-signal: 0 1px 0 rgb(255 255 255 / 0.25) inset, 0 8px 20px -10px rgb(194 78 28 / 0.7);
+  --shadow-focus-ring: 0 0 0 2px var(--color-card), 0 0 0 4px var(--color-signal);
+  /* A 1 px inner edge for swatches and previews, so light colors don't melt into the paper. */
+  --shadow-hairline: inset 0 0 0 1px rgb(34 27 23 / 0.14);
+  --shadow-inset: inset 0 2px 12px rgb(34 27 23 / 0.08);
 
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -143,7 +164,7 @@
   /* Small uppercase mono labels — the "printer's marks" of the system. */
   .eyebrow {
     font-family: var(--font-mono);
-    font-size: 0.72rem;
+    font-size: var(--text-mark);
     letter-spacing: 0.14em;
     text-transform: uppercase;
     color: var(--color-muted);

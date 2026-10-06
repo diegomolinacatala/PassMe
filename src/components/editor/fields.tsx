@@ -1,10 +1,8 @@
 "use client";
 
 import { useId, type ReactNode } from "react";
+import { Field, inputClasses } from "@/components/ui/field";
 import { cn } from "@/lib/cn";
-
-export const INPUT_CLASSES =
-  "w-full rounded-xl border border-line bg-card px-3.5 text-[0.95rem] text-ink placeholder:text-muted/60 outline-none transition-[border-color,box-shadow] duration-200 hover:border-line-strong focus:border-ink focus:shadow-[0_0_0_4px_rgb(20_20_20/0.06)] aria-[invalid=true]:border-danger aria-[invalid=true]:focus:shadow-[0_0_0_4px_rgb(180_35_24/0.1)]";
 
 interface SectionProps {
   number: string;
@@ -18,10 +16,10 @@ interface SectionProps {
 export function Section({ number, title, description, children, aside }: SectionProps) {
   const id = useId();
   return (
-    <section aria-labelledby={id} className="rounded-[26px] border hairline bg-card/70 p-5 shadow-[0_1px_0_rgb(255_255_255/0.6)_inset] sm:p-7">
+    <section aria-labelledby={id} className="rounded-panel border hairline bg-card/70 p-5 sm:p-7">
       <header className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <p className="font-mono text-[11px] tracking-[0.16em] text-signal-deep">{number}</p>
+          <p className="eyebrow text-signal-deep">{number}</p>
           <h2 id={id} className="mt-1 font-display text-[1.9rem] leading-none tracking-tight">
             {title}
           </h2>
@@ -48,6 +46,7 @@ interface TextFieldProps {
   prefix?: string;
   className?: string;
   required?: boolean;
+  optional?: boolean;
 }
 
 export function TextField({
@@ -64,67 +63,54 @@ export function TextField({
   prefix,
   className,
   required,
+  optional,
 }: TextFieldProps) {
-  const id = useId();
-  const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined;
   const nearLimit = value.length > maxLength * 0.8;
+  const counter = (
+    <span className={cn("font-mono text-mark tabular-nums", nearLimit ? "text-signal-deep" : "text-muted")} aria-hidden="true">
+      {value.length}/{maxLength}
+    </span>
+  );
 
   return (
-    <div className={className}>
-      <div className="mb-1.5 flex items-baseline justify-between gap-2">
-        <label htmlFor={id} className="text-sm font-medium text-ink-soft">
-          {label}
-          {required ? <span className="text-signal-deep"> *</span> : null}
-        </label>
-        <span className={cn("font-mono text-[10px] tabular-nums", nearLimit ? "text-signal-deep" : "text-muted/70")} aria-hidden="true">
-          {value.length}/{maxLength}
-        </span>
-      </div>
-      {multiline ? (
-        <textarea
-          id={id}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onBlur={onBlur}
-          maxLength={maxLength}
-          placeholder={placeholder}
-          rows={3}
-          aria-invalid={Boolean(error)}
-          aria-describedby={describedBy}
-          className={cn(INPUT_CLASSES, "min-h-24 resize-y py-2.5 leading-relaxed")}
-        />
-      ) : (
-        <div className="relative">
-          {prefix ? (
-            <span className="pointer-events-none absolute inset-y-0 left-3.5 flex items-center font-mono text-sm text-muted">
-              {prefix}
-            </span>
-          ) : null}
-          <input
-            id={id}
+    // Errors show on blur, so they're announced as they appear.
+    <Field label={label} optional={optional} hint={hint} error={error} liveError aside={counter} className={className}>
+      {(props) =>
+        multiline ? (
+          <textarea
+            {...props}
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onBlur={onBlur}
             maxLength={maxLength}
             placeholder={placeholder}
-            autoComplete={autoComplete}
-            aria-invalid={Boolean(error)}
-            aria-describedby={describedBy}
-            className={cn(INPUT_CLASSES, "h-11")}
-            style={prefix ? { paddingLeft: `calc(0.875rem + ${prefix.length}ch)` } : undefined}
+            required={required}
+            rows={3}
+            className={inputClasses({ size: "multiline" })}
           />
-        </div>
-      )}
-      {error ? (
-        <p id={`${id}-error`} className="mt-1.5 text-sm text-danger" role="alert">
-          {error}
-        </p>
-      ) : hint ? (
-        <p id={`${id}-hint`} className="mt-1.5 text-xs text-muted">
-          {hint}
-        </p>
-      ) : null}
-    </div>
+        ) : (
+          <div className="relative">
+            {prefix ? (
+              <span className="pointer-events-none absolute inset-y-0 left-3.5 flex items-center font-mono text-sm text-muted">
+                {prefix}
+              </span>
+            ) : null}
+            <input
+              {...props}
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              onBlur={onBlur}
+              maxLength={maxLength}
+              placeholder={placeholder}
+              autoComplete={autoComplete}
+              required={required}
+              className={inputClasses()}
+              style={prefix ? { paddingLeft: `calc(0.875rem + ${prefix.length}ch)` } : undefined}
+            />
+          </div>
+        )
+      }
+    </Field>
   );
 }
 

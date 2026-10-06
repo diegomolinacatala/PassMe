@@ -1,9 +1,11 @@
 "use client";
 
-import { CircleCheck, LoaderCircle, Send } from "lucide-react";
+import { CircleCheck, Send } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { sendMyCardAction } from "@/app/dashboard/actions";
 import { buttonClasses } from "@/components/ui/button";
+import { Notice } from "@/components/ui/notice";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { ShareLinkButton } from "@/components/ui/share-link-button";
 import type { VisitSource } from "@/lib/env";
 
@@ -31,7 +33,7 @@ function Sent({ firstName, demo }: { firstName: string; demo: boolean }) {
   useEffect(() => heading.current?.focus(), []);
   return (
     <div role="status" className="flex items-start gap-3 rounded-2xl bg-paper/10 px-4 py-3.5">
-      <CircleCheck className="mt-0.5 size-5 shrink-0 text-glow" aria-hidden />
+      <CircleCheck className="mt-0.5 size-5 shrink-0 text-paper" aria-hidden />
       <div>
         <p ref={heading} tabIndex={-1} className="font-medium outline-none">
           {firstName} ya tiene tu tarjeta.
@@ -83,23 +85,23 @@ export function WelcomeSendCard({ referrer, via, summary, shareUrl, demo }: Welc
         />
       ) : (
         <>
-          <button
+          <SubmitButton
             type="button"
             onClick={send}
-            disabled={pending}
-            aria-busy={pending}
-            className={buttonClasses({ variant: "signal", size: "lg", className: "w-full px-5" })}
+            pending={pending}
+            pendingLabel="Mandándosela…"
+            icon={<Send className="size-5" aria-hidden />}
+            className="w-full px-5"
           >
-            {pending ? <LoaderCircle className="size-5 animate-spin" aria-hidden /> : <Send className="size-5" aria-hidden />}
-            {pending ? "Mandándosela…" : `Mandarle mi tarjeta a ${firstName}`}
-          </button>
+            {`Mandarle mi tarjeta a ${firstName}`}
+          </SubmitButton>
           {summary ? <p className="mt-2 text-center text-sm text-paper/70">{summary}</p> : null}
         </>
       )}
       {error ? (
-        <p role="alert" className="mt-2 text-sm text-paper">
+        <Notice tone="error" onDark className="mt-2">
           {error}
-        </p>
+        </Notice>
       ) : null}
     </div>
   );

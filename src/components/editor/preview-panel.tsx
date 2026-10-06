@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useRef, useState, type KeyboardEvent } from "react";
 import { ProfileCard } from "@/components/card/profile-card";
 import { WalletPass } from "@/components/card/wallet-pass";
 import type { PublicCard } from "@/lib/card/types";
@@ -17,18 +17,39 @@ type TabId = (typeof TABS)[number]["id"];
 export function PreviewPanel({ card }: { card: PublicCard }) {
   const [tab, setTab] = useState<TabId>("apple");
   const id = useId();
+  const buttons = useRef<Array<HTMLButtonElement | null>>([]);
+
+  // ARIA tabs: one Tab stop (the selected tab); arrows, Home and End move and select.
+  function onKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
+    const last = TABS.length - 1;
+    const target =
+      event.key === "ArrowRight" ? (index === last ? 0 : index + 1)
+      : event.key === "ArrowLeft" ? (index === 0 ? last : index - 1)
+      : event.key === "Home" ? 0
+      : event.key === "End" ? last
+      : null;
+    if (target === null) return;
+    event.preventDefault();
+    setTab(TABS[target]!.id);
+    buttons.current[target]?.focus();
+  }
 
   return (
     <div className="min-w-0">
       <div role="tablist" aria-label="Vista previa" className="flex min-w-0 rounded-full border hairline bg-paper-deep/70 p-1">
-        {TABS.map((t) => (
+        {TABS.map((t, index) => (
           <button
             key={t.id}
+            ref={(el) => {
+              buttons.current[index] = el;
+            }}
             type="button"
             role="tab"
             id={`${id}-tab-${t.id}`}
             aria-selected={tab === t.id}
             aria-controls={`${id}-panel`}
+            tabIndex={tab === t.id ? 0 : -1}
+            onKeyDown={(event) => onKeyDown(event, index)}
             // The full name even when the phone shows the short one ("Google" → "Google Wallet").
             aria-label={t.label}
             onClick={() => setTab(t.id)}
@@ -47,7 +68,7 @@ export function PreviewPanel({ card }: { card: PublicCard }) {
         id={`${id}-panel`}
         role="tabpanel"
         aria-labelledby={`${id}-tab-${tab}`}
-        className="relative mt-5 flex min-h-[460px] min-w-0 justify-center overflow-hidden rounded-[28px] bg-paper-deep px-3 py-8 shadow-[inset_0_2px_12px_rgb(34_27_23/0.08)] sm:px-4"
+        className="relative mt-5 flex min-h-[460px] min-w-0 justify-center overflow-hidden rounded-object bg-paper-deep px-3 py-8 shadow-inset sm:px-4"
       >
         {tab === "web" ? (
           <div className="w-full max-w-[360px] min-w-0 origin-top scale-[0.94]">

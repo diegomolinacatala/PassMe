@@ -52,8 +52,7 @@ export function CodeInput({
               key={i}
               className={cn(
                 "relative grid h-14 place-items-center rounded-xl border bg-card font-mono text-2xl font-medium text-ink transition-[border-color,box-shadow,transform] duration-200 sm:h-15",
-                invalid ? "border-danger" : isActive ? "border-ink shadow-[0_0_0_4px_rgb(34_27_23/0.07)]" : "border-line",
-                digit && !invalid && "border-line-strong",
+                invalid ? "border-danger" : isActive ? "border-ink shadow-focus-ring" : digit ? "border-ink-soft" : "border-field-border",
                 // A small gap in the middle makes 8 digits easy to read and compare (1234 5678).
                 length === 8 && i === 4 && "ml-1.5 sm:ml-2.5",
               )}

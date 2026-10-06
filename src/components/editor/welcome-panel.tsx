@@ -1,10 +1,11 @@
 "use client";
 
 import { ArrowUpRight, LoaderCircle, Smartphone } from "lucide-react";
-import { useState, useTransition } from "react";
+import { createContext, use, useState, useTransition } from "react";
 import { createHandoffLinkAction } from "@/app/dashboard/actions";
 import { QrCode } from "@/components/card/qr-code";
 import { buttonClasses } from "@/components/ui/button";
+import { Notice } from "@/components/ui/notice";
 import { ShareLinkButton } from "@/components/ui/share-link-button";
 import { AddToWalletButton, passHref, QrShortcutButton } from "@/components/wallet/add-to-wallet-button";
 import { cn } from "@/lib/cn";
@@ -40,9 +41,16 @@ const QUIET_LINK =
  * the QR second. Then this phone's one wallet button. A single way out:
  * "Personalizar mi tarjeta".
  */
+/**
+ * Lets the editor take over when the welcome closes: its title goes back to
+ * being the page's H1 and gets the focus.
+ */
+export const WelcomeContext = createContext<{ onDismiss: () => void } | null>(null);
+
 export function WelcomePanel(props: WelcomePanelProps) {
   const { slug, fullName, qrUrl, shareUrl, referrer, via, sendSummary, wallet, platform, demo } = props;
   const [open, setOpen] = useState(true);
+  const context = use(WelcomeContext);
   const [handoff, setHandoff] = useState<string | null>(null);
   const [handoffError, setHandoffError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -67,7 +75,8 @@ export function WelcomePanel(props: WelcomePanelProps) {
     // Drop ?nueva=1 so a reload doesn't bring the welcome back.
     window.history.replaceState(null, "", "/dashboard");
     // The panel is gone: keep the keyboard (and screen reader) in the editor, not on <body>.
-    document.getElementById("editor-title")?.focus();
+    if (context) context.onDismiss();
+    else document.getElementById("editor-title")?.focus();
   }
 
   function openOnPhone() {
@@ -89,16 +98,16 @@ export function WelcomePanel(props: WelcomePanelProps) {
     <section
       aria-labelledby="welcome-title"
       className={cn(
-        "relative mb-10 grid animate-rise overflow-hidden rounded-[30px] bg-ink px-5 py-7 text-paper shadow-object sm:px-10 sm:py-10",
+        "relative mb-10 grid animate-rise overflow-hidden rounded-object bg-ink px-5 py-7 text-paper shadow-object sm:px-10 sm:py-10",
         "[grid-template-areas:'title'_'send'_'qr'_'wallet'_'text'_'actions'] md:grid-cols-[auto_minmax(0,1fr)] md:gap-x-12",
         "md:[grid-template-areas:'qr_title'_'qr_send'_'qr_wallet'_'qr_text'_'qr_actions'] md:[grid-template-rows:repeat(4,auto)_1fr]",
       )}
     >
       <div className="[grid-area:title]">
         <p className="eyebrow text-paper/60">Tarjeta creada</p>
-        <h2 id="welcome-title" className="mt-2 font-display text-[2.2rem] leading-[0.95] tracking-tight sm:text-5xl">
+        <h1 id="welcome-title" className="mt-2 font-display text-[2.2rem] leading-[0.95] tracking-tight sm:text-5xl">
           Ya tienes tu tarjeta, <em className="text-glow">{firstName}.</em>
-        </h2>
+        </h1>
       </div>
 
       {sendFirst && referrer ? (
@@ -109,13 +118,13 @@ export function WelcomePanel(props: WelcomePanelProps) {
 
       <figure className="mx-auto mt-6 w-fit [grid-area:qr] md:mt-0 md:self-center">
         {handoff ? (
-          <div className="mx-auto w-fit rounded-[22px] bg-white p-3">
+          <div className="mx-auto w-fit rounded-pass bg-white p-3">
             <QrCode value={handoff} label="QR para añadir el pase desde tu móvil" className="size-56 text-ink sm:size-60" quietZone={1} />
           </div>
         ) : (
           <a
             href="/dashboard/qr"
-            className="mx-auto block w-fit rounded-[22px] bg-white p-3 shadow-[0_20px_40px_-20px_rgb(0_0_0/0.6)] transition-transform duration-200 active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-glow"
+            className="mx-auto block w-fit rounded-pass bg-white p-3 shadow-object transition-transform duration-200 active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-glow"
           >
             <QrCode
               value={qrUrl}
@@ -125,7 +134,7 @@ export function WelcomePanel(props: WelcomePanelProps) {
             />
           </a>
         )}
-        <figcaption className="mt-3 text-center font-mono text-[11px] tracking-[0.14em] text-glow uppercase">{qrCaption}</figcaption>
+        <figcaption className="eyebrow mt-3 text-center text-glow">{qrCaption}</figcaption>
       </figure>
 
       {walletButtons.length > 0 || phoneWallet === "qr" ? (
@@ -157,9 +166,9 @@ export function WelcomePanel(props: WelcomePanelProps) {
           </button>
         ) : null}
         {handoffError ? (
-          <p role="alert" className="mt-2 text-sm text-paper">
+          <Notice tone="error" onDark className="mt-2">
             {handoffError}
-          </p>
+          </Notice>
         ) : null}
       </div>
 

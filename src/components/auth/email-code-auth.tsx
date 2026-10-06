@@ -1,18 +1,17 @@
 "use client";
 
-import { ArrowUpRight, LoaderCircle, MailCheck, Pencil } from "lucide-react";
-import { useActionState, useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { ArrowUpRight, LoaderCircle, Pencil } from "lucide-react";
+import { useActionState, useCallback, useEffect, useId, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { authAction, signInWithGoogle, type AuthState } from "@/app/login/actions";
-import { Button } from "@/components/ui/button";
+import { InlineError, inputClasses } from "@/components/ui/field";
+import { NewTabHint } from "@/components/ui/new-tab-hint";
+import { Notice } from "@/components/ui/notice";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { Turnstile } from "@/components/ui/turnstile";
 import { formatCountdown, inboxFor, LOGIN_CODE_LENGTH } from "@/lib/auth/code";
-import { cn } from "@/lib/cn";
 import { CodeInput } from "./code-input";
 import { useSignedInElsewhere } from "./session-sync";
-
-const INPUT =
-  "h-13 w-full rounded-2xl border border-line bg-card px-4 text-base text-ink placeholder:text-muted/70 transition-[border-color,box-shadow] outline-none focus:border-ink focus:shadow-[0_0_0_4px_rgb(20_20_20/0.06)] read-only:opacity-60 aria-[invalid=true]:border-danger";
 
 export interface EmailCodeAuthProps {
   /** Where to go after signing in (ignored when a quick-card `draft` is sent). */
@@ -91,16 +90,6 @@ export function EmailCodeAuth(props: EmailCodeAuthProps) {
   );
 }
 
-function SubmitButton({ children, pendingLabel, disabled }: { children: ReactNode; pendingLabel: string; disabled?: boolean }) {
-  const { pending } = useFormStatus();
-  return (
-    <Button type="submit" size="lg" className="w-full" disabled={pending || disabled} aria-busy={pending}>
-      {pending ? <LoaderCircle className="size-5 animate-spin" aria-hidden /> : null}
-      {pending ? pendingLabel : children}
-    </Button>
-  );
-}
-
 interface EmailStepProps extends EmailCodeAuthProps {
   email: string;
   error?: string;
@@ -118,7 +107,7 @@ function EmailStep({ next, continueTo, email, error, state, dispatch, pending, g
         <input type="hidden" name="intent" value="send" />
         <input type="hidden" name="next" value={next} />
         <label className="block">
-          <span className="eyebrow">Tu email</span>
+          <span className="text-sm font-medium text-ink-soft">Tu email</span>
           <input
             type="email"
             name="email"
@@ -131,13 +120,13 @@ function EmailStep({ next, continueTo, email, error, state, dispatch, pending, g
             placeholder="tu@email.com"
             aria-invalid={Boolean(error)}
             aria-describedby={error ? errorId : undefined}
-            className={cn(INPUT, "mt-2")}
+            className={inputClasses({ className: "mt-1.5" })}
           />
         </label>
         {error ? (
-          <p id={errorId} role="alert" className="text-sm text-danger">
+          <InlineError id={errorId} live>
             {error}
-          </p>
+          </InlineError>
         ) : null}
         {captchaSiteKey ? <Turnstile siteKey={captchaSiteKey} action="login" resetKey={state} /> : null}
         <SubmitButton pendingLabel="Enviando el código…">Enviarme un código</SubmitButton>
@@ -160,21 +149,21 @@ function EmailStep({ next, continueTo, email, error, state, dispatch, pending, g
 }
 
 function GoogleButton() {
-  const { pending } = useFormStatus();
   return (
-    <Button type="submit" variant="outline" size="lg" className="w-full" disabled={pending}>
-      {pending ? (
-        <LoaderCircle className="size-5 animate-spin" aria-hidden />
-      ) : (
-        <svg viewBox="0 0 24 24" className="size-5" aria-hidden="true">
+    <SubmitButton
+      variant="outline"
+      pendingLabel="Conectando con Google…"
+      icon={
+        <svg viewBox="0 0 24 24" className="size-5 shrink-0" aria-hidden="true">
           <path fill="#4285F4" d="M22.5 12.3c0-.8-.1-1.5-.2-2.3H12v4.3h5.9a5 5 0 0 1-2.2 3.3v2.7h3.6c2-1.9 3.2-4.7 3.2-8Z" />
           <path fill="#34A853" d="M12 23c3 0 5.5-1 7.3-2.7l-3.6-2.7c-1 .7-2.2 1-3.7 1-2.9 0-5.3-1.9-6.2-4.5H2.1v2.8A11 11 0 0 0 12 23Z" />
           <path fill="#FBBC05" d="M5.8 14.1a6.6 6.6 0 0 1 0-4.2V7.1H2.1a11 11 0 0 0 0 9.8l3.7-2.8Z" />
           <path fill="#EA4335" d="M12 5.4c1.6 0 3.1.6 4.2 1.7l3.2-3.2A11 11 0 0 0 2.1 7.1l3.7 2.8C6.7 7.3 9.1 5.4 12 5.4Z" />
         </svg>
-      )}
+      }
+    >
       Continuar con Google
-    </Button>
+    </SubmitButton>
   );
 }
 
@@ -233,28 +222,28 @@ function CodeStep({ state, dispatch, pending, onEditEmail, next, draft, from, vi
 
   return (
     <div className="animate-rise">
-      <div id={statusId} className="flex items-start gap-3 rounded-2xl bg-ok/10 px-4 py-3.5 text-ok">
-        <MailCheck className="mt-0.5 size-5 shrink-0" aria-hidden />
-        <div className="min-w-0 flex-1 text-sm text-ink-soft">
-          <p className="font-medium text-ok">¡Código enviado!</p>
-          <p className="mt-0.5">
-            Lo hemos mandado a <strong className="font-semibold text-ink [overflow-wrap:anywhere]">{state.email}</strong>. Tarda unos
-            segundos; mira también en spam o promociones.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onEditEmail}
-          className="-my-1 -mr-1.5 inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-xs text-muted transition-colors hover:bg-ink/[0.06] hover:text-ink"
-        >
-          <Pencil className="size-3" aria-hidden /> Cambiar
-        </button>
-      </div>
+      <Notice
+        id={statusId}
+        tone="ok"
+        title="¡Código enviado!"
+        action={
+          <button
+            type="button"
+            onClick={onEditEmail}
+            className="-my-1.5 -mr-2 inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full px-2.5 text-sm text-muted transition-colors hover:bg-ink/[0.06] hover:text-ink"
+          >
+            <Pencil className="size-3.5" aria-hidden /> Cambiar email
+          </button>
+        }
+      >
+        Lo hemos mandado a <strong className="font-semibold text-ink [overflow-wrap:anywhere]">{state.email}</strong>. Tarda unos
+        segundos; mira también en spam o promociones.
+      </Notice>
 
       {state.notice ? (
-        <p key={answer} role="status" className="mt-3 rounded-xl bg-signal-wash px-3.5 py-2.5 text-sm text-signal-deep">
+        <Notice key={answer} tone="info" className="mt-3">
           {state.notice}
-        </p>
+        </Notice>
       ) : null}
 
       {/* noValidate: a pasted "1234 5678" must still submit; the server keeps only the digits. */}
@@ -286,9 +275,9 @@ function CodeStep({ state, dispatch, pending, onEditEmail, next, draft, from, vi
           />
         </div>
         {state.error ? (
-          <p key={answer} id={errorId} role="alert" className="text-sm text-danger">
+          <InlineError key={answer} id={errorId} live>
             {state.error}
-          </p>
+          </InlineError>
         ) : null}
         <SubmitButton pendingLabel="Comprobando…" disabled={code.length < LOGIN_CODE_LENGTH}>
           {submitLabel}
@@ -313,6 +302,7 @@ function CodeStep({ state, dispatch, pending, onEditEmail, next, draft, from, vi
             className="inline-flex items-center gap-1 text-muted underline-offset-4 hover:text-ink hover:underline"
           >
             Abrir {inbox.name} <ArrowUpRight className="size-3.5" aria-hidden />
+            <NewTabHint />
           </a>
         ) : null}
       </form>

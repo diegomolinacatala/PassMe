@@ -44,8 +44,8 @@ export function AddToWalletButton({ wallet, href, blockedLabel, onDark = false, 
         className={cn(BADGE, "border border-dashed", onDark ? "border-paper/30 text-paper/70" : "border-line-strong text-muted", className)}
       >
         <Glyph />
-        <span className="flex-1 text-[0.95rem]">{name}</span>
-        <span className="font-mono text-[11px] tracking-wider uppercase">{blockedLabel ?? "No disponible todavía"}</span>
+        <span className="flex-1 text-body">{name}</span>
+        <span className="font-mono text-mark tracking-wider uppercase">{blockedLabel ?? "No disponible todavía"}</span>
       </div>
     );
   }

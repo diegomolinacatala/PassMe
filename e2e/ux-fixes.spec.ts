@@ -64,11 +64,11 @@ test.describe("editor", () => {
   });
 
   test("the received-contacts counter follows deletions", async ({ page }) => {
-    page.on("dialog", (dialog) => dialog.accept());
     await page.goto("/dashboard");
     const panel = page.locator("#contactos");
     await expect(panel.getByText("1 en total")).toBeVisible();
     await panel.getByRole("button", { name: /Borrar el contacto de Lucía Martín/ }).click();
+    await panel.getByRole("button", { name: "Borrar", exact: true }).click();
     await expect(panel.getByText(/Aún no te ha dejado nadie/)).toBeVisible();
     await expect(panel.getByText("en total")).toHaveCount(0);
   });

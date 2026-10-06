@@ -50,7 +50,7 @@ export function CreateYoursCta({ slug, via, ownerName }: { slug: string; via: Vi
   return (
     <section
       aria-labelledby="crea-la-tuya"
-      className="relative isolate mt-5 overflow-hidden rounded-[28px] bg-ink px-6 pt-7 pb-6 text-paper shadow-object"
+      className="relative isolate mt-5 overflow-hidden rounded-object bg-ink px-6 pt-7 pb-6 text-paper shadow-object"
     >
       <BrandMotif
         color={BRAND.glow}
@@ -63,7 +63,7 @@ export function CreateYoursCta({ slug, via, ownerName }: { slug: string; via: Vi
       <h2 id="crea-la-tuya" className="mt-2 font-display text-[2.2rem] leading-[0.95] tracking-tight">
         Ten tu tarjeta así <em className="text-glow">en un minuto.</em>
       </h2>
-      <p className="mt-3 text-[0.95rem] leading-relaxed text-paper/80">
+      <p className="mt-3 text-body leading-relaxed text-paper/80">
         Como la de {firstName}: vive en la cartera de tu móvil y se comparte con un QR. Gratis y sin instalar nada.
       </p>
       <Link href={createPath(slug, via)} className={buttonClasses({ variant: "signal", size: "lg", className: "group mt-6 w-full" })}>
@@ -78,7 +78,7 @@ export function CreateYoursCta({ slug, via, ownerName }: { slug: string; via: Vi
 /** In place of "Crear mi tarjeta" when the owner opens their own card. */
 export function OwnCardNote() {
   return (
-    <section aria-labelledby="tu-tarjeta" className="mt-5 rounded-[28px] border hairline bg-card/80 px-6 py-5">
+    <section aria-labelledby="tu-tarjeta" className="mt-5 rounded-object border hairline bg-card/80 px-6 py-5">
       <h2 id="tu-tarjeta" className="font-display text-2xl leading-tight tracking-tight">
         Así la ven <em className="text-signal">los demás.</em>
       </h2>

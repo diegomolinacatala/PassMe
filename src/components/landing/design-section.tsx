@@ -53,7 +53,7 @@ export function DesignSection() {
             {CARD_THEMES.map((theme) => (
               <li
                 key={theme.id}
-                className="inline-flex items-center gap-2 rounded-full border border-line bg-card py-1 pr-3 pl-1 font-mono text-[10px] tracking-[0.14em] text-ink-soft uppercase"
+                className="inline-flex items-center gap-2 eyebrow rounded-full border hairline bg-card py-1 pr-3 pl-1 text-ink-soft"
               >
                 <span
                   className="grid size-5 place-items-center rounded-full"

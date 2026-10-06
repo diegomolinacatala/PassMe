@@ -23,7 +23,7 @@ Diego puede cambiar cualquiera: están aisladas en sus PRs.
 |---|---|---|
 | P1 | `feat/ux-p1-arreglos` | ✅ hecho y subido |
 | P2 | `feat/ux-p2-mi-qr` | ✅ hecho (pendiente de subir) |
-| P3 | `feat/ux-p3-sistema` | pendiente |
+| P3 | `feat/ux-p3-sistema` | ✅ hecho (pendiente de subir) |
 | P4 | `feat/ux-p4-crear` | pendiente |
 | P5 | `feat/ux-p5-tarjeta` | pendiente |
 | P6 | `feat/ux-p6-reuniones` | pendiente |
@@ -42,6 +42,15 @@ Diego puede cambiar cualquiera: están aisladas en sus PRs.
 - **P2.9**: Google no tiene un equivalente a «Hecho con PassMe» en el pase (`linksModuleData` solo lleva la tarjeta y sus datos), así que no hay nada que alinear. La visita del dueño a su propia tarjeta sigue contando en las estadísticas.
 - **P1.20 (rezagado)**: el email «Alguien te ha dejado su contacto» aún decía «Deja que te dejen su contacto»; ahora dice «Recibir contactos».
 - **P1.9**: las páginas demo de reuniones mandan su estado al servidor (`demoState`) para encadenar acciones (confirmar y luego cancelar). Solo en demo; no se guarda nada.
+- **P3 (componentes)**: todo está en `src/components/ui/`: `field.tsx` (`Field`, `InlineError`, `inputClasses()`), `notice.tsx`, `submit-button.tsx`, `undo-notice.tsx`, `choice.ts` (radios) y `new-tab-hint.tsx`. Las reglas están en `docs/BRAND.md` § 8. `cn()` conoce ahora los tokens (`text-body`, `rounded-panel`, `shadow-press-ink`…): sin eso, tailwind-merge tomaba `text-body` por un color y borraba el `text-white` del botón.
+- **P3.1**: los botones llevan una clase sin estilo `btn-<variante>` (no un `data-variant`, porque `buttonClasses()` también se usa en `<a>` y `<Link>`); el E2E cuenta los `.btn-signal` visibles al cargar cada ruta. «Responder» (reuniones del editor) pasa a `ink`. Queda para P5: en la tarjeta pública, el envío de un formulario abierto (o «Crear la mía con estos datos») y el bloque oscuro «Crear mi tarjeta» son los dos `signal`, aunque nunca coinciden en pantalla.
+- **P3.2**: el token es `--color-field-border: #8a7f6e`, no `#8f8473`: ese se quedaba en 2,87:1 sobre `paper-deep`. `rg "border-line bg-" src/components` devuelve 0: la única definición de campo es `inputClasses()` (con el token nuevo). Los demás controles con borde (días y horas del selector, horas a confirmar, «Añadir» datos, accesos rápidos) también usan `field-border`; las cajas que no son controles pasan a `hairline`. El campo del enlace (`slug-field`) sube a 16 px y su prefijo se corta con «…» si la letra es muy grande.
+- **P3.3**: `tests/design-tokens.test.ts` mide los estados sobre los tokens reales de `globals.css`. Encontró que el título verde de los avisos `ok` (`text-ok` sobre `bg-ok/10`) se quedaba en 4,08:1: ahora el título va en tinta y el verde queda para el icono. Lo mismo en la etiqueta «Publicada» del editor.
+- **P3.4**: «Continuar con Google» dice «Conectando con Google…» y «Sí, cancelar…» dice «Cancelando…». El aviso «Casi no se ve sobre el fondo» del diseño no se ha tocado (es una advertencia, no un error).
+- **P3.5**: una reunión quitada de la lista se borra en el servidor a los 6 s (o al salir de la página); «Deshacer» solo la vuelve a enseñar. También tienen deshacer las horas propuestas en el selector. En la confirmación de un contacto recibido el foco va a «No borrar» (la opción segura).
+- **P3.6**: los 3 `rounded-[…]` que quedan son el móvil dibujado de la landing. `text-[0.9…rem]` también pasa a `text-body`. Para que nada se salga con la letra al 200 %: las cabeceras (landing y editor) y la fila de etiqueta de los campos pueden partirse en dos líneas, la columna derecha del editor tiene `min-w-0` y las filas de reuniones bajan sus botones.
+- **P3.7**: el radio es una capa invisible (`absolute inset-0 opacity-0`) sobre toda la opción en vez de `sr-only`: el teclado funciona igual y los toques (y Playwright) caen siempre en el radio. Las horas a confirmar de `meeting-response.tsx` siguen con `sr-only`.
+- **P3.8**: con `?nueva=1`, el título de la bienvenida es el H1 y el del editor un H2; al cerrar la bienvenida (`WelcomeContext`) el del editor vuelve a ser H1 y recibe el foco. El H2 del formulario de reunión tiene estilo de *eyebrow* para no cambiar el diseño. `ExternalLink` ya no se usaba.
 
 ## Notas para retomar
 
