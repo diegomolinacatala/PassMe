@@ -49,6 +49,7 @@ sequenceDiagram
 | Datos | `src/lib/data/*` | Lecturas/escrituras en Supabase. Cliente con sesión (RLS) para el dueño, cliente anónimo para lo público y cliente *admin* solo donde es imprescindible. `rate-limits.ts` (límites compartidos en Postgres), `contact-requests.ts` (contactos recibidos). |
 | Pases | `src/lib/pass/*` | `apple.ts` (pass.json + firma), `google.ts` (objeto genérico + JWT + sync REST), `apns.ts` (push HTTP/2), `web-service.ts` (protocolo de Apple), `handoff.ts` (tokens de 30 min), `images.ts` (logo/icono con sharp), `art.tsx` (banda de Apple y *hero* de Google con Satori). |
 | Rutas | `src/app/**` | Páginas (landing, tarjeta, alta `/crear`, login, editor, handoff, legales) y API (`/api/pass/*`, `/api/wallet/v1/*`, `/api/events`, `/api/health`, `/api/cron/cleanup`). Exportación de contactos en `/dashboard/contactos`. |
+| Panel | `src/lib/admin/*`, `src/app/admin/*` | Estadísticas del producto para quien lo lleva: acceso propio (`auth.ts`, `session.ts`), cálculo puro (`stats.ts`), muestra para el modo demo (`demo.ts`); los datos los carga `src/lib/data/admin-stats.ts`. |
 | Borde | `src/proxy.ts` | CSP con nonce por petición, refresco de sesión de Supabase, redirección de `/dashboard` sin sesión. |
 
 ## Modelo de datos
@@ -131,6 +132,7 @@ stateDiagram-v2
     - Un tope diario global (`MEETING_EMAIL_DAILY_BUDGET`, 60 por defecto) para no agotar el plan de Resend, que comparten los códigos de acceso.
   - El primer email al dueño, el único que un anónimo puede provocar, solo lleva las horas, el formato, el nombre y la empresa. Las notas del visitante le llegan cuando ya ha respondido.
   - El email del dueño no se revela hasta que confirma. Hay límites por reunión y por conexión, y como mucho 10 rondas de contrapropuestas.
+- **Panel privado** (`/admin`): usuario y contraseña propios en variables de entorno (sin ellas, 404), independientes de las cuentas de PassMe. Comparación en tiempo constante, contraseña de 16 caracteres o más, 5 intentos por IP cada 15 min y 150 en total por hora, y una cookie de 3 días `httpOnly`, `SameSite=Strict` y limitada a `/admin`, firmada con una clave derivada de las credenciales (cambiar la contraseña la invalida). Lee con la clave secreta: usuarios, tarjetas, pases de Apple (nunca los *push tokens*) y eventos; de los contactos recibidos y las reuniones, solo cifras.
 - **Cabeceras**: CSP con nonce + `strict-dynamic` (todas las páginas se renderizan por petición para poder llevar nonce), HSTS, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`.
 - **Privacidad**: métricas sin IPs ni cookies (una visita por sesión del navegador); los clics solo cuentan si el enlace existe y es visible; los bots/previsualizadores no cuentan; las tarjetas llevan `noindex`. Retención: `cleanup_expired_data()` a diario (Vercel Cron).
 

@@ -98,6 +98,7 @@ Sin tocar nada, `npm run dev` ya funciona en **modo demo**: landing, tarjeta de 
 1. [vercel.com](https://vercel.com) → *Add New → Project* → importa `diegomolinacatala/PassMe`. Framework: Next.js (automático).
 2. *Environment Variables*: copia todas las de `.env.local` **excepto** `NEXT_PUBLIC_SITE_URL`, que en producción debe ser la URL pública final (`https://passme-xxx.vercel.app` o tu dominio). Márcalas para *Production*; en *Preview* pon solo lo necesario para probar (los despliegues de preview compartirían tu base de datos y tu certificado de Apple).
    - Añade también `CRON_SECRET` (16 caracteres aleatorios o más: `openssl rand -hex 24`). Activa la limpieza diaria de datos caducados que programa `vercel.json`.
+   - (Opcional) **Panel de estadísticas** en `/admin`: `ADMIN_USERNAME` (el que quieras) y `ADMIN_PASSWORD` (16 caracteres o más, generada: `openssl rand -base64 18` o el generador de tu gestor de contraseñas). Márcalas como *Sensitive* y solo para *Production*. Sin ellas `/admin` da 404. La sesión dura 3 días. Para cerrar todas las sesiones del panel (por ejemplo, si pierdes un portátil), cambia la contraseña y vuelve a desplegar.
 3. La región de las funciones ya viene fijada a **Frankfurt (fra1)** en `vercel.json` (misma zona que Supabase = menos latencia). Si creaste Supabase en otra región, cámbiala ahí (p. ej. `dub1` para Irlanda).
 4. *Deploy*. Después:
    - Abre `https://TU-URL/api/health` → debe devolver `"supabase": true`.

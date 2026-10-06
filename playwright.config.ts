@@ -2,6 +2,9 @@ import { defineConfig, devices } from "@playwright/test";
 
 const PORT = Number(process.env.E2E_PORT ?? 3100);
 
+/** Test-only login for the private dashboard (/admin), which shows sample data in demo mode. */
+export const E2E_ADMIN = { username: "admin", password: "e2e-admin-password" };
+
 /**
  * E2E runs against a production build in demo mode (no Supabase env needed):
  *   npm run build && npm run e2e
@@ -25,6 +28,7 @@ export default defineConfig({
     command: `npx next start -p ${PORT}`,
     url: `http://localhost:${PORT}/api/health`,
     reuseExistingServer: !process.env.CI,
+    env: { ADMIN_USERNAME: E2E_ADMIN.username, ADMIN_PASSWORD: E2E_ADMIN.password },
     timeout: 60_000,
   },
 });
