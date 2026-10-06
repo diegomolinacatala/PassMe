@@ -29,9 +29,11 @@ export const DEMO_CARD: OwnerCard = {
   updatedAt: "2026-09-27T00:00:00.000Z",
   links: [
     { id: "demo-email", kind: "email", value: "alex@example.com", visible: true },
+    { id: "demo-mobile", kind: "phone", value: "+34 612 345 678", visible: true },
     { id: "demo-linkedin", kind: "linkedin", value: "https://www.linkedin.com/in/alex-rivera-demo", visible: true },
     { id: "demo-web", kind: "website", value: "https://example.com", label: "Portfolio", visible: true },
     { id: "demo-instagram", kind: "instagram", value: "estudio.norte", visible: true },
+    // Hidden on purpose: tests check it never reaches visitors.
     { id: "demo-phone", kind: "phone", value: "+34 600 000 000", visible: false },
   ],
 };

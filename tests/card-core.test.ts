@@ -187,8 +187,10 @@ describe("vcard", () => {
     expect(vcf).toContain(".URL:https://www.instagram.com/estudio.norte");
     expect(vcf).toContain(".X-ABLabel:Portfolio");
     expect(vcf).toContain(".URL:https://passme.app/u/demo");
+    // The visible mobile is there; the hidden phone never is.
+    expect(vcf).toContain("TEL;TYPE=CELL:+34612345678");
     expect(vcf).not.toContain("600 000 000");
-    expect(vcf).not.toContain("TEL");
+    expect(vcf).not.toContain("600000000");
   });
 
   it("dedupes phone numbers shared with WhatsApp", () => {

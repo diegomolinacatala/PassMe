@@ -1,10 +1,7 @@
 "use client";
 
-import { Check, Share } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { buttonClasses } from "@/components/ui/button";
-import { NewTabHint } from "@/components/ui/new-tab-hint";
-import { announce } from "@/lib/announce";
+import { useEffect, useRef, type ReactNode } from "react";
+import { NEW_TAB_SUFFIX, NewTabHint } from "@/components/ui/new-tab-hint";
 
 type TrackKind = "view" | "link_click";
 
@@ -48,16 +45,20 @@ interface TrackedLinkProps {
   slug: string;
   linkId?: string;
   className?: string;
+  /** For icon-only links (e.g. the WhatsApp button next to a phone). */
+  label?: string;
   children: ReactNode;
 }
 
 /** External/contact link that records a click without delaying navigation. */
-export function TrackedLink({ href, slug, linkId, className, children }: TrackedLinkProps) {
+export function TrackedLink({ href, slug, linkId, className, label, children }: TrackedLinkProps) {
   const isHttp = /^https?:/i.test(href);
   return (
     <a
       href={href}
       className={className}
+      aria-label={label ? `${label}${isHttp ? NEW_TAB_SUFFIX : ""}` : undefined}
+      title={label}
       {...(isHttp ? { target: "_blank", rel: "noopener noreferrer nofollow" } : {})}
       onClick={() => {
         if (linkId) track({ slug, kind: "link_click", linkId });
@@ -66,38 +67,5 @@ export function TrackedLink({ href, slug, linkId, className, children }: Tracked
       {children}
       {isHttp ? <NewTabHint /> : null}
     </a>
-  );
-}
-
-export function ShareButton({ name, slug, disabled }: { name: string; slug: string; disabled?: boolean }) {
-  const [copied, setCopied] = useState(false);
-
-  async function share() {
-    const url = `${window.location.origin}/u/${encodeURIComponent(slug)}?src=share`;
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: `${name} · PassMe`, url });
-        return;
-      }
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      announce("Enlace copiado");
-      window.setTimeout(() => setCopied(false), 1800);
-    } catch {
-      // User dismissed the share sheet — nothing to do.
-    }
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={share}
-      disabled={disabled}
-      className={buttonClasses({ variant: "outline", size: "lg", className: "aspect-square px-0 disabled:opacity-100" })}
-      aria-label={copied ? "Enlace copiado" : "Compartir tarjeta"}
-      title={copied ? "Enlace copiado" : "Compartir"}
-    >
-      {copied ? <Check className="size-5" aria-hidden /> : <Share className="size-5" aria-hidden />}
-    </button>
   );
 }

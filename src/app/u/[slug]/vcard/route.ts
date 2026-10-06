@@ -1,5 +1,5 @@
 import { after, type NextRequest } from "next/server";
-import { buildVCard, savedWithPassMeNote, vcardContentDisposition } from "@/lib/card/vcard";
+import { buildVCard, savedWithPassMeNote, servesVCardInline, vcardContentDisposition } from "@/lib/card/vcard";
 import { getPublicCard, resolveSlugRedirect } from "@/lib/data/cards";
 import { createSharedRateLimiter } from "@/lib/data/rate-limits";
 import { recordEventBySlug } from "@/lib/data/events";
@@ -38,10 +38,8 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/u/[slug]/vca
   }
 
   const body = buildVCard(card, { profileUrl: profileUrl(card.slug), photo, savedNote: savedWithPassMeNote(prettyProfileUrl(card.slug)) });
-  // iOS Safari shows its native "add contact" sheet for inline vCards; other browsers
-  // (Android Chrome would render text/* inline) get a download that opens Contacts.
-  const isIos = /iPhone|iPad|iPod/i.test(request.headers.get("user-agent") ?? "");
-  const disposition = isIos ? "inline" : "attachment";
+  // The card page reads the same rule to explain the download (see SaveContact).
+  const disposition = servesVCardInline(request.headers.get("user-agent")) ? "inline" : "attachment";
 
   if (!isBot(request.headers.get("user-agent"))) {
     const source = parseVisitSource(request.nextUrl.searchParams.get("src"));

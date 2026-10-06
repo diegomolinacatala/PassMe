@@ -9,6 +9,7 @@ import { Field, InlineError, inputClasses } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { Turnstile } from "@/components/ui/turnstile";
+import { ActionPanel, PanelCloseButton, useCardPage } from "@/components/card/card-page-context";
 import { rememberDetails } from "@/lib/card/draft-storage";
 import { createPath, parseVia } from "@/lib/card/quick";
 import type { FieldErrors } from "@/lib/card/schema";
@@ -47,13 +48,15 @@ interface Who {
 
 const STEP_ONE_FIELDS = new Set(["slots", "duration", "format", "location"]);
 
-function SentMessage({ owner, slug, source, state, slots, timeZone }: {
+function SentMessage({ owner, slug, source, state, slots, timeZone, saved }: {
   owner: string;
   slug: string;
   source: string;
   state: Extract<MeetingRequestState, { status: "sent" }>;
   slots: ReadonlyArray<string>;
   timeZone: string;
+  /** "Guardar contacto" is done: creating a card becomes the page's main action. */
+  saved: boolean;
 }) {
   const heading = useRef<HTMLParagraphElement>(null);
   const { details } = state;
@@ -82,35 +85,18 @@ function SentMessage({ owner, slug, source, state, slots, timeZone }: {
           : `Ya la tiene ${owner}. En cuanto elija una hora, te escribimos a ${state.email} con la invitación para tu calendario.`}
       </p>
       <div className="mt-5 border-t hairline pt-5">
-        <p className="text-sm text-ink-soft">¿Y si te haces tu propia tarjeta? Ya tenemos tus datos.</p>
+        <p className="text-sm text-ink-soft">
+          ¿Te haces tu propia tarjeta? <strong className="font-medium text-ink">Empieza con lo que acabas de escribir.</strong>
+        </p>
         <Link
           href={createPath(slug, via)}
-          className={buttonClasses({ variant: "signal", className: "group mt-3" })}
+          className={buttonClasses({ variant: saved ? "signal" : "ink", className: "group mt-3" })}
         >
           Crear la mía con estos datos
           <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-0.5" aria-hidden />
         </Link>
       </div>
     </div>
-  );
-}
-
-function CollapsedCta({ owner, onOpen }: { owner: string; onOpen: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="group flex w-full items-center gap-4 rounded-panel border border-ink/80 bg-card px-5 py-4 text-left shadow-soft transition-[background-color,transform] duration-300 hover:bg-white active:translate-y-px"
-    >
-      <span className="grid size-11 shrink-0 place-items-center rounded-full bg-ink text-paper transition-transform duration-500 group-hover:-rotate-6">
-        <CalendarClock className="size-5" aria-hidden />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block font-medium">Agendar reunión con {owner}</span>
-        <span className="block text-sm text-muted">Propón día y hora. {owner} confirma con un toque.</span>
-      </span>
-      <ArrowRight className="size-4 shrink-0 text-muted transition-transform duration-300 group-hover:translate-x-0.5 group-hover:text-ink" aria-hidden />
-    </button>
   );
 }
 
@@ -329,6 +315,8 @@ function StepWho({ owner, ownerFullName, when, who, onChange, timeZone, errors, 
  * collapsed by default so the card stays the star of the page.
  */
 export function MeetingRequest({ slug, ownerName, source, captchaSiteKey }: MeetingRequestProps) {
+  const { saved, markSent } = useCardPage();
+  // Taken when the panel first opens: "now" and the visitor's time zone for the slot picker.
   const [open, setOpen] = useState<{ now: number; timeZone: string } | null>(null);
   const [step, setStep] = useState<1 | 2>(1);
   const [when, setWhen] = useState<When>({ slots: [], duration: DEFAULT_DURATION, format: "in_person", location: "" });
@@ -347,6 +335,10 @@ export function MeetingRequest({ slug, ownerName, source, captchaSiteKey }: Meet
     target?.focus();
   }, [state]);
 
+  useEffect(() => {
+    if (state.status === "sent") markSent("meeting");
+  }, [state.status, markSent]);
+
   const [handled, setHandled] = useState(state);
   if (handled !== state) {
     setHandled(state);
@@ -356,9 +348,8 @@ export function MeetingRequest({ slug, ownerName, source, captchaSiteKey }: Meet
   }
 
   if (state.status === "sent" && open) {
-    return <SentMessage owner={owner} slug={slug} source={source} state={state} slots={when.slots} timeZone={open.timeZone} />;
+    return <SentMessage owner={owner} slug={slug} source={source} state={state} slots={when.slots} timeZone={open.timeZone} saved={saved} />;
   }
-  if (!open) return <CollapsedCta owner={owner} onOpen={() => setOpen({ now: Date.now(), timeZone: localTimeZone() })} />;
 
   const serverErrors = state.status === "error" ? (state.errors ?? {}) : {};
   const errors: FieldErrors = Object.fromEntries(Object.entries(serverErrors).filter(([key]) => !edited.has(key)));
@@ -374,65 +365,77 @@ export function MeetingRequest({ slug, ownerName, source, captchaSiteKey }: Meet
   }
 
   return (
-    <section aria-labelledby="agendar-reunion">
-      <form ref={form} action={submit} onSubmit={onSubmit} className="relative animate-rise rounded-panel border hairline bg-card px-5 py-5" noValidate>
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 id="agendar-reunion" className="eyebrow">
-            Agendar reunión con {owner}
-          </h2>
-          <p className="eyebrow" aria-hidden>
-            {step}/2
-          </p>
-        </div>
+    <ActionPanel
+      panel="meeting"
+      id="agendar"
+      icon={<CalendarClock className="size-5" aria-hidden />}
+      title={`Agendar reunión con ${owner}`}
+      subtitle={`Propón día y hora. ${owner} confirma con un toque.`}
+      onOpen={() => setOpen((current) => current ?? { now: Date.now(), timeZone: localTimeZone() })}
+    >
+      {open ? (
+        <section aria-labelledby="agendar-reunion">
+          <form ref={form} action={submit} onSubmit={onSubmit} className="relative animate-rise rounded-panel border hairline bg-card px-5 py-5" noValidate>
+            <div className="-mt-2 -mr-2 mb-2 flex items-center justify-between gap-3">
+              <h2 id="agendar-reunion" className="eyebrow">
+                Agendar reunión con {owner}
+              </h2>
+              <div className="flex shrink-0 items-center gap-1">
+                <p className="eyebrow" aria-hidden>
+                  {step}/2
+                </p>
+                <PanelCloseButton panel="meeting" />
+              </div>
+            </div>
 
-        {/* Step 1's choices travel with the form whichever step is on screen. */}
-        {when.slots.map((iso) => (
-          <input key={iso} type="hidden" name="slot" value={iso} />
-        ))}
-        <input type="hidden" name="duration" value={when.duration} />
-        <input type="hidden" name="format" value={when.format} />
-        <input type="hidden" name="location" value={when.format === "in_person" ? when.location : ""} />
-        <input type="hidden" name="timeZone" value={open.timeZone} />
+            {/* Step 1's choices travel with the form whichever step is on screen. */}
+            {when.slots.map((iso) => (
+              <input key={iso} type="hidden" name="slot" value={iso} />
+            ))}
+            <input type="hidden" name="duration" value={when.duration} />
+            <input type="hidden" name="format" value={when.format} />
+            <input type="hidden" name="location" value={when.format === "in_person" ? when.location : ""} />
+            <input type="hidden" name="timeZone" value={open.timeZone} />
 
-        {step === 1 ? (
-          <StepWhen
-            owner={owner}
-            when={when}
-            onChange={(patch) => {
-              setWhen((prev) => ({ ...prev, ...patch }));
-              touch(Object.keys(patch));
-              if (patch.slots?.length) setStepError(null);
-            }}
-            timeZone={open.timeZone}
-            now={open.now}
-            errors={errors}
-            onNext={() => {
-              if (when.slots.length === 0) return setStepError("Elige al menos una hora.");
-              setStepError(null);
-              setStep(2);
-            }}
-          />
-        ) : (
-          <>
-            <StepWho
-              owner={owner}
-              ownerFullName={ownerName}
-              when={when}
-              who={who}
-              onChange={(patch) => {
-                setWho((prev) => ({ ...prev, ...patch }));
-                touch(Object.keys(patch));
-              }}
-              timeZone={open.timeZone}
-              errors={errors}
-              onBack={() => setStep(1)}
-            />
-            <div className="mt-4 space-y-4">
-              {captchaSiteKey ? <Turnstile siteKey={captchaSiteKey} action="meeting" resetKey={state} /> : null}
-              {state.status === "error" ? (
-                <div data-form-error tabIndex={-1} className="outline-none">
-                  <Notice tone="error">{state.message}</Notice>
-                </div>
+            {step === 1 ? (
+              <StepWhen
+                owner={owner}
+                when={when}
+                onChange={(patch) => {
+                  setWhen((prev) => ({ ...prev, ...patch }));
+                  touch(Object.keys(patch));
+                  if (patch.slots?.length) setStepError(null);
+                }}
+                timeZone={open.timeZone}
+                now={open.now}
+                errors={errors}
+                onNext={() => {
+                  if (when.slots.length === 0) return setStepError("Elige al menos una hora.");
+                  setStepError(null);
+                  setStep(2);
+                }}
+              />
+            ) : (
+              <>
+                <StepWho
+                  owner={owner}
+                  ownerFullName={ownerName}
+                  when={when}
+                  who={who}
+                  onChange={(patch) => {
+                    setWho((prev) => ({ ...prev, ...patch }));
+                    touch(Object.keys(patch));
+                  }}
+                  timeZone={open.timeZone}
+                  errors={errors}
+                  onBack={() => setStep(1)}
+                />
+                <div className="mt-4 space-y-4">
+                  {captchaSiteKey ? <Turnstile siteKey={captchaSiteKey} action="meeting" resetKey={state} /> : null}
+                  {state.status === "error" ? (
+                    <div data-form-error tabIndex={-1} className="outline-none">
+                      <Notice tone="error">{state.message}</Notice>
+                    </div>
               ) : null}
               <SubmitButton pending={pending} pendingLabel="Enviando…" icon={<CalendarClock className="size-5" aria-hidden />}>
                 Enviar propuesta
@@ -443,5 +446,7 @@ export function MeetingRequest({ slug, ownerName, source, captchaSiteKey }: Meet
         )}
       </form>
     </section>
+      ) : null}
+    </ActionPanel>
   );
 }

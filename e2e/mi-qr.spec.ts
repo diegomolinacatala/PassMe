@@ -184,7 +184,7 @@ test.describe("welcome after creating a card", () => {
     const welcome = await createCardFrom(page, "/u/demo", "/crear?de=demo");
     const send = welcome.getByRole("button", { name: "Mandarle mi tarjeta a Alex" });
     await expect(send).toBeVisible();
-    await expect(welcome.getByText("Alex verá tu nombre y tu email.")).toBeVisible();
+    await expect(welcome.getByText("Alex verá tu nombre, tu email y tu móvil.")).toBeVisible();
     await expect(welcome.getByText("¿Estáis juntos? Enséñale este QR")).toBeVisible();
     // Only one way to close it.
     await expect(welcome.getByRole("button", { name: /Cerrar/ })).toHaveCount(0);

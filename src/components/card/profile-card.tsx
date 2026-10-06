@@ -1,9 +1,10 @@
-import { ArrowUpRight, MapPin, UserRoundPlus } from "lucide-react";
-import { Mark } from "@/components/brand/logo";
+import { MapPin, UserRoundPlus } from "lucide-react";
+import type { ReactNode } from "react";
 import { buttonClasses } from "@/components/ui/button";
 import { cardCssVars } from "@/lib/card/colors";
 import { resolveDesign, type Typeface } from "@/lib/card/design";
-import { linkDisplay, linkHref, linkTitle } from "@/lib/card/links";
+import { linkDisplay, linkHref, linkTitle, linkVerb, whatsappHrefForPhone, type LinkKind } from "@/lib/card/links";
+import { nameScale, type NameScale } from "@/lib/card/name-scale";
 import { fadesUnderText } from "@/lib/card/pattern";
 import type { PublicCard } from "@/lib/card/types";
 import { cn } from "@/lib/cn";
@@ -11,14 +12,16 @@ import { Avatar } from "./avatar";
 import { LinkIcon } from "./link-icon";
 import { DeferredPatternSvg } from "./deferred-pattern-svg";
 import { editorialLines, monogram, MONOGRAM_OPACITY } from "./pass-art";
-import { ShareButton, TrackedLink } from "./profile-actions";
+import { TrackedLink } from "./profile-actions";
 
 interface ProfileCardProps {
   card: PublicCard;
   /** Editor preview: no navigation, no tracking. */
   preview?: boolean;
-  /** How the visitor arrived (?src=…): "Guardar contacto" counts under the same source. */
-  source?: string;
+  /** The public page's "Guardar contacto" (a client component); the preview draws a still one. */
+  saveAction?: ReactNode;
+  /** "Pasarle esta tarjeta a alguien", under the contact rows. */
+  shareAction?: ReactNode;
   className?: string;
 }
 
@@ -31,11 +34,37 @@ const ART_FOCUS = { x: ART_BOX.width - AVATAR_INSET.right, y: ART_BOX.height - A
 
 /** The name in the owner's typeface (the pass sets it the same way). */
 const NAME_CLASSES: Record<Typeface, string> = {
-  clasica: "font-display text-[2.7rem] leading-[0.95] tracking-tight",
-  cursiva: "font-display text-[2.7rem] leading-[0.95] tracking-tight italic",
-  editorial: "font-display text-[2.7rem] leading-[0.95] tracking-tight",
-  moderna: "font-sans text-[2.05rem] leading-[1.02] font-medium tracking-[-0.035em]",
+  clasica: "font-display leading-[0.95] tracking-tight",
+  cursiva: "font-display leading-[0.95] tracking-tight italic",
+  editorial: "font-display leading-[0.95] tracking-tight",
+  moderna: "font-sans leading-[1.02] font-medium tracking-[-0.035em]",
 };
+
+/**
+ * Name sizes: fluid with the screen, a step down for long names, and smaller
+ * on landscape phones so "Guardar contacto" peeks on the first screen.
+ * The sans typeface is wider, so it runs smaller.
+ */
+const NAME_SIZES: Record<"serif" | "sans", Record<NameScale, string>> = {
+  serif: {
+    lg: "text-[clamp(2rem,1.6rem+2vw,2.7rem)] [@media(max-height:500px)]:text-[2rem]",
+    md: "text-[clamp(1.75rem,1.45rem+1.5vw,2.2rem)] [@media(max-height:500px)]:text-[1.75rem]",
+    sm: "text-[clamp(1.5rem,1.3rem+1vw,1.8rem)] [@media(max-height:500px)]:text-[1.5rem]",
+  },
+  sans: {
+    lg: "text-[clamp(1.6rem,1.3rem+1.5vw,2.05rem)] [@media(max-height:500px)]:text-[1.6rem]",
+    md: "text-[clamp(1.45rem,1.2rem+1.2vw,1.75rem)] [@media(max-height:500px)]:text-[1.45rem]",
+    sm: "text-[clamp(1.3rem,1.15rem+0.8vw,1.5rem)] [@media(max-height:500px)]:text-[1.3rem]",
+  },
+};
+
+/** A still "Guardar contacto" for the editor's preview: looks like the real one, but isn't an action. */
+const PREVIEW_SAVE_CLASSES = buttonClasses({ variant: "signal", size: "lg", className: "w-full" }).replace("btn-signal", "");
+
+/** Emails and phone numbers may break anywhere (they have no spaces); the rest between words when possible. */
+function valueBreak(kind: LinkKind): string {
+  return kind === "email" || kind === "phone" || kind === "whatsapp" ? "break-all" : "break-words";
+}
 
 /** The pass's monogram, centered on the avatar like on the strip. */
 function Monogram({ name, italic }: { name: string; italic: boolean }) {
@@ -64,18 +93,20 @@ function Monogram({ name, italic }: { name: string; italic: boolean }) {
  * Styled like the pass: the card's color and motif on the stub, a
  * perforation, and a paper body with the contacts.
  */
-export function ProfileCard({ card, preview = false, source = "direct", className }: ProfileCardProps) {
+export function ProfileCard({ card, preview = false, saveAction, shareAction, className }: ProfileCardProps) {
   const name = card.fullName || "Tu nombre";
   const meta = [card.headline, card.company].filter(Boolean).join(" · ");
-  const vcardHref = `/u/${encodeURIComponent(card.slug)}/vcard${source !== "direct" ? `?src=${encodeURIComponent(source)}` : ""}`;
   const design = resolveDesign(card);
   const [first, rest] = editorialLines(name);
+  const nameSize = NAME_SIZES[design.typeface === "moderna" ? "sans" : "serif"][nameScale(name)];
+  // A phone with its country code also gets a WhatsApp button, unless the card already lists WhatsApp.
+  const listsWhatsapp = card.links.some((link) => link.kind === "whatsapp");
 
   return (
     <article
       className={cn("relative overflow-hidden rounded-object bg-card shadow-object", className)}
       style={cardCssVars(design.background, design.detail)}
-      aria-label={`Tarjeta de contacto de ${name}`}
+      aria-label={`Tarjeta de ${name}`}
     >
       {/* Stub */}
       <header className="relative isolate overflow-hidden bg-[var(--card-bg)] px-6 pt-5 pb-9 text-[var(--card-fg)]">
@@ -89,21 +120,19 @@ export function ProfileCard({ card, preview = false, source = "direct", classNam
           height={ART_BOX.height}
           style={{ position: "absolute", right: 0, bottom: 0, zIndex: -1, maxWidth: "none" }}
         />
-        <div className="flex items-center justify-between gap-3">
-          <span className="eyebrow inline-flex items-center gap-1.5 text-[var(--card-label)]">
-            <Mark className="size-4" cutout="var(--card-bg)" />
-            Tarjeta de contacto
-          </span>
-          {card.pronouns ? (
+        {/* No "Tarjeta de contacto" label: the PassMe logo is right above the card. */}
+        {card.pronouns ? (
+          <div className="flex justify-end">
             <span className="rounded-full border border-current/25 bg-[var(--card-bg)] px-2 py-0.5 font-mono text-mark tracking-wide">
               {card.pronouns}
             </span>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
 
-        <div className="mt-10 flex items-end justify-between gap-4">
+        <div className={cn("flex items-end justify-between gap-4 [@media(max-height:500px)]:mt-3", card.pronouns ? "mt-6" : "mt-12")}>
           <div className="min-w-0">
-            <h1 className={cn("break-words", NAME_CLASSES[design.typeface])}>
+            {/* Balanced lines, broken between words; break-words only rescues a single word wider than the card. */}
+            <h1 className={cn("break-words text-balance", NAME_CLASSES[design.typeface], nameSize)}>
               {design.typeface === "editorial" && rest ? (
                 <>
                   <span className="block">{first}</span>
@@ -143,46 +172,40 @@ export function ProfileCard({ card, preview = false, source = "direct", classNam
           <p className="mt-3 px-1 text-body leading-relaxed whitespace-pre-line text-ink-soft">{card.bio}</p>
         ) : null}
 
-        <div className="mt-5 grid grid-cols-[1fr_auto] gap-2">
+        <div className="mt-5">
           {preview ? (
-            <span className={buttonClasses({ variant: "ink", size: "lg", className: "w-full" })}>
+            <span className={PREVIEW_SAVE_CLASSES}>
               <UserRoundPlus className="size-5" aria-hidden />
               Guardar contacto
             </span>
           ) : (
-            // Plain link: iOS/Android open .vcf responses in the native "add contact" sheet.
-            // Downloads are counted server-side by the vCard route.
-            <a href={vcardHref} className={buttonClasses({ variant: "ink", size: "lg", className: "w-full" })}>
-              <UserRoundPlus className="size-5" aria-hidden />
-              Guardar contacto
-            </a>
+            saveAction
           )}
-          <ShareButton name={name} slug={card.slug} disabled={preview} />
         </div>
 
         {card.links.length > 0 ? (
           <ul className="mt-6 divide-y divide-line/80 border-y border-line/80">
             {card.links.map((link) => {
+              const display = linkDisplay(link.kind, link.value);
+              const whatsapp = link.kind === "phone" && !listsWhatsapp ? whatsappHrefForPhone(link.value) : null;
               const content = (
                 <>
                   <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[var(--card-bg)] text-[var(--card-label)] transition-transform duration-300 ease-[var(--ease-spring)] group-hover:-rotate-6">
                     <LinkIcon kind={link.kind} size={19} />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="eyebrow block">
-                      {linkTitle(link)}
-                    </span>
-                    <span className="block truncate text-body">{linkDisplay(link.kind, link.value)}</span>
+                    <span className="eyebrow block">{linkTitle(link)}</span>
+                    <span className={cn("block text-body", valueBreak(link.kind))}>{display}</span>
                   </span>
-                  <ArrowUpRight
-                    className="size-4 shrink-0 text-muted transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-ink"
-                    aria-hidden
-                  />
+                  {/* What tapping does, instead of a generic arrow. */}
+                  <span className="shrink-0 text-sm font-medium text-muted transition-colors group-hover:text-ink">{linkVerb(link.kind)}</span>
                 </>
               );
-              const rowClass = "group flex items-center gap-3.5 px-1 py-3.5";
+              const rowClass = "group flex min-w-0 flex-1 items-center gap-3.5 px-1 py-3.5";
+              const whatsappClass =
+                "grid size-11 shrink-0 place-items-center rounded-full border hairline text-ink transition-colors hover:bg-ink hover:text-paper";
               return (
-                <li key={link.id}>
+                <li key={link.id} className="flex items-center gap-2">
                   {preview ? (
                     <div className={rowClass}>{content}</div>
                   ) : (
@@ -190,6 +213,17 @@ export function ProfileCard({ card, preview = false, source = "direct", classNam
                       {content}
                     </TrackedLink>
                   )}
+                  {whatsapp ? (
+                    preview ? (
+                      <span className={whatsappClass} aria-hidden="true">
+                        <LinkIcon kind="whatsapp" size={18} />
+                      </span>
+                    ) : (
+                      <TrackedLink href={whatsapp} slug={card.slug} linkId={link.id} className={whatsappClass} label={`WhatsApp a ${display}`}>
+                        <LinkIcon kind="whatsapp" size={18} />
+                      </TrackedLink>
+                    )
+                  ) : null}
                 </li>
               );
             })}
@@ -200,6 +234,8 @@ export function ProfileCard({ card, preview = false, source = "direct", classNam
             Añade un teléfono o un email para que puedan contactarte.
           </p>
         ) : null}
+
+        {shareAction ? <div className="mt-3 flex justify-center">{shareAction}</div> : null}
       </div>
     </article>
   );

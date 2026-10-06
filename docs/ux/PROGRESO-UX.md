@@ -25,7 +25,7 @@ Diego puede cambiar cualquiera: están aisladas en sus PRs.
 | P2 | `feat/ux-p2-mi-qr` | ✅ hecho (pendiente de subir) |
 | P3 | `feat/ux-p3-sistema` | ✅ hecho (pendiente de subir) |
 | P4 | `feat/ux-p4-crear` | ✅ hecho (pendiente de subir) |
-| P5 | `feat/ux-p5-tarjeta` | pendiente |
+| P5 | `feat/ux-p5-tarjeta` | ✅ hecho (pendiente de subir) |
 | P6 | `feat/ux-p6-reuniones` | pendiente |
 | P7 | `feat/ux-p7-editor` | pendiente |
 | P8 | `feat/ux-p8-…` | pendiente |
@@ -58,6 +58,14 @@ Diego puede cambiar cualquiera: están aisladas en sus PRs.
 - **P4.5**: en iPhone, «Abrir Gmail» (`googlegmail://`) y «Abrir Mail» (`message://`, para todo lo que no es Gmail, también dominios de empresa) se abren en la misma pestaña. Si la app Gmail no está instalada, Safari dará un error: hay que probarlo en un iPhone real (3.3.4).
 - **P4.6**: `suggestEmailFix()` en `src/lib/auth/email-typos.ts`; la lista incluye `gmail.es` (habitual en España y no es de Gmail). La sugerencia no bloquea el envío. En `/crear` sale bajo «Te mandaremos un código a …» y «Sí, corregir» cambia también el email de la tarjeta. D3 (b): «Cerrar sesión y entrar con ese» lleva a `/login`; `/auth/signout` acepta un `next` validado con `safeNextPath` (si no, a la portada).
 - **P2.4 (rezagado)**: en `/crear`, un Android ve la vista previa de Apple con «Así se verá tu tarjeta» mientras Google Wallet esté apagado.
+- **P5 (estado compartido)**: `src/components/card/card-page-context.tsx` guarda qué panel está abierto, qué se ha enviado y si ya se pulsó «Guardar contacto». `ActionPanel` es el patrón común de «Déjale tu contacto» y «Agendar reunión» (fila con círculo `signal-wash`, `aria-expanded`/`aria-controls`, subtítulo en `aria-describedby`, «Cerrar» de 44×44 que devuelve el foco). El contenedor del panel existe siempre (vacío si está plegado) para que `aria-controls` no apunte a nada.
+- **P5.1 / P5.7**: tras enviar un formulario, «Crear la mía con estos datos» es `ink` mientras «Guardar contacto» siga pendiente y pasa a `signal` cuando ya se guardó: así nunca hay dos botones naranjas. Con un formulario abierto en escritorio pueden verse a la vez «Guardar contacto» y el envío del formulario (los dos `signal`); en el móvil no coinciden en pantalla. La vista previa del editor dibuja «Guardar contacto» con los colores `signal` pero sin la clase `btn-signal` (no es una acción).
+- **P5.3**: fuera de iOS, «Contacto guardado» llega al volver a la pestaña (`visibilitychange`) o a la ventana (`blur` → `focus`, para el ordenador); en iOS, con el propio toque. iOS se detecta igual que la ruta de la vCard (`servesVCardInline`, que también cuenta el iPad) y el nombre del archivo sale de `vcardDisplayFilename`, el mismo que manda la descarga. El botón redondo de compartir desaparece (`ShareButton` borrado); «Pasarle esta tarjeta a alguien» usa `ShareLinkButton` con el icono de cada plataforma (`shareIcon`).
+- **P5.4**: el nombre baja de tamaño a partir de 24 y 36 caracteres (`nameScale()` en `src/lib/card/name-scale.ts`). Se mantiene `break-words` en el nombre solo como último recurso para una palabra más ancha que la tarjeta (no corta a mitad de palabra si cabe). El criterio «con un nombre de 52 caracteres, “Guardar contacto” se ve en 780 px» no tiene E2E (la tarjeta demo tiene un nombre fijo): lo cubre el test unitario del tamaño. Las URL largas siguen abreviándose a 48 caracteres con «…» (`prettyUrl`, lo usan también los pases); el texto de las filas ya no se corta con CSS.
+- **P5.5**: `linkVerb()` y `whatsappHrefForPhone()` en `src/lib/card/links.ts`; el segundo vuelve a pasar el número por las reglas de WhatsApp (prefijo obligatorio) y construye el enlace con `linkHref("whatsapp", …)`. Si la tarjeta ya tiene un WhatsApp, los teléfonos no llevan el botón. El clic en el botón cuenta para la fila del teléfono en «Lo más pulsado». La tarjeta demo tiene ahora un móvil visible (`+34 612 345 678`) y conserva el teléfono oculto para los tests de enlaces ocultos.
+- **P5.6**: el error de «al menos uno» se guarda en los dos campos (`CONTACT_ONE_OF_ERROR`) y el formulario lo enseña una sola vez bajo Email, con los dos campos en rojo y descritos por él. Lo escrito se guarda en `sessionStorage` (`passme:contact-draft:<slug>`) y se borra al enviar; actualizada la frase de almacenamiento de `/privacidad`. D2 (b): la casilla sigue, con fila de 44 px y su error justo encima del botón. Con D2 (b) son 4 toques (abrir, móvil, casilla, enviar), no 3.
+- **P5.8**: el QR solo se ve a partir de 1024 px y no al dueño (él tiene «Mi QR»).
+- **P5 (fuera de alcance, para P6)**: el texto de la confirmación de la reunión ya no dice «Ya tenemos tus datos»; el resto de textos y la casilla del formulario de reunión siguen para P6.
 
 ## Notas para retomar
 

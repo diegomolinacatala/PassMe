@@ -418,51 +418,51 @@ Origen: ONB-01, ONB-05, ONB-06, ONB-14, ONB-16, LIFE-05.
 
 Lo que ve quien escanea. Origen: SCAN-01–10, SCAN-14, SCAN-15, SCAN-17, SCAN-18, ONB-10, ONB-11, ONB-15, ONB-20, A11Y-06, A11Y-09, COH-03, COH-06, MEET-10, MEET-26.
 
-**P5.1 · Jerarquía: la tarjeta de la otra persona es la protagonista** [M] · SCAN-05, ONB-11, COH-06
+**✅ P5.1 · Jerarquía: la tarjeta de la otra persona es la protagonista** [M] · SCAN-05, ONB-11, COH-06
 - `create-yours.tsx` (barra superior: hoy `ink`, 36 px, «Crea la tuya gratis»): variante `outline`, alto 44 px, texto «Crear la mía».
 - «Guardar contacto» es el único botón `signal` de la primera pantalla.
 - El bloque oscuro del final se mantiene (es el que vende); su botón pasa a `paper` sobre el fondo oscuro.
 - ✔ En la primera pantalla del iPhone 15 y del Pixel 7 solo hay un botón relleno: «Guardar contacto».
 
-**P5.2 · Orden y forma de las acciones secundarias** [M] · SCAN-08, ONB-20, A11Y-09, SCAN-07
+**✅ P5.2 · Orden y forma de las acciones secundarias** [M] · SCAN-08, ONB-20, A11Y-09, SCAN-07
 - `src/app/u/[slug]/page.tsx`: primero «Déjale tu contacto» (el gesto recíproco), después la reunión.
 - Las dos con el mismo patrón visual: borde sólido `hairline`, icono en un círculo `signal-wash`, flecha a la derecha (hoy una es sólida y otra discontinua).
 - `aria-expanded` + `aria-controls`; el subtítulo va en `aria-describedby` (no en el nombre del botón).
 - Una vez abierto, un botón «Cerrar» (44×44, arriba a la derecha) que lo pliega y devuelve el foco. Abrir uno pliega el otro.
 - ✔ En `/u/demo`, el primer bloque bajo la tarjeta es «Déjale tu contacto»; VoiceOver anuncia «… botón, contraído»; cada panel abierto se puede cerrar.
 
-**P5.3 · «Guardar contacto» con respuesta, sobre todo en Android** [A] · SCAN-02, ONB-10, SCAN-17, ONB-15
+**✅ P5.3 · «Guardar contacto» con respuesta, sobre todo en Android** [A] · SCAN-02, ONB-10, SCAN-17, ONB-15
 - `profile-card.tsx`: convertir el botón en un componente cliente pequeño.
 - Fuera de iOS (descarga como adjunto): al pulsar, mantener la descarga y mostrar bajo el botón, en línea (no modal): «Casi está. Abre **Alex Rivera.vcf** para guardarlo en tus contactos.» + un dibujo simple de la barra de descargas con «Abrir» resaltado + «¿No lo ves? Volver a descargar».
 - En todos: al volver a la pestaña (`visibilitychange`) o tras el clic, el botón pasa a «Contacto guardado» (variante `outline`, con check) y aparece debajo, con la animación `rise` existente: «¿Y tú? **Déjale el tuyo a Alex** · **Crear mi tarjeta**». El primero abre el formulario y hace scroll hasta él.
 - El botón redondo de compartir junto a «Guardar contacto» sale de ahí: «Guardar contacto» a todo el ancho y, bajo los datos de contacto, un enlace de texto «Pasarle esta tarjeta a alguien» (con el icono de compartir de cada plataforma: `Share` en iOS, `Share2` en el resto; en escritorio, «Enlace copiado» visible).
 - ✔ En el Pixel 7, tras pulsar «Guardar contacto», aparece el texto que nombra el archivo; tras volver a la pestaña, el botón dice «Contacto guardado» y se ve la invitación sin scroll; en la primera pantalla hay un único botón de acción.
 
-**P5.4 · Letra grande y pantallas estrechas** [A] · SCAN-03, A11Y-06, SCAN-14, SCAN-18
+**✅ P5.4 · Letra grande y pantallas estrechas** [A] · SCAN-03, A11Y-06, SCAN-14, SCAN-18
 - `profile-card.tsx`: `grid-cols-[minmax(0,1fr)_auto]` (si queda alguna rejilla tras P5.3); los datos de contacto nunca con puntos suspensivos (email y teléfono con `break-all`, el resto con `break-words`).
 - Nombre: `clamp(2rem, 1.6rem + 2vw, 2.7rem)` y además más pequeño según la longitud (> 24 caracteres y > 36); `text-wrap: balance`; cortar solo en espacios o tras un guion (no `overflow-wrap: anywhere` a mitad de palabra).
 - Quitar la etiqueta «TARJETA DE CONTACTO» de la cabecera de la tarjeta pública (no aporta; el logo ya está arriba).
 - Horizontal (`@media (max-height: 500px)`): menos margen superior y nombre a `2rem`, para que «Guardar contacto» asome en la primera pantalla.
 - ✔ A 360 px con `html{font-size:130%}`: «Guardar contacto» y el email completos, sin scroll horizontal; con un nombre de 52 caracteres, «Guardar contacto» se ve en una primera pantalla de 780 px; en el Pixel 7 en horizontal asoma «Guardar contacto».
 
-**P5.5 · Cada fila dice qué hace; teléfono y WhatsApp** [M] · SCAN-10
+**✅ P5.5 · Cada fila dice qué hace; teléfono y WhatsApp** [M] · SCAN-10
 - `profile-card.tsx`: sustituir la flecha ↗ común por un verbo corto a la derecha según el tipo: «Llamar», «Escribir» (email), «Abrir» (webs y redes), «WhatsApp».
 - Filas `phone` con prefijo internacional: un segundo botón de icono WhatsApp (44×44) que abre `wa.me/<número>` (construido con `linkHref()` o una función hermana con tests; nunca concatenando el valor sin validar).
 - `src/lib/card/demo.ts`: teléfono visible en la tarjeta demo.
 - ✔ Cada fila dice qué pasa al tocarla; una tarjeta con móvil +34 ofrece llamar y WhatsApp.
 
-**P5.6 · «Déjale tu contacto» en 3 toques** ⚖️ D2 [M] · SCAN-06, SCAN-09, COH-03
+**✅ P5.6 · «Déjale tu contacto» en 3 toques** ⚖️ D2 [M] · SCAN-06, SCAN-09, COH-03
 - `contact-form.tsx`: orden Nombre → **Móvil** → Email, con «Con el móvil o el email basta.» bajo el título; el error de «al menos uno» marca **los dos** campos (`src/lib/card/contact.ts`); Empresa y Mensaje plegados tras «+ Añadir empresa o un mensaje»; contador «0/500» a partir de 400 caracteres.
 - Con D2 = (a): sin casilla, y bajo el botón: «Al enviar, Alex recibe tu nombre y lo que escribas. Más info». Con D2 = (b): la fila de la casilla mide ≥ 44 px y su error sale junto al botón.
 - «Más info» abre `/privacidad#contactos` en otra pestaña (o despliega dos frases en línea), y lo escrito se guarda en `sessionStorage` para no perderlo al volver.
 - Textos: botón, título y envío con el mismo verbo («Déjale tu contacto a Alex» / «Dejarle mi contacto»). Confirmación sin «Ya tenemos tus datos»: «¿Te haces tu propia tarjeta? **Empieza con lo que acabas de escribir.**». Respuesta según el canal: con teléfono, «Alex te llamará o te escribirá cuando pueda.»; solo con email, «Alex te escribirá cuando pueda.»
 - ✔ Con nombre y móvil, enviar cuesta 3 toques (abrir, móvil, enviar) con D2 = (a); con el formulario vacío, el error resalta Móvil y Email; ningún texto dice «tenemos tus datos».
 
-**P5.7 · Tras enviar, una sola llamada a crear** [M] · SCAN-01, MEET-10
+**✅ P5.7 · Tras enviar, una sola llamada a crear** [M] · SCAN-01, MEET-10
 - `src/app/u/[slug]/page.tsx`: cuando el formulario de contacto o el de reunión está enviado, ocultar el bloque oscuro de crear y, si se envió la reunión, también «Déjale tu contacto» (Alex ya tiene los datos). Requiere convertir la parte inferior en un pequeño componente cliente o compartir el estado por contexto.
 - ✔ Tras enviar, en la página hay un solo botón naranja.
 
-**P5.8 · Escritorio: pasarse la tarjeta al móvil** [B] · SCAN-15
+**✅ P5.8 · Escritorio: pasarse la tarjeta al móvil** [B] · SCAN-15
 - `page.tsx`: a partir de 1024 px, una columna lateral con el QR de la tarjeta (`QrCode`, `?src=qr`) y «Escanéalo con tu móvil para guardar a Alex».
 - ✔ A 1440 px se ve el QR y abre `/u/<slug>?src=qr`.
 

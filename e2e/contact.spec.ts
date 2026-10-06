@@ -12,7 +12,7 @@ test.describe("contact exchange", () => {
 
     await page.getByRole("button", { name: "Dejarle mi contacto" }).click();
     await expect(page.getByText("Dinos cómo te llamas.")).toBeVisible();
-    await expect(page.getByText("Deja al menos un email o un teléfono.")).toBeVisible();
+    await expect(page.getByText("Deja tu móvil o tu email: con uno basta.")).toBeVisible();
     await expect(page.getByText("Marca la casilla para poder enviar tus datos.")).toBeVisible();
 
     // Values survive the failed attempt.

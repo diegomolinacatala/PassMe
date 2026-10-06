@@ -75,7 +75,8 @@ test("details left with 'Déjale tu contacto' prefill the new card", async ({ pa
   await page.goto("/u/demo?src=qr");
   await page.getByRole("button", { name: /Déjale tu contacto a Alex/ }).click();
   await page.getByLabel("Nombre").fill("Lucía Martín");
-  await page.getByLabel("Teléfono").fill("+34 611 22 33 44");
+  await page.getByLabel("Móvil", { exact: true }).fill("+34 611 22 33 44");
+  await page.getByRole("button", { name: "Añadir empresa o un mensaje" }).click();
   await page.getByLabel("Empresa").fill("Hotel Mirador");
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "Dejarle mi contacto" }).click();
@@ -86,7 +87,7 @@ test("details left with 'Déjale tu contacto' prefill the new card", async ({ pa
   await page.waitForURL(/\/crear\?de=demo/);
   await expect(page.getByLabel("Nombre y apellidos")).toHaveValue("Lucía Martín");
   await expect(page.getByLabel("Empresa")).toHaveValue("Hotel Mirador");
-  await expect(page.getByLabel("Móvil")).toHaveValue("+34 611 22 33 44");
+  await expect(page.getByLabel("Móvil", { exact: true })).toHaveValue("+34 611 22 33 44");
 });
 
 test("the email's button asks for a tap instead of signing in on open", async ({ page }) => {

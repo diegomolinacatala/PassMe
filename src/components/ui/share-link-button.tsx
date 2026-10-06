@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Copy, Share } from "lucide-react";
+import { Check, Copy, Share, Share2 } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
 import { announce } from "@/lib/announce";
 import { cn } from "@/lib/cn";
@@ -34,6 +34,8 @@ interface ShareLinkButtonProps {
   className?: string;
   /** Extra classes for the icon (e.g. a muted tone in menus). */
   iconClassName?: string;
+  /** The share glyph people know on their phone: iOS's box with an arrow, or Android's three dots. */
+  shareIcon?: "ios" | "android";
 }
 
 /**
@@ -51,6 +53,7 @@ export function ShareLinkButton({
   size = "md",
   className,
   iconClassName,
+  shareIcon = "ios",
 }: ShareLinkButtonProps) {
   const canShare = useCanShare();
   const [copied, setCopied] = useState(false);
@@ -77,7 +80,7 @@ export function ShareLinkButton({
   }
 
   const label = copied ? "Enlace copiado" : canShare ? shareLabel : copyLabel;
-  const Icon = copied ? Check : canShare ? Share : Copy;
+  const Icon = copied ? Check : canShare ? (shareIcon === "ios" ? Share : Share2) : Copy;
 
   return (
     <button type="button" onClick={share} className={className ?? cn(buttonClasses({ variant, size }), copied && "text-ok")}>

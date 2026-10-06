@@ -418,3 +418,21 @@ export function linkDisplay(kind: LinkKind, value: string): string {
 export function isWebLink(kind: LinkKind): boolean {
   return kind !== "email" && kind !== "phone";
 }
+
+/** What tapping a contact row does, said in one short verb on the public card. */
+export function linkVerb(kind: LinkKind): string {
+  if (kind === "phone") return "Llamar";
+  if (kind === "email") return "Escribir";
+  if (kind === "whatsapp") return "WhatsApp";
+  return "Abrir";
+}
+
+/**
+ * `https://wa.me/<digits>` for a stored phone number, or null when it has no
+ * international prefix (WhatsApp can't guess the country). The value goes
+ * through the WhatsApp rules again, so nothing unvalidated reaches the href.
+ */
+export function whatsappHrefForPhone(value: string): string | null {
+  const normalized = normalizeLinkValue("whatsapp", value);
+  return normalized.ok ? linkHref("whatsapp", normalized.value) : null;
+}

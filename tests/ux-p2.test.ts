@@ -189,10 +189,10 @@ describe("«Mandarle mi tarjeta»", () => {
     expect(sentDetailsSentence("Alex", { email: "", phone: "" })).toBe("Alex verá tu nombre.");
   });
 
-  it("works from the demo card (its phone is hidden)", () => {
+  it("works from the demo card (its visible mobile, never the hidden phone)", () => {
     const details = sendCardDetails(DEMO_CARD, null, "u");
     expect(details.email).toBe("alex@example.com");
-    expect(details.phone).toBe("");
+    expect(details.phone).toBe("+34 612 345 678");
   });
 });
 

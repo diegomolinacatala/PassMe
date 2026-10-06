@@ -36,7 +36,8 @@ export function CreateYoursBar({ slug, via, isOwner = false }: CreateYoursBarPro
           Editar mi tarjeta
         </a>
       ) : (
-        <Link href={createPath(slug, via)} className={buttonClasses({ variant: "ink", size: "sm", className: "pr-4 pl-3 shadow-soft" })}>
+        // Outline: on someone else's card, their "Guardar contacto" is the one filled button.
+        <Link href={createPath(slug, via)} className={buttonClasses({ variant: "outline", size: "sm", className: "min-h-11 pr-4 pl-3 sm:min-h-11" })}>
           <Plus className="size-4" aria-hidden />
           Crear la mía
         </Link>
@@ -66,7 +67,7 @@ export function CreateYoursCta({ slug, via, ownerName }: { slug: string; via: Vi
       <p className="mt-3 text-body leading-relaxed text-paper/80">
         Como la de {firstName}: vive en la cartera de tu móvil y se comparte con un QR. Gratis y sin instalar nada.
       </p>
-      <Link href={createPath(slug, via)} className={buttonClasses({ variant: "signal", size: "lg", className: "group mt-6 w-full" })}>
+      <Link href={createPath(slug, via)} className={buttonClasses({ variant: "paper", size: "lg", className: "group mt-6 w-full" })}>
         Crear mi tarjeta
         <ArrowRight className="size-5 transition-transform duration-300 group-hover:translate-x-0.5" aria-hidden />
       </Link>

@@ -129,10 +129,24 @@ export function vcardFilename(slug: string): string {
  * as the plain-ASCII fallback for old clients.
  */
 export function vcardContentDisposition(disposition: "inline" | "attachment", fullName: string, slug: string): string {
-  const clean = fullName.replace(/[\u0000-\u001f\u007f/\\:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
   const fallback = vcardFilename(slug);
-  if (!clean) return `${disposition}; filename="${fallback}"`;
-  return `${disposition}; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(`${clean}.vcf`)}`;
+  const named = vcardDisplayFilename(fullName, slug);
+  if (named === fallback) return `${disposition}; filename="${fallback}"`;
+  return `${disposition}; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(named)}`;
+}
+
+/** The file name a browser saves the vCard as ("Alex Rivera.vcf"), also shown on the card to find it. */
+export function vcardDisplayFilename(fullName: string, slug: string): string {
+  const clean = fullName.replace(/[\u0000-\u001f\u007f/\\:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
+  return clean ? `${clean}.vcf` : vcardFilename(slug);
+}
+
+/**
+ * iOS Safari shows its native "add contact" sheet for inline vCards; other
+ * browsers (Android Chrome would render text/* inline) get a download.
+ */
+export function servesVCardInline(userAgent: string | null | undefined): boolean {
+  return /iPhone|iPad|iPod/i.test(userAgent ?? "");
 }
 
 /** "Guardado con PassMe el 05/10/2026 · getpassme.com/u/alex" (date in Spain's time zone). */

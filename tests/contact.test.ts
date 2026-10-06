@@ -29,7 +29,8 @@ describe("contact request validation", () => {
     const result = parseContactRequest({ ...base, name: " ", email: "", consent: false });
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(Object.keys(result.errors).sort()).toEqual(["consent", "email", "name"]);
+    // Neither phone nor email: both fields are marked.
+    expect(Object.keys(result.errors).sort()).toEqual(["consent", "email", "name", "phone"]);
   });
 
   it("rejects malformed contacts and oversized text", () => {

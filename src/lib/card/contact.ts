@@ -32,6 +32,12 @@ function optionalContact(kind: "email" | "phone", max: number) {
     });
 }
 
+/** Shown under the phone and email fields when both are empty. */
+export const CONTACT_ONE_OF_ERROR = "Deja tu móvil o tu email: con uno basta.";
+
+/** Also run a refinement when other fields failed, so the visitor sees every problem at once. */
+const always = ({ value }: { value: unknown }) => typeof value === "object" && value !== null;
+
 export const contactRequestSchema = z
   .object({
     name: line(CONTACT_LIMITS.name).pipe(z.string().min(1, "Dinos cómo te llamas.")),
@@ -41,12 +47,9 @@ export const contactRequestSchema = z
     message: paragraph(CONTACT_LIMITS.message),
     consent: z.literal(true, { error: "Marca la casilla para poder enviar tus datos." }),
   })
-  .refine((value) => Boolean(value.email || value.phone), {
-    path: ["email"],
-    message: "Deja al menos un email o un teléfono.",
-    // Also run when other fields failed, so the visitor sees every problem at once.
-    when: ({ value }) => typeof value === "object" && value !== null,
-  });
+  // Neither phone nor email: both fields are marked, so it's clear either one will do.
+  .refine((value) => Boolean(value.email || value.phone), { path: ["phone"], message: CONTACT_ONE_OF_ERROR, when: always })
+  .refine((value) => Boolean(value.email || value.phone), { path: ["email"], message: CONTACT_ONE_OF_ERROR, when: always });
 
 export type ValidContactRequest = z.output<typeof contactRequestSchema>;
 
