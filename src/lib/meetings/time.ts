@@ -11,11 +11,22 @@
 export const DEFAULT_TIME_ZONE = "Europe/Madrid";
 const LOCALE = "es-ES";
 
+export interface TimeGroup {
+  label: string;
+  times: ReadonlyArray<string>;
+  /** Early and late times: folded until asked for. */
+  folded?: boolean;
+}
+
 /** Times of day the picker offers, every half hour. */
-export const TIME_GROUPS: ReadonlyArray<{ label: string; times: ReadonlyArray<string> }> = [
+export const TIME_GROUPS: ReadonlyArray<TimeGroup> = [
   { label: "Por la mañana", times: halfHours(9, 14) },
   { label: "Por la tarde", times: halfHours(14, 20) },
+  { label: "Más temprano o más tarde", times: ["08:00", "08:30", "20:00", "20:30"], folded: true },
 ];
+
+/** Half hours still free in the usual times for the picker to open on a day: five hours, so from 15:00 on it's tomorrow. */
+const OPENING_MIN_FREE = 10;
 
 function halfHours(from: number, to: number): string[] {
   const times: string[] = [];
@@ -132,6 +143,8 @@ export interface PickerDay {
   month: string;
   /** Full name for screen readers: "martes, 7 de octubre". */
   long: string;
+  /** Saturday or Sunday: still pickable, just quieter. */
+  weekend: boolean;
 }
 
 const strip = (value: string) => value.replace(/\.$/, "");
@@ -149,6 +162,7 @@ export function pickerDay(key: string, label?: string): PickerDay {
     day: noon.getUTCDate(),
     month: strip(SHORT_MONTH.format(noon)),
     long: LONG_DAY.format(noon),
+    weekend: [0, 6].includes(noon.getUTCDay()),
   };
 }
 
@@ -159,6 +173,17 @@ export function upcomingDays(now: Date, timeZone: string, count: number): Picker
     const key = new Date(Date.UTC(today.year, today.month - 1, today.day + i, 12)).toISOString().slice(0, 10);
     return pickerDay(key, i === 0 ? "Hoy" : i === 1 ? "Mañana" : undefined);
   });
+}
+
+/**
+ * The day the picker opens on: the first weekday with enough of the usual
+ * times still free (after 15:00, tomorrow; on a Friday evening or a weekend,
+ * Monday). Falls back to the first day.
+ */
+export function openingDayKey(now: Date, timeZone: string, days: ReadonlyArray<PickerDay>): string {
+  const usual = TIME_GROUPS.filter((group) => !group.folded).flatMap((group) => group.times);
+  const free = (key: string) => usual.filter((time) => (zonedTimeToUtc(key, time, timeZone)?.getTime() ?? 0) > now.getTime()).length;
+  return days.find((day) => !day.weekend && free(day.key) >= OPENING_MIN_FREE)?.key ?? days[0]!.key;
 }
 
 function formatter(options: Intl.DateTimeFormatOptions, timeZone: string): Intl.DateTimeFormat {

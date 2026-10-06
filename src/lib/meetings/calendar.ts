@@ -19,6 +19,8 @@ export interface CalendarEvent {
   end: string;
   summary: string;
   description: string;
+  /** Minutes before the start for the reminder (30 if unset). */
+  alarmMinutes?: number;
   location: string;
   url: string;
   organizer: CalendarPerson;
@@ -75,7 +77,8 @@ export function buildIcs(event: CalendarEvent, method: CalendarMethod, now: Date
   }
   lines.push(`STATUS:${cancelled ? "CANCELLED" : "CONFIRMED"}`, "TRANSP:OPAQUE");
   if (!cancelled) {
-    lines.push("BEGIN:VALARM", "ACTION:DISPLAY", `DESCRIPTION:${escapeText(event.summary)}`, "TRIGGER:-PT30M", "END:VALARM");
+    const alarm = event.alarmMinutes ?? 30;
+    lines.push("BEGIN:VALARM", "ACTION:DISPLAY", `DESCRIPTION:${escapeText(event.summary)}`, `TRIGGER:-PT${alarm}M`, "END:VALARM");
   }
   lines.push("END:VEVENT", "END:VCALENDAR");
   return lines.map(foldLine).join("\r\n") + "\r\n";

@@ -22,8 +22,10 @@ export interface EmailBody {
   paragraphs: ReadonlyArray<string>;
   /** Label/value rows (when, where, with whom…). */
   details?: ReadonlyArray<readonly [string, string]>;
-  /** Stacked buttons (e.g. one per proposed time). The first is the main one. */
+  /** Stacked buttons (e.g. one per proposed time). The first is the main one, unless `equalButtons`. */
   buttons?: ReadonlyArray<EmailButton>;
+  /** Alternatives of equal weight (the proposed times): every button outlined, none in signal orange. */
+  equalButtons?: boolean;
   buttonsIntro?: string;
   /** Smaller text links under the buttons. */
   links?: ReadonlyArray<EmailLink>;
@@ -84,7 +86,7 @@ export function renderEmailHtml(body: EmailBody): string {
 
   const buttons = body.buttons?.length
     ? `${body.buttonsIntro ? `<p style="margin:6px 0 12px;font-size:14px;color:${MUTED};">${escapeHtml(body.buttonsIntro)}</p>` : ""}<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${body.buttons
-        .map((b, i) => button(b, i === 0))
+        .map((b, i) => button(b, i === 0 && !body.equalButtons))
         .join("")}</table>`
     : "";
 

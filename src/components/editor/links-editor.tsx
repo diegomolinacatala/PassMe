@@ -30,9 +30,11 @@ interface LinksEditorProps {
   /** Puts a removed link back where it was ("Deshacer"). */
   onRestore: (link: CardLink, index: number) => void;
   onMove: (id: string, direction: -1 | 1) => void;
+  /** The card takes meeting proposals: a booking link then lives inside "Agendar reunión". */
+  takesMeetings?: boolean;
 }
 
-export function LinksEditor({ links, suggestedEmail, errors, showErrors, onAdd, onUpdate, onRemove, onRestore, onMove }: LinksEditorProps) {
+export function LinksEditor({ links, suggestedEmail, errors, showErrors, onAdd, onUpdate, onRemove, onRestore, onMove, takesMeetings }: LinksEditorProps) {
   // Id of a just-added link whose input should receive focus once it mounts.
   const pendingFocus = useRef<string | null>(null);
   const addFirst = useRef<HTMLButtonElement>(null);
@@ -194,6 +196,12 @@ export function LinksEditor({ links, suggestedEmail, errors, showErrors, onAdd, 
       )}
 
       <UndoNotice item={undo} onUndo={restore} onExpire={() => setUndo(null)} />
+
+      {takesMeetings && links.some((link) => link.kind === "booking") ? (
+        <p className="mt-3 rounded-2xl bg-paper-deep/70 px-3.5 py-2.5 text-sm text-ink-soft">
+          Ya recibes propuestas de reunión. Con Calendly o Cal.com, la gente podrá elegir entre los dos: tu enlace de reservas aparece dentro de «Agendar reunión».
+        </p>
+      ) : null}
 
       <div className="mt-5">
         <p className="eyebrow mb-3">

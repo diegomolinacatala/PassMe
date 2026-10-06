@@ -85,12 +85,14 @@ test.describe("deleting and removing", () => {
     });
     await page.goto("/dashboard");
     const panel = page.locator("#reuniones");
-    const remove = panel.getByRole("button", { name: /^Quitar la reunión con / }).first();
-    const name = (await remove.getAttribute("aria-label"))!.replace("Quitar la reunión con ", "");
+    // An unanswered proposal: the bin offers "say no" or "remove without telling" (P6.11).
+    const remove = panel.getByRole("button", { name: /^Rechazar o quitar la propuesta de / }).first();
+    const label = (await remove.getAttribute("aria-label"))!;
     await remove.click();
-    await expect(panel.getByRole("button", { name: `Quitar la reunión con ${name}` })).toHaveCount(0);
+    await panel.getByRole("button", { name: "Quitar sin avisar (es spam)" }).click();
+    await expect(panel.getByRole("button", { name: label })).toHaveCount(0);
     await panel.getByRole("button", { name: "Deshacer" }).click();
-    await expect(panel.getByRole("button", { name: `Quitar la reunión con ${name}` })).toHaveCount(1);
+    await expect(panel.getByRole("button", { name: label })).toHaveCount(1);
     expect(dialogs).toBe(0);
   });
 });

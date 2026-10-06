@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, CalendarClock, CircleCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, ArrowUpRight, CalendarClock, CircleCheck } from "lucide-react";
 import Link from "next/link";
 import { startTransition, useActionState, useEffect, useRef, useState, type FormEvent } from "react";
 import { submitMeetingAction, type MeetingRequestState } from "@/app/u/[slug]/meeting-actions";
@@ -10,15 +10,17 @@ import { Notice } from "@/components/ui/notice";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { Turnstile } from "@/components/ui/turnstile";
 import { ActionPanel, PanelCloseButton, useCardPage } from "@/components/card/card-page-context";
-import { rememberDetails } from "@/lib/card/draft-storage";
+import { TrackedLink } from "@/components/card/profile-actions";
+import { readStoredDraft, rememberDetails } from "@/lib/card/draft-storage";
 import { createPath, parseVia } from "@/lib/card/quick";
 import type { FieldErrors } from "@/lib/card/schema";
 import { cn } from "@/lib/cn";
 import { firstName, formatDuration } from "@/lib/meetings/model";
 import { DEFAULT_DURATION, FORMAT_LABELS, MEETING_DURATIONS, MEETING_LIMITS, type MeetingDuration, type MeetingFormat } from "@/lib/meetings/schema";
-import { formatSlotShort, localTimeZone, timeZoneCity } from "@/lib/meetings/time";
+import { clearMeetingForm, readMeetingForm, writeMeetingForm, type MeetingFormWhen, type MeetingFormWho } from "@/lib/meetings/form-storage";
+import { formatDay, formatSlotShort, formatTime, localTimeZone, timeZoneCity } from "@/lib/meetings/time";
 import { Segmented } from "./form-bits";
-import { FORMAT_ICONS } from "./shared";
+import { FORMAT_ICONS, useClientNow } from "./shared";
 import { SlotPicker } from "./slot-picker";
 
 interface MeetingRequestProps {
@@ -26,27 +28,21 @@ interface MeetingRequestProps {
   ownerName: string;
   source: string;
   captchaSiteKey: string | null;
+  /** The card's booking link (Calendly…), offered here instead of in the card's list. */
+  booking: { href: string; linkId: string } | null;
 }
 
 /** What the visitor chose in step 1. */
-interface When {
-  slots: string[];
-  duration: MeetingDuration;
-  format: MeetingFormat;
-  location: string;
-}
+type When = MeetingFormWhen;
 
 /** What they typed in step 2. */
-interface Who {
-  name: string;
-  email: string;
-  phone: string;
-  company: string;
-  topic: string;
-  consent: boolean;
-}
+type Who = MeetingFormWho & { consent: boolean };
 
 const STEP_ONE_FIELDS = new Set(["slots", "duration", "format", "location"]);
+/** Step 2 has its own history entry: the browser's back button returns to the times. */
+const STEP_TWO_HASH = "#reunion-2";
+const EMPTY_WHEN: When = { slots: [], duration: DEFAULT_DURATION, format: "in_person", location: "", link: "" };
+const EMPTY_WHO: Who = { name: "", email: "", phone: "", company: "", topic: "", consent: false };
 
 function SentMessage({ owner, slug, source, state, slots, timeZone, saved }: {
   owner: string;
@@ -61,6 +57,7 @@ function SentMessage({ owner, slug, source, state, slots, timeZone, saved }: {
   const heading = useRef<HTMLParagraphElement>(null);
   const { details } = state;
   const via = parseVia(source);
+  const last = slots.at(-1);
   useEffect(() => heading.current?.focus(), []);
   // Any "create mine" button on the page (top bar, dark block) now starts with these details.
   useEffect(() => {
@@ -84,6 +81,16 @@ function SentMessage({ owner, slug, source, state, slots, timeZone, saved }: {
           ? "Es la tarjeta de ejemplo: esta vez no se ha enviado nada."
           : `Ya la tiene ${owner}. En cuanto elija una hora, te escribimos a ${state.email} con la invitación para tu calendario.`}
       </p>
+      {last ? (
+        <p className="mx-auto mt-2 max-w-xs text-xs text-muted">
+          Si {owner} no responde antes del {formatDay(last, timeZone)} a las {formatTime(last, timeZone)}, la propuesta caduca sola.
+        </p>
+      ) : null}
+      {state.guestPath ? (
+        <Link href={state.guestPath} className={buttonClasses({ variant: "outline", className: "mt-4" })}>
+          Ver o cancelar mi propuesta
+        </Link>
+      ) : null}
       <div className="mt-5 border-t hairline pt-5">
         <p className="text-sm text-ink-soft">
           ¿Te haces tu propia tarjeta? <strong className="font-medium text-ink">Empieza con lo que acabas de escribir.</strong>
@@ -102,6 +109,8 @@ function SentMessage({ owner, slug, source, state, slots, timeZone, saved }: {
 
 interface StepWhenProps {
   owner: string;
+  slug: string;
+  booking: MeetingRequestProps["booking"];
   when: When;
   onChange: (patch: Partial<When>) => void;
   timeZone: string;
@@ -110,7 +119,7 @@ interface StepWhenProps {
   onNext: () => void;
 }
 
-function StepWhen({ owner, when, onChange, timeZone, now, errors, onNext }: StepWhenProps) {
+function StepWhen({ owner, slug, booking, when, onChange, timeZone, now, errors, onNext }: StepWhenProps) {
   const heading = useRef<HTMLHeadingElement>(null);
   const picker = useRef<HTMLDivElement>(null);
   const [flash, setFlash] = useState(false);
@@ -140,6 +149,15 @@ function StepWhen({ owner, when, onChange, timeZone, now, errors, onNext }: Step
         <p className="mt-1 text-sm text-muted">
           Propón hasta tres horas (hora de {timeZoneCity(timeZone)}). {owner} recibe un email y elige una.
         </p>
+        {booking ? (
+          <p className="mt-2 text-sm text-ink-soft">
+            ¿Prefieres ver sus huecos libres?{" "}
+            <TrackedLink href={booking.href} slug={slug} linkId={booking.linkId} className="inline-flex items-center gap-0.5 font-medium text-signal-deep underline-offset-4 hover:underline">
+              Abrir su calendario
+              <ArrowUpRight className="size-3.5" aria-hidden />
+            </TrackedLink>
+          </p>
+        ) : null}
       </div>
       <div
         ref={picker}
@@ -167,24 +185,35 @@ function StepWhen({ owner, when, onChange, timeZone, now, errors, onNext }: Step
         stacked
       />
       {when.format === "in_person" ? (
-        <Field label="Dónde" optional error={errors.location} hint="Un sitio que os venga bien a los dos. Se puede cambiar al confirmar.">
+        <Field label="Dónde" optional error={errors.location} hint="Un sitio, o un enlace de Google Maps o Apple Maps. Se puede cambiar al confirmar.">
           {(props) => (
             <input
               {...props}
               value={when.location}
               onChange={(e) => onChange({ location: e.target.value })}
-              maxLength={MEETING_LIMITS.location}
+              maxLength={MEETING_LIMITS.videoLink}
               placeholder="Café Central, Madrid"
               className={inputClasses()}
             />
           )}
         </Field>
+      ) : when.format === "video" ? (
+        <Field label="Enlace (si ya lo tienes)" optional error={errors.location} hint={`De Meet, Zoom, Teams, Whereby, Jitsi o Webex. Si no, ${owner} lo añade al confirmar.`}>
+          {(props) => (
+            <input
+              {...props}
+              type="url"
+              inputMode="url"
+              value={when.link}
+              onChange={(e) => onChange({ link: e.target.value })}
+              maxLength={MEETING_LIMITS.videoLink}
+              placeholder="https://meet.google.com/…"
+              className={inputClasses()}
+            />
+          )}
+        </Field>
       ) : (
-        <p className="text-xs text-muted">
-          {when.format === "video"
-            ? `${owner} añade el enlace de la videollamada al confirmar (o os lo pasáis por email).`
-            : `${owner} te llamará: en el siguiente paso deja tu teléfono.`}
-        </p>
+        <p className="text-xs text-muted">{`${owner} te llamará: en el siguiente paso deja tu teléfono.`}</p>
       )}
       <Button size="lg" variant={count > 0 ? "signal" : "ink"} className={cn("group w-full", count === 0 && "opacity-60")} onClick={next}>
         {count === 0 ? "Elige al menos una hora" : `Continuar con ${count} ${count === 1 ? "hora" : "horas"}`}
@@ -205,6 +234,8 @@ interface StepWhoProps {
   onBack: () => void;
 }
 
+const CONSENT_ERROR_ID = "agendar-consent-error";
+
 function StepWho({ owner, ownerFullName, when, who, onChange, timeZone, errors, onBack }: StepWhoProps) {
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => heading.current?.focus(), []);
@@ -218,9 +249,9 @@ function StepWho({ owner, ownerFullName, when, who, onChange, timeZone, errors, 
     <div className="animate-rise space-y-4">
       <div>
         <h3 ref={heading} tabIndex={-1} className="font-display text-[1.7rem] leading-tight outline-none">
-          ¿Quién <em className="text-signal">propone?</em>
+          ¿Cómo te <em className="text-signal">avisamos?</em>
         </h3>
-        <p className="mt-1 text-sm text-muted">Para que {owner} sepa quién eres y podamos enviarte la invitación.</p>
+        <p className="mt-1 text-sm text-muted">Te escribimos aquí cuando {owner} elija una hora.</p>
       </div>
 
       <div className="flex items-start justify-between gap-3 rounded-2xl bg-paper-deep/70 px-3.5 py-3">
@@ -275,7 +306,14 @@ function StepWho({ owner, ownerFullName, when, who, onChange, timeZone, errors, 
       </div>
       <Field label="¿De qué queréis hablar?" optional error={errors.topic}>
         {(props) => (
-          <input {...props} {...text("topic")} maxLength={MEETING_LIMITS.topic} placeholder="Nos conocimos en… / Me gustaría hablar de…" className={inputClasses()} />
+          <textarea
+            {...props}
+            {...text("topic")}
+            rows={2}
+            maxLength={MEETING_LIMITS.topic}
+            placeholder="Nos conocimos en… · Me gustaría hablar de…"
+            className={inputClasses({ size: "multiline" })}
+          />
         )}
       </Field>
 
@@ -287,7 +325,7 @@ function StepWho({ owner, ownerFullName, when, who, onChange, timeZone, errors, 
         </label>
       </div>
 
-      <label className="flex items-start gap-3 text-sm leading-snug text-ink-soft">
+      <label className="flex min-h-11 items-center gap-3 text-sm leading-snug text-ink-soft">
         <input
           type="checkbox"
           name="consent"
@@ -295,7 +333,8 @@ function StepWho({ owner, ownerFullName, when, who, onChange, timeZone, errors, 
           checked={who.consent}
           onChange={(e) => onChange({ consent: e.target.checked })}
           aria-invalid={Boolean(errors.consent)}
-          className="mt-0.5 size-4 shrink-0 accent-[var(--color-ink)]"
+          aria-describedby={errors.consent ? CONSENT_ERROR_ID : undefined}
+          className="size-5 shrink-0 accent-[var(--color-ink)]"
         />
         <span>
           Acepto que {ownerFullName} reciba estos datos y que PassMe me escriba sobre esta reunión.{" "}
@@ -304,7 +343,6 @@ function StepWho({ owner, ownerFullName, when, who, onChange, timeZone, errors, 
           </a>
         </span>
       </label>
-      {errors.consent ? <InlineError className="-mt-2">{errors.consent}</InlineError> : null}
     </div>
   );
 }
@@ -314,13 +352,40 @@ function StepWho({ owner, ownerFullName, when, who, onChange, timeZone, errors, 
  * them by email and confirms one with a tap. Two short steps (when → who),
  * collapsed by default so the card stays the star of the page.
  */
-export function MeetingRequest({ slug, ownerName, source, captchaSiteKey }: MeetingRequestProps) {
-  const { saved, markSent } = useCardPage();
+export function MeetingRequest({ slug, ownerName, source, captchaSiteKey, booking }: MeetingRequestProps) {
+  const { saved, markSent, open: showPanel } = useCardPage();
   // Taken when the panel first opens: "now" and the visitor's time zone for the slot picker.
   const [open, setOpen] = useState<{ now: number; timeZone: string } | null>(null);
   const [step, setStep] = useState<1 | 2>(1);
-  const [when, setWhen] = useState<When>({ slots: [], duration: DEFAULT_DURATION, format: "in_person", location: "" });
-  const [who, setWho] = useState<Who>({ name: "", email: "", phone: "", company: "", topic: "", consent: false });
+  const [when, setWhen] = useState<When>(EMPTY_WHEN);
+  const [who, setWho] = useState<Who>(EMPTY_WHO);
+  // Back in this tab (reload, back button) or sent here to try again (?reunion=1): pick up where it was.
+  const clientNow = useClientNow();
+  const [restored, setRestored] = useState(false);
+  const [autoOpen, setAutoOpen] = useState(false);
+  if (clientNow > 0 && !restored) {
+    setRestored(true);
+    const stored = readMeetingForm(slug);
+    const retry = new URLSearchParams(window.location.search).get("reunion") === "1";
+    if (stored || retry) {
+      const known = readStoredDraft()?.draft;
+      setWhen(stored?.when ?? EMPTY_WHEN);
+      setWho({
+        ...EMPTY_WHO,
+        name: known?.fullName ?? "",
+        email: known?.email ?? "",
+        phone: known?.phone ?? "",
+        company: known?.company ?? "",
+        ...Object.fromEntries(Object.entries(stored?.who ?? {}).filter(([, value]) => value)),
+      });
+      setStep(stored?.step === 2 && window.location.hash === STEP_TWO_HASH ? 2 : 1);
+      setOpen({ now: clientNow, timeZone: localTimeZone() });
+      setAutoOpen(true);
+    }
+  }
+  useEffect(() => {
+    if (autoOpen) showPanel("meeting", { scroll: true });
+  }, [autoOpen, showPanel]);
   const [stepError, setStepError] = useState<string | null>(null);
   // Server errors go stale as soon as their field changes.
   const [edited, setEdited] = useState<ReadonlySet<string>>(new Set());
@@ -336,8 +401,36 @@ export function MeetingRequest({ slug, ownerName, source, captchaSiteKey }: Meet
   }, [state]);
 
   useEffect(() => {
-    if (state.status === "sent") markSent("meeting");
-  }, [state.status, markSent]);
+    if (state.status !== "sent") return;
+    markSent("meeting");
+    clearMeetingForm(slug);
+    if (window.location.hash === STEP_TWO_HASH) window.history.replaceState(null, "", window.location.pathname + window.location.search);
+  }, [state.status, markSent, slug]);
+
+  // Keep the half-filled form for this tab (never the consent box).
+  useEffect(() => {
+    if (!open || state.status === "sent") return;
+    const typed = { name: who.name, email: who.email, phone: who.phone, company: who.company, topic: who.topic };
+    writeMeetingForm(slug, { step, when, who: typed });
+  }, [open, step, when, who, slug, state.status]);
+
+  // The browser's back (and forward) button moves between the two steps.
+  useEffect(() => {
+    const onPopState = () => setStep(window.location.hash === STEP_TWO_HASH && when.slots.length > 0 ? 2 : 1);
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [when.slots.length]);
+
+  function toStepTwo() {
+    setStep(2);
+    if (window.location.hash !== STEP_TWO_HASH) window.history.pushState(null, "", STEP_TWO_HASH);
+  }
+
+  function toStepOne() {
+    // Undo our own history entry, so "back" afterwards leaves the page as expected.
+    if (window.location.hash === STEP_TWO_HASH) window.history.back();
+    setStep(1);
+  }
 
   const [handled, setHandled] = useState(state);
   if (handled !== state) {
@@ -394,12 +487,14 @@ export function MeetingRequest({ slug, ownerName, source, captchaSiteKey }: Meet
             ))}
             <input type="hidden" name="duration" value={when.duration} />
             <input type="hidden" name="format" value={when.format} />
-            <input type="hidden" name="location" value={when.format === "in_person" ? when.location : ""} />
+            <input type="hidden" name="location" value={when.format === "in_person" ? when.location : when.format === "video" ? when.link : ""} />
             <input type="hidden" name="timeZone" value={open.timeZone} />
 
             {step === 1 ? (
               <StepWhen
                 owner={owner}
+                slug={slug}
+                booking={booking}
                 when={when}
                 onChange={(patch) => {
                   setWhen((prev) => ({ ...prev, ...patch }));
@@ -412,7 +507,7 @@ export function MeetingRequest({ slug, ownerName, source, captchaSiteKey }: Meet
                 onNext={() => {
                   if (when.slots.length === 0) return setStepError("Elige al menos una hora.");
                   setStepError(null);
-                  setStep(2);
+                  toStepTwo();
                 }}
               />
             ) : (
@@ -428,7 +523,7 @@ export function MeetingRequest({ slug, ownerName, source, captchaSiteKey }: Meet
                   }}
                   timeZone={open.timeZone}
                   errors={errors}
-                  onBack={() => setStep(1)}
+                  onBack={toStepOne}
                 />
                 <div className="mt-4 space-y-4">
                   {captchaSiteKey ? <Turnstile siteKey={captchaSiteKey} action="meeting" resetKey={state} /> : null}
@@ -437,9 +532,13 @@ export function MeetingRequest({ slug, ownerName, source, captchaSiteKey }: Meet
                       <Notice tone="error">{state.message}</Notice>
                     </div>
               ) : null}
-              <SubmitButton pending={pending} pendingLabel="Enviando…" icon={<CalendarClock className="size-5" aria-hidden />}>
-                Enviar propuesta
-              </SubmitButton>
+              <div className="space-y-2">
+                {/* Next to the button, where the eye is when sending fails. */}
+                {errors.consent ? <InlineError id={CONSENT_ERROR_ID}>{errors.consent}</InlineError> : null}
+                <SubmitButton pending={pending} pendingLabel="Enviando…" icon={<CalendarClock className="size-5" aria-hidden />}>
+                  Enviar propuesta
+                </SubmitButton>
+              </div>
               <p className="text-center text-xs text-muted">Tus datos solo los ve {owner}. No te apuntamos a nada.</p>
             </div>
           </>

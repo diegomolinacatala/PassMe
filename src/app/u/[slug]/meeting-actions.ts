@@ -12,12 +12,21 @@ import { createSharedRateLimiter } from "@/lib/data/rate-limits";
 import { isSupabaseConfigured } from "@/lib/env";
 import { log } from "@/lib/log";
 import { parseMeetingRequest } from "@/lib/meetings/schema";
+import { meetingPath } from "@/lib/meetings/links";
 import { meetingsAvailable, notifyNewProposal } from "@/lib/meetings/service";
+import { DEMO_MEETING_ID } from "@/lib/meetings/view";
 import { clientRateKey, getClientIp, parseVisitSource } from "@/lib/request";
 
 export type MeetingRequestState =
   | { status: "idle" }
-  | { status: "sent"; demo?: boolean; email: string; details: { name: string; email: string; phone: string; company: string } }
+  | {
+      status: "sent";
+      demo?: boolean;
+      email: string;
+      details: { name: string; email: string; phone: string; company: string };
+      /** The visitor's own signed page, to check or cancel what they sent. */
+      guestPath: string | null;
+    }
   | { status: "error"; message: string; errors?: FieldErrors };
 
 // Per visitor first; then per card (only for real cards that take proposals).
@@ -59,7 +68,7 @@ export async function submitMeetingAction(
   const details = { name: data.name, email: data.email, phone: data.phone ?? "", company: data.company };
 
   const cleanSlug = String(slug).toLowerCase();
-  if (cleanSlug === DEMO_SLUG || !isSupabaseConfigured()) return { status: "sent", demo: true, email: data.email, details };
+  if (cleanSlug === DEMO_SLUG || !isSupabaseConfigured()) return { status: "sent", demo: true, email: data.email, details, guestPath: `/reunion/${DEMO_MEETING_ID}/invitado` };
   if (!checkSlug(cleanSlug).ok || !meetingsAvailable()) return { status: "error", message: GENERIC_ERROR };
 
   const requestHeaders = await headers();
@@ -88,5 +97,5 @@ export async function submitMeetingAction(
   }
 
   after(() => notifyNewProposal(result.id).catch((error: unknown) => log.error("meeting proposal email failed", {}, error)));
-  return { status: "sent", email: data.email, details };
+  return { status: "sent", email: data.email, details, guestPath: meetingPath(result.id, "guest") };
 }

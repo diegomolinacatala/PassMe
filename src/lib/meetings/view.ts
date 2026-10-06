@@ -1,5 +1,5 @@
 import { googleCalendarUrl } from "./calendar";
-import { describeWhere, displayName, type Meeting, type MeetingOwner } from "./model";
+import { calendarLocation, meetingDescription, ownerContactEmail, type Meeting, type MeetingOwner } from "./model";
 import type { MeetingFormat } from "./schema";
 import { allowedActions, meetingStage, openSlots, type MeetingAction, type MeetingParty, type MeetingStage, type MeetingStatus } from "./state";
 import { addMinutes, dateKey, zonedTimeToUtc } from "./time";
@@ -52,7 +52,8 @@ export function toMeetingView(meeting: Meeting, owner: MeetingOwner, party: Meet
       email: meeting.guest.email,
       phone: meeting.guest.phone,
     },
-    owner: { name: owner.name, slug: owner.slug, email: party === "guest" && confirmed ? owner.email : null },
+    // The owner sees which email the guest will get; the guest, only once confirmed.
+    owner: { name: owner.name, slug: owner.slug, email: party === "owner" || confirmed ? ownerContactEmail(owner) : null },
     responseNote: meeting.responseNote,
     closedBy: meeting.closedBy,
     actions: allowedActions(meeting, party, now),
@@ -62,13 +63,12 @@ export function toMeetingView(meeting: Meeting, owner: MeetingOwner, party: Meet
 /** "Add to Google Calendar" for a confirmed meeting, from the viewer's side. */
 export function viewGoogleCalendarUrl(view: MeetingView): string | null {
   if (!view.confirmedStart) return null;
-  const other = view.party === "owner" ? displayName(view.guest) : view.owner.name;
   return googleCalendarUrl({
     start: view.confirmedStart,
     end: addMinutes(view.confirmedStart, view.durationMinutes),
     summary: `Reunión con ${view.party === "owner" ? view.guest.name : view.owner.name}`,
-    description: [view.topic ? `Tema: ${view.topic}` : "", `Con: ${other}`, "Agendada con PassMe."].filter(Boolean).join("\n"),
-    location: view.format === "phone" ? describeWhere(view) : view.location,
+    description: meetingDescription(view, view.party, view.owner),
+    location: calendarLocation(view, view.party),
   });
 }
 
@@ -76,6 +76,8 @@ export function viewGoogleCalendarUrl(view: MeetingView): string | null {
 
 /** /reunion/demo/<side> shows a sample proposal (demo mode only: nothing is stored). */
 export const DEMO_MEETING_ID = "demo";
+/** The sample card's visible email (see DEMO_CARD): what the sample guest gets. */
+export const DEMO_CONTACT_EMAIL = "alex@example.com";
 
 /** A proposal for the next weekday at 10:00 and 12:30 (Madrid), from a sample visitor. */
 export function demoMeeting(now: Date): Meeting {

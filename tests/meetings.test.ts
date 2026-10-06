@@ -9,11 +9,13 @@ import {
   formatSlot,
   formatSlotShort,
   isTimeZone,
+  openingDayKey,
   TIME_GROUPS,
   timeKey,
   upcomingDays,
   zonedTimeToUtc,
 } from "@/lib/meetings/time";
+import { toMeetingView, viewGoogleCalendarUrl } from "@/lib/meetings/view";
 
 const NOW = new Date("2026-10-02T09:00:00.000Z"); // Friday 11:00 in Madrid
 const TUE_10 = "2026-10-06T08:00:00.000Z"; // Tuesday 6 Oct, 10:00 in Madrid
@@ -50,7 +52,32 @@ describe("meeting times", () => {
     expect(formatSlot(TUE_10, "Europe/Madrid")).toBe("martes, 6 de octubre, 10:00");
     expect(formatSlotShort(TUE_10, "Europe/Madrid")).toBe("mar 6 oct · 10:00");
     expect(describeWhen(TUE_10, 45, "Europe/Madrid")).toBe("martes, 6 de octubre · 10:00–10:45 (hora de Madrid)");
-    expect(TIME_GROUPS.flatMap((g) => g.times)).toHaveLength(22);
+    expect(TIME_GROUPS.filter((g) => !g.folded).flatMap((g) => g.times)).toHaveLength(22);
+    // Early and late times are folded, and the server takes them.
+    expect(TIME_GROUPS.find((g) => g.folded)?.times).toEqual(["08:00", "08:30", "20:00", "20:30"]);
+    const early = zonedTimeToUtc("2026-10-06", "08:00", "Europe/Madrid")!.toISOString();
+    expect(parseMeetingRequest({ ...proposal, slots: [early] }, NOW).ok).toBe(true);
+  });
+
+  it("opens the picker on a useful day", () => {
+    const zone = "Europe/Madrid";
+    const open = (iso: string) => {
+      const now = new Date(iso);
+      return openingDayKey(now, zone, upcomingDays(now, zone, 14));
+    };
+    // Monday 17:50 → Tuesday, and its first row is all free.
+    const monday = new Date("2026-10-05T15:50:00.000Z");
+    const tuesday = open(monday.toISOString());
+    expect(tuesday).toBe("2026-10-06");
+    for (const time of TIME_GROUPS[0]!.times.slice(0, 4)) {
+      expect(zonedTimeToUtc(tuesday, time, zone)!.getTime()).toBeGreaterThan(monday.getTime());
+    }
+    expect(open("2026-10-05T07:00:00.000Z")).toBe("2026-10-05"); // Monday 9:00 → today
+    expect(open("2026-10-05T12:59:00.000Z")).toBe("2026-10-05"); // 14:59 → still today
+    expect(open("2026-10-05T13:00:00.000Z")).toBe("2026-10-06"); // 15:00 → tomorrow
+    expect(open("2026-10-02T14:00:00.000Z")).toBe("2026-10-05"); // Friday 16:00 → Monday
+    expect(open("2026-10-03T08:00:00.000Z")).toBe("2026-10-05"); // Saturday → Monday
+    expect(upcomingDays(monday, zone, 7).filter((d) => d.weekend).map((d) => d.key)).toEqual(["2026-10-10", "2026-10-11"]);
   });
 });
 
@@ -133,6 +160,67 @@ describe("meeting request validation", () => {
     expect(hidden.ok && hidden.data.name).toBe("Marta Gil");
   });
 
+  it("lets normal text through and quotes the fragment that looks like a link or a phone", () => {
+    const ok = (fields: Partial<typeof proposal>) => parseMeetingRequest({ ...proposal, ...fields }, NOW);
+    for (const fields of [
+      { topic: "Nos vimos en Expo.Pack" },
+      { company: "Grupo Aranda S.L." },
+      { topic: "Reunión el 27-10-2026" },
+      { topic: "Reunión el 27-10-2026 a las 10:30, o el 28/10/2026 10h30" },
+      { name: "Marta (Aranda)" },
+      { name: "Gil, Marta" },
+      { company: "EE.UU. y CC.OO." },
+      { topic: "Precio 3.5 por unidad" },
+    ]) {
+      expect(ok(fields).ok, JSON.stringify(fields)).toBe(true);
+    }
+    const errorOf = (fields: Partial<typeof proposal>) => {
+      const result = ok(fields);
+      return result.ok ? null : Object.values(result.errors)[0];
+    };
+    expect(errorOf({ topic: "visita www.x.com" })).toBe("“www.x.com” parece un enlace. Escríbelo sin el punto.");
+    expect(errorOf({ topic: "llámame al 612345678" })).toBe("“612345678” parece un teléfono: ponlo en su campo.");
+    expect(errorOf({ company: "acme.io/precios" })).toBe("“acme.io/precios” parece un enlace. Escríbelo sin el punto.");
+    expect(errorOf({ topic: "escríbeme a ana@x.es" })).toBe("“ana@x.es” parece un email. Si es el tuyo, ponlo en su campo.");
+    expect(errorOf({ name: "Marta evil.com" })).toBe("“evil.com” parece un enlace. Escríbelo sin el punto.");
+    // Still links or phones: schemes, short links, known TLDs, paths, spaced or dotted numbers.
+    for (const topic of [
+      "visita evil.com.",
+      "Evil.Com",
+      "bit.ly",
+      "promo en shop.xyz",
+      "mira x.weird/abc",
+      "http://x",
+      "ftp://x",
+      "612 345 678",
+      "+34 612-345-678",
+      "06.12.34.56.78",
+      "10:30 612 345 678",
+    ]) {
+      expect(ok({ topic }).ok, topic).toBe(false);
+    }
+  });
+
+  it("takes a map link as the place and the visitor's own video link, from vetted services only", () => {
+    const at = (fields: Partial<typeof proposal>) => parseMeetingRequest({ ...proposal, ...fields }, NOW);
+    const mapped = at({ location: "https://maps.app.goo.gl/AbC123" });
+    expect(mapped.ok && mapped.data.location).toBe("https://maps.app.goo.gl/AbC123");
+    expect(at({ location: "http://www.google.com/maps/place/Caf%C3%A9" }).ok).toBe(true);
+    expect(at({ location: "https://maps.apple.com/?q=Cafe" }).ok).toBe(true);
+    for (const location of ["https://evil.example/maps", "https://google.com.evil.example/maps", "https://goo.gl/abc"]) {
+      const result = at({ location });
+      expect(result.ok, location).toBe(false);
+      if (!result.ok) expect(result.errors.location).toMatch(/^Ese enlace no vale: para el sitio, Google Maps o Apple Maps/);
+    }
+    const teams = at({ format: "video", location: "https://teams.microsoft.com/l/meetup-join/abc" });
+    expect(teams.ok && teams.data.location).toBe("https://teams.microsoft.com/l/meetup-join/abc");
+    expect(at({ format: "video", location: "https://evil.example/join" }).ok).toBe(false);
+    // A video link where a place goes is refused, with the reason.
+    const misplaced = at({ location: "https://meet.google.com/abc-defg-hij" });
+    expect(!misplaced.ok && misplaced.errors.location).toBe("Solo enlaces de Google Maps o Apple Maps. Si no, escribe el sitio.");
+    expect(parseConfirm({ slot: TUE_10, location: "https://maps.app.goo.gl/AbC123" }, "in_person").ok).toBe(true);
+  });
+
   it("asks a phone for calls, drops places for remote meetings and canonicalizes the zone", () => {
 
     const call = parseMeetingRequest({ ...proposal, format: "phone" }, NOW);
@@ -194,6 +282,19 @@ function meeting(overrides: Partial<Meeting> = {}): Meeting {
     ...overrides,
   };
 }
+
+describe("the email the guest gets", () => {
+  const owner = { id: "o", name: "Alex Rivera", slug: "alex", email: "login@example.com", contactEmail: "alex@estudionorte.com" };
+
+  it("is the card's email: the owner sees it before confirming, the guest only once confirmed", () => {
+    expect(toMeetingView(meeting(), owner, "owner", NOW).owner.email).toBe("alex@estudionorte.com");
+    expect(toMeetingView(meeting(), owner, "guest", NOW).owner.email).toBeNull();
+    const confirmed = meeting({ status: "confirmed", confirmedStart: TUE_10, sequence: 1 });
+    expect(toMeetingView(confirmed, owner, "guest", NOW).owner.email).toBe("alex@estudionorte.com");
+    // Without an email on the card, the login one.
+    expect(toMeetingView(confirmed, { ...owner, contactEmail: null }, "guest", NOW).owner.email).toBe("login@example.com");
+  });
+});
 
 describe("meeting state", () => {
   it("lets the side that didn't propose answer, and the proposer withdraw", () => {
@@ -315,14 +416,32 @@ describe("calendar files", () => {
       // Calendars get shared: the signed link stays out of them.
       url: "",
     });
-    expect(forOwner.description).toContain("marta@example.com · +34 600 000 000");
-    expect(forOwner.description).toContain("Tema: Un café");
+    // One fact per line, no nested parentheses.
+    expect(forOwner.description).toBe(
+      "Con: Marta Gil (Mirador)\nEmail: marta@example.com\nTeléfono: +34 600 000 000\nTema: Un café\nAgendada con PassMe.",
+    );
+    // The .ics and the Google link (email and signed page) say the same; the reminder fits the format.
+    const ownerView = toMeetingView(m, { id: "o", ...owner, slug: "diego" }, "owner", NOW);
+    expect(new URL(viewGoogleCalendarUrl(ownerView)!).searchParams.get("details")).toBe(forOwner.description);
+    expect(new URL(googleCalendarUrl(forOwner)).searchParams.get("details")).toBe(forOwner.description);
+    expect(buildIcs(forOwner, "PUBLISH")).toContain("TRIGGER:-PT60M");
+    expect(buildIcs(meetingEvent({ ...m, format: "video" }, owner, "owner", { uidDomain: "getpassme.com" }), "PUBLISH")).toContain("TRIGGER:-PT10M");
     expect(forOwner.description).not.toContain("/reunion/");
     const forGuest = meetingEvent(m, owner, "guest", { uidDomain: "getpassme.com" });
     expect(forGuest.summary).toBe("Reunión con Diego Molina");
     expect(forGuest.description).toContain("diego@example.com");
     expect(forGuest.description).not.toContain("Un café");
     expect(describeWhere(meeting({ format: "phone" }))).toBe("Llamada al +34 600 000 000");
+    // A map link: "Cómo llegar" in the owner's copy only, never as text in emails.
+    const mapped = meeting({ status: "confirmed", confirmedStart: TUE_12, sequence: 1, location: "https://maps.app.goo.gl/AbC123" });
+    expect(describeWhere(mapped)).toBe("En persona");
+    expect(meetingEvent(mapped, owner, "owner", { uidDomain: "getpassme.com" }).location).toBe("https://maps.app.goo.gl/AbC123");
+    expect(meetingEvent(mapped, owner, "guest", { uidDomain: "getpassme.com" }).location).toBe("En persona");
+    // A video link (the visitor's, kept by whoever confirmed) reaches both invitations.
+    const video = meeting({ status: "confirmed", confirmedStart: TUE_12, sequence: 1, format: "video", location: "https://teams.microsoft.com/l/x" });
+    for (const side of ["owner", "guest"] as const) {
+      expect(meetingEvent(video, owner, side, { uidDomain: "getpassme.com" }).location).toBe("https://teams.microsoft.com/l/x");
+    }
   });
 });
 
@@ -339,13 +458,16 @@ describe("meeting emails", () => {
     expect(email.text).toContain("Cómo: En persona");
     expect(email.subject).toBe("Marta Gil te propone una reunión");
     expect(email.html).toContain('href="https://getpassme.com/reunion/a/b?hora=0"');
-    expect(email.html).toContain("martes, 6 de octubre, 12:00");
+    expect(email.html).toContain("mar 6 oct · 12:00–12:30");
+    expect(email.text).toContain("Marta Gil (Mirador) vio tu tarjeta y te propone 2 horas. Toca la que te venga bien.");
+    // The times are equal choices: none gets the signal orange.
+    expect(email.html).not.toMatch(/background:#c24e1c/i);
     expect(email.html).toContain("?accion=otra");
     expect(email.html).toContain("?accion=no");
     expect(email.html).not.toContain("Compra ya");
     expect(email.text).not.toContain("Compra ya");
     expect(email.text).not.toContain("nota");
-    expect(email.text).toContain("- martes, 6 de octubre, 10:00: https://getpassme.com/reunion/a/b?hora=0");
+    expect(email.text).toContain("- mar 6 oct · 10:00–10:30: https://getpassme.com/reunion/a/b?hora=0");
   });
 
   it("escapes everything that came from people", () => {
@@ -406,7 +528,7 @@ describe("meeting emails", () => {
       wasConfirmed: false,
       showNote: false,
     });
-    expect(withdrawn.subject).toBe("Marta Gil ha retirado su propuesta de reunión");
+    expect(withdrawn.subject).toBe("Marta Gil ha cancelado su propuesta de reunión");
     expect(withdrawn.text).not.toContain("spam");
 
     const cancelled = cancelledEmail(ctx(meeting({ status: "cancelled", closedBy: "owner", confirmedStart: TUE_10 })), {

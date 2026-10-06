@@ -22,11 +22,11 @@ Diego puede cambiar cualquiera: están aisladas en sus PRs.
 | PR | Rama | Estado |
 |---|---|---|
 | P1 | `feat/ux-p1-arreglos` | ✅ hecho y subido |
-| P2 | `feat/ux-p2-mi-qr` | ✅ hecho (pendiente de subir) |
-| P3 | `feat/ux-p3-sistema` | ✅ hecho (pendiente de subir) |
-| P4 | `feat/ux-p4-crear` | ✅ hecho (pendiente de subir) |
-| P5 | `feat/ux-p5-tarjeta` | ✅ hecho (pendiente de subir) |
-| P6 | `feat/ux-p6-reuniones` | pendiente |
+| P2 | `feat/ux-p2-mi-qr` | ✅ hecho y subido |
+| P3 | `feat/ux-p3-sistema` | ✅ hecho y subido |
+| P4 | `feat/ux-p4-crear` | ✅ hecho y subido |
+| P5 | `feat/ux-p5-tarjeta` | ✅ hecho y subido |
+| P6 | `feat/ux-p6-reuniones` | ✅ hecho y subido |
 | P7 | `feat/ux-p7-editor` | pendiente |
 | P8 | `feat/ux-p8-…` | pendiente |
 
@@ -66,6 +66,18 @@ Diego puede cambiar cualquiera: están aisladas en sus PRs.
 - **P5.6**: el error de «al menos uno» se guarda en los dos campos (`CONTACT_ONE_OF_ERROR`) y el formulario lo enseña una sola vez bajo Email, con los dos campos en rojo y descritos por él. Lo escrito se guarda en `sessionStorage` (`passme:contact-draft:<slug>`) y se borra al enviar; actualizada la frase de almacenamiento de `/privacidad`. D2 (b): la casilla sigue, con fila de 44 px y su error justo encima del botón. Con D2 (b) son 4 toques (abrir, móvil, casilla, enviar), no 3.
 - **P5.8**: el QR solo se ve a partir de 1024 px y no al dueño (él tiene «Mi QR»).
 - **P5 (fuera de alcance, para P6)**: el texto de la confirmación de la reunión ya no dice «Ya tenemos tus datos»; el resto de textos y la casilla del formulario de reunión siguen para P6.
+- **P6.1**: el interruptor ya era «Recibir propuestas de reunión». Se corrigen los restos: la privacidad («Si usas «Agendar reunión»»), el pie de los emails al dueño y «ha retirado su propuesta» → «ha cancelado su propuesta». «Propuesta de reunión» se queda como sustantivo.
+- **P6.2**: el texto de caducidad usa la **última** hora propuesta, no la primera: una propuesta sigue abierta mientras le quede alguna hora (`openSlots`), así que la primera sería falsa con varias.
+- **P6.3**: el bloque «¿Confirmas…?» solo sale con `?hora=N` válido y sin `?accion`. «Proponer otras horas» y «No puedo» desde ahí abren su panel normal; al volver se ve la lista completa (así el foco vuelve a su botón).
+- **P6.4**: «día útil» = primer día entre semana con ≥ 10 medias horas libres de las habituales (9:00–19:30), o sea, a partir de las 15:00 abre mañana. El grupo plegado es 8:00, 8:30, 20:00 y 20:30 (cuatro, una fila). La tira centra el día activo moviendo solo la tira (`scrollTo`), no la página. Los fines de semana se atenúan con `text-muted` (con `opacity` fallaba el contraste de axe).
+- **P6.5**: los dominios se detectan con una lista de TLD genéricos más todos los de país (`EE.UU.`, `CC.OO.`, `S.L.` pasan; `bit.ly`, `x.co` no). Un dominio seguido de `/` es enlace aunque el TLD no esté en la lista. Antes de buscar teléfonos se quitan fechas `dd-mm-aaaa`/`dd/mm/aaaa` (solo años 19xx/20xx) y horas `10:30`/`10h30` (con punto no: `06.12.34.56.78` sigue siendo un teléfono).
+- **P6.6**: la casilla no se restaura al recargar (marcarla tiene que ser un acto deliberado). El formulario se guarda en `sessionStorage` (`passme:meeting:<slug>`, 30 min) y el paso 2 vive en `#reunion-2`. Al volver al paso 1, el selector se abre en el día de la primera hora elegida.
+- **P6.7**: sin migración. El lugar admite un enlace de Google Maps (`maps.app.goo.gl`, `goo.gl/maps`, `google.com/maps`, `maps.google.com`) o Apple Maps; se ve como «Cómo llegar» en las páginas firmadas y va en el `LOCATION` del `.ics`/Google del dueño; en los emails y en la invitación del invitado sale solo «En persona». **Desviación:** el enlace de vídeo que pone quien propone se guarda en `location` (no hay columna para saber quién lo escribió). No aparece en ningún email hasta que alguien confirma: el que confirma lo ve en su campo y lo deja o lo cambia, igual que hoy cuando añade el suyo, y desde ahí llega a la invitación de los dos (lo que pide el criterio de aceptación). Si Diego quiere que el invitado nunca lo reciba por email, hace falta una columna nueva (P8).
+- **P6.8**: hecha la alternativa: «Proponer otras horas» lleva a `/u/<slug>?reunion=1`, guarda nombre, email, teléfono y empresa con `rememberDetails` y el formulario se abre solo y relleno. Falta marcar la casilla.
+- **P6.9**: el email que ve el invitado (página, «Contacto» del email confirmado, `Reply-To`, organizador de su `.ics`) es el primer email **visible** de la tarjeta, leído con `getPublicCard` (`get_public_card`, sin enlaces ocultos); si no hay, el de la cuenta. A Diego le siguen llegando los emails a su dirección de acceso (verificada): si no, cualquiera podría poner un email ajeno en su tarjeta y usar PassMe para escribirle.
+- **P6.10**: con reuniones activas, el enlace de reservas sale de la lista de la tarjeta y aparece en el paso 1 («Abrir su calendario», con el mismo registro de clics). La tarjeta demo no tiene enlace de reservas, así que el E2E solo cubre el aviso del editor.
+- **P6.11**: `declineMeetingAction` comprueba la sesión, que la reunión es suya (RLS y dueño guardado) y aplica el mismo cambio y emails que «No puedo» (`changeMeeting`), con su propio límite (20 cada 10 min). Lo rechazado pasa a «Anteriores» sin recargar.
+- **P6.12**: las alarmas son de 60 min en persona y 10 min en vídeo o llamada. La descripción del calendario sale de una sola función (`meetingDescription`) para el `.ics`, el enlace de Google del email y el de la página.
 
 ## Notas para retomar
 

@@ -304,6 +304,7 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, pla
               onRemove={editor.removeLink}
               onRestore={editor.restoreLink}
               onMove={editor.moveLink}
+              takesMeetings={draft.acceptsMeetingRequests}
             />
           </Section>
 

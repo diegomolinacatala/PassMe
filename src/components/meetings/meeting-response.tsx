@@ -10,9 +10,11 @@ import { NewTabHint } from "@/components/ui/new-tab-hint";
 import { Notice } from "@/components/ui/notice";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { contactEmailHref, contactPhoneHref } from "@/lib/card/contact";
+import { rememberDetails } from "@/lib/card/draft-storage";
 import type { FieldErrors } from "@/lib/card/schema";
 import { cn } from "@/lib/cn";
-import { describeWhere, displayName, firstName, formatDuration } from "@/lib/meetings/model";
+import { linkHref } from "@/lib/card/links";
+import { describeWhere, displayName, firstName, formatDuration, hasMapLink } from "@/lib/meetings/model";
 import { MEETING_LIMITS } from "@/lib/meetings/schema";
 import type { MeetingAction } from "@/lib/meetings/state";
 import { addMinutes, formatDay, formatTime, timeZoneCity } from "@/lib/meetings/time";
@@ -162,7 +164,18 @@ function Summary({ view }: { view: MeetingView }) {
         <Fact label="Cómo">
           <span className="flex items-start gap-1.5">
             <Icon className="mt-0.5 size-3.5 shrink-0 text-muted" aria-hidden />
-            <span className="min-w-0">{describeWhere(view)}</span>
+            <span className="min-w-0">
+              {describeWhere(view)}
+              {hasMapLink(view) ? (
+                <>
+                  {" · "}
+                  <a href={linkHref("website", view.location)} target="_blank" rel="noopener noreferrer" className="font-medium text-signal-deep underline-offset-4 hover:underline">
+                    Cómo llegar
+                    <NewTabHint />
+                  </a>
+                </>
+              ) : null}
+            </span>
           </span>
         </Fact>
         <Fact label="Duración">{formatDuration(view.durationMinutes)}</Fact>
@@ -247,7 +260,6 @@ function ConfirmPanel({
   returnFocus,
 }: PanelProps & { selected: string | null; onSelect: (slot: string) => void; onMode: (mode: Mode) => void; returnFocus: Mode | null }) {
   const [location, setLocation] = useState(view.location);
-  const other = otherName(view);
   const counterButton = useRef<HTMLButtonElement>(null);
   const declineButton = useRef<HTMLButtonElement>(null);
   // Back from "Proponer otras horas" or "No puedo": focus returns to the button that opened it.
@@ -309,7 +321,7 @@ function ConfirmPanel({
                 inputMode={view.format === "video" ? "url" : undefined}
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
-                maxLength={view.format === "video" ? MEETING_LIMITS.videoLink : MEETING_LIMITS.location}
+                maxLength={MEETING_LIMITS.videoLink}
                 placeholder={view.format === "video" ? "https://meet.google.com/…" : "Café Central, Madrid"}
                 className={inputClasses()}
               />
@@ -320,9 +332,7 @@ function ConfirmPanel({
         <SubmitButton pending={pending} pendingLabel="Confirmando…" icon={<CalendarCheck2 className="size-5" aria-hidden />}>
           {selected ? `Confirmar ${formatTime(selected, view.timeZone)}` : "Confirmar"}
         </SubmitButton>
-        <p className="text-center text-xs text-muted">
-          {view.party === "owner" ? `${other} recibirá la invitación con tu email para que podáis hablar.` : "Os enviamos la invitación a los dos."}
-        </p>
+        <InvitationNote view={view} />
       </form>
       <div className="mt-4 grid grid-cols-2 gap-2 border-t hairline pt-4">
         {view.actions.includes("counter") ? (
@@ -340,6 +350,75 @@ function ConfirmPanel({
           <CalendarX2 className="size-4" aria-hidden />
           No puedo
         </Button>
+      </div>
+    </Panel>
+  );
+}
+
+/** "martes 6" for the question "¿Confirmas el martes 6 a las 12:30?". */
+function shortDay(slot: string, timeZone: string): string {
+  const match = /^(\S+), (\d+)/.exec(formatDay(slot, timeZone));
+  return match ? `${match[1]} ${match[2]}` : formatDay(slot, timeZone);
+}
+
+/** Who will receive the invitation with which email (the owner's side only). */
+function InvitationNote({ view }: { view: MeetingView }) {
+  return (
+    <p className="text-center text-xs text-muted">
+      {view.party !== "owner" ? (
+        "Os enviamos la invitación a los dos."
+      ) : view.owner.email ? (
+        <>
+          {otherName(view)} recibirá la invitación con tu email <strong className="font-medium break-all text-ink-soft">{view.owner.email}</strong>.
+        </>
+      ) : (
+        `${otherName(view)} recibirá la invitación con tu email para que podáis hablar.`
+      )}
+    </p>
+  );
+}
+
+/**
+ * Straight from the email's time button: the question, one wide button and
+ * the ways out, above everything else. Still a second tap on purpose: mail
+ * scanners open links, but never press buttons.
+ */
+function QuickConfirm({ view, act, pending, slot, onExpand, onMode }: PanelProps & { slot: string; onExpand: () => void; onMode: (mode: Mode) => void }) {
+  const other = view.party === "owner" ? displayName(view.guest) : view.owner.name;
+  const time = formatTime(slot, view.timeZone);
+  const heading = useFocusOnMount<HTMLHeadingElement>();
+  return (
+    <Panel className="animate-rise">
+      <form action={act} className="space-y-3">
+        <input type="hidden" name="intent" value="confirm" />
+        <input type="hidden" name="slot" value={slot} />
+        <input type="hidden" name="location" value={view.location} />
+        <h2 ref={heading} tabIndex={-1} className="font-display text-2xl leading-tight outline-none">
+          ¿Confirmas el <strong className="font-medium">{shortDay(slot, view.timeZone)}</strong> a las{" "}
+          <strong className="font-medium text-signal-deep">{time}</strong>?
+        </h2>
+        <p className="text-sm text-ink-soft">
+          Con {other} · {formatDuration(view.durationMinutes)} · {describeWhere(view)}
+        </p>
+        <SubmitButton pending={pending} pendingLabel="Confirmando…" icon={<CalendarCheck2 className="size-5" aria-hidden />}>
+          {`Confirmar ${time}`}
+        </SubmitButton>
+        <InvitationNote view={view} />
+      </form>
+      <div className="mt-3 flex flex-wrap items-center justify-center gap-x-1 gap-y-1 border-t hairline pt-3 text-sm">
+        {view.openSlots.length > 1 ? (
+          <button type="button" onClick={onExpand} className="inline-flex min-h-11 items-center rounded-full px-3 font-medium text-ink hover:bg-paper-deep">
+            Elegir otra de sus horas
+          </button>
+        ) : null}
+        {view.actions.includes("counter") ? (
+          <button type="button" onClick={() => onMode("counter")} className="inline-flex min-h-11 items-center rounded-full px-3 text-muted hover:text-ink">
+            Proponer otras horas
+          </button>
+        ) : null}
+        <button type="button" onClick={() => onMode("decline")} className="inline-flex min-h-11 items-center rounded-full px-3 text-muted hover:text-ink">
+          No puedo
+        </button>
       </div>
     </Panel>
   );
@@ -525,6 +604,8 @@ export function MeetingResponse({ id, signature, initial, preset, demo }: Meetin
   const presetSlot = preset.slotIndex !== null ? initial.slots[preset.slotIndex] : undefined;
   const [selected, setSelected] = useState<string | null>(presetSlot && initial.openSlots.includes(presetSlot) ? presetSlot : (initial.openSlots[0] ?? null));
   const [mode, setModeState] = useState<Mode>(preset.mode && initial.actions.includes(preset.mode) ? preset.mode : "confirm");
+  // Arriving from a time button in the email: ask about that time first.
+  const [quick, setQuick] = useState(Boolean(presetSlot && initial.openSlots.includes(presetSlot) && !preset.mode && initial.actions.includes("confirm")));
   // The panel the person just left, so focus can return to the button that opened it.
   const [returnFocus, setReturnFocus] = useState<Mode | null>(null);
   const setMode = (next: Mode) => {
@@ -563,6 +644,9 @@ export function MeetingResponse({ id, signature, initial, preset, demo }: Meetin
     error: errors.note,
   });
 
+  const answering = view.stage === "awaiting" && canAnswer && mode === "confirm";
+  const showQuick = answering && quick && selected !== null;
+
   return (
     <div className="mt-8 space-y-4">
       <header>
@@ -570,7 +654,7 @@ export function MeetingResponse({ id, signature, initial, preset, demo }: Meetin
         <h1 className="mt-2 font-display text-[2.4rem] leading-[1] tracking-tight">
           <Title view={view} />
         </h1>
-        {view.stage === "awaiting" && canAnswer ? (
+        {view.stage === "awaiting" && canAnswer && !showQuick ? (
           <p className="mt-3 text-ink-soft">
             {view.proposedBy === "guest"
               ? `Te propone ${view.openSlots.length === 1 ? "esta hora" : "estas horas"}. Elige una y le enviamos la invitación.`
@@ -580,9 +664,20 @@ export function MeetingResponse({ id, signature, initial, preset, demo }: Meetin
       </header>
 
       <StatusBanner state={state} other={otherName(view)} />
+      {showQuick && selected ? (
+        <QuickConfirm
+          {...panel}
+          slot={selected}
+          onExpand={() => setQuick(false)}
+          onMode={(next) => {
+            setQuick(false);
+            setMode(next);
+          }}
+        />
+      ) : null}
       <Summary view={view} />
 
-      {view.stage === "awaiting" && canAnswer && mode === "confirm" ? (
+      {answering && !showQuick ? (
         <ConfirmPanel {...panel} selected={selected} onSelect={setSelected} onMode={setMode} returnFocus={returnFocus} />
       ) : null}
       {view.stage === "awaiting" && canAnswer && mode === "counter" ? <CounterPanel {...panel} onBack={() => setMode("confirm")} /> : null}
@@ -591,7 +686,17 @@ export function MeetingResponse({ id, signature, initial, preset, demo }: Meetin
       {view.stage === "confirmed" ? <ConfirmedPanel view={view} icsHref={`/reunion/${id}/${signature}/invitacion.ics`} cancel={cancel("Cancelar reunión")} /> : null}
 
       {view.party === "guest" && ["declined", "cancelled", "expired"].includes(view.stage) ? (
-        <a href={`/u/${view.owner.slug}`} className={buttonClasses({ variant: "signal", size: "lg", className: "w-full" })}>
+        <a
+          href={`/u/${view.owner.slug}?reunion=1`}
+          // The card's meeting form opens with these details already in.
+          onClick={() =>
+            rememberDetails(
+              { fullName: view.guest.name, email: view.guest.email ?? "", phone: view.guest.phone ?? "", company: view.guest.company },
+              view.owner.slug,
+            )
+          }
+          className={buttonClasses({ variant: "signal", size: "lg", className: "w-full" })}
+        >
           <CalendarClock className="size-5" aria-hidden />
           Proponer otras horas
         </a>

@@ -164,7 +164,7 @@ describe("meeting service", () => {
     if (!result.ok) throw new Error(result.error);
     await result.emails();
     const [email] = sent();
-    expect(email).toMatchObject({ to: ["diego@example.com"], subject: "Marta Gil ha retirado su propuesta de reunión" });
+    expect(email).toMatchObject({ to: ["diego@example.com"], subject: "Marta Gil ha cancelado su propuesta de reunión" });
     expect(email!.text).not.toContain("spam.example");
   });
 

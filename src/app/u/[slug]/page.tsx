@@ -13,6 +13,7 @@ import { SaveContact } from "@/components/card/save-contact";
 import { MeetingRequest } from "@/components/meetings/meeting-request";
 import { ShareLinkButton } from "@/components/ui/share-link-button";
 import { resolveDesign } from "@/lib/card/design";
+import { linkHref } from "@/lib/card/links";
 import { createPath } from "@/lib/card/quick";
 import { servesVCardInline, vcardDisplayFilename } from "@/lib/card/vcard";
 import { findOwnerCard, getPublicCard, resolveSlugRedirect } from "@/lib/data/cards";
@@ -69,6 +70,10 @@ export default async function PublicCardPage({ params, searchParams }: PageProps
   const { background } = resolveDesign(card);
   const captchaSiteKey = getTurnstileSiteKey();
   const takesMeetings = card.acceptsMeetingRequests && meetingsAvailable();
+  // One way in to meet: with proposals on, the booking link moves into "Agendar reunión".
+  const bookingLink = takesMeetings ? card.links.find((link) => link.kind === "booking") : undefined;
+  const booking = bookingLink ? { href: linkHref("booking", bookingLink.value), linkId: bookingLink.id } : null;
+  const listedCard = bookingLink ? { ...card, links: card.links.filter((link) => link.kind !== "booking") } : card;
   const [viewer, requestHeaders] = await Promise.all([viewerOf(card.slug), headers()]);
   const userAgent = requestHeaders.get("user-agent");
   const isOwner = viewer === "owner";
@@ -87,7 +92,7 @@ export default async function PublicCardPage({ params, searchParams }: PageProps
           <div className="lg:grid lg:grid-cols-[440px_minmax(0,1fr)] lg:items-start lg:gap-12">
             <div className="min-w-0">
               <ProfileCard
-                card={card}
+                card={listedCard}
                 saveAction={
                   <SaveContact
                     href={vcardHref}
@@ -117,7 +122,7 @@ export default async function PublicCardPage({ params, searchParams }: PageProps
                     <ContactForm slug={card.slug} ownerName={card.fullName} source={source} captchaSiteKey={captchaSiteKey} />
                   ) : null}
                   {takesMeetings ? (
-                    <MeetingRequest slug={card.slug} ownerName={card.fullName} source={source} captchaSiteKey={captchaSiteKey} />
+                    <MeetingRequest slug={card.slug} ownerName={card.fullName} source={source} captchaSiteKey={captchaSiteKey} booking={booking} />
                   ) : null}
                 </div>
               ) : null}

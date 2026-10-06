@@ -15,9 +15,10 @@ import type { OwnerCard } from "@/lib/card/types";
 import { contactIpLimiter, deliverContactRequest, DELIVERY_ERRORS, GENERIC_DELIVERY_ERROR } from "@/lib/contact-delivery";
 import { findOwnerCard, isSlugAvailable, saveOwnerCard } from "@/lib/data/cards";
 import { deleteContactRequest } from "@/lib/data/contact-requests";
-import { deleteOwnMeeting } from "@/lib/data/meetings";
+import { deleteOwnMeeting, getMeetingRecord, ownsMeeting } from "@/lib/data/meetings";
 import { createSharedRateLimiter } from "@/lib/data/rate-limits";
 import { log } from "@/lib/log";
+import { changeMeeting } from "@/lib/meetings/service";
 import { clientRateKey } from "@/lib/request";
 import { HANDOFF_TTL_SECONDS, signHandoffToken } from "@/lib/pass/handoff";
 import { notifyWalletsOfUpdate } from "@/lib/pass/service";
@@ -194,6 +195,29 @@ export async function deleteMeetingAction(id: string): Promise<DeleteResult> {
         ? "Esta reunión sigue en pie: cancélala desde su página para que la otra persona se entere."
         : "No hemos podido quitarla. Inténtalo de nuevo.",
   };
+}
+
+// Each "no" sends an email: keep it human-paced.
+const declineLimiter = createSharedRateLimiter({ name: "meeting-decline-owner", limit: 20, windowMs: 10 * 60_000 });
+
+/**
+ * «Decir que no» from the editor: the same change and email as "No puedo" on
+ * the meeting's signed page, authorized by the session instead of the link.
+ */
+export async function declineMeetingAction(id: string): Promise<DeleteResult> {
+  const session = await requireUser();
+  if (!session) return { ok: false, error: "Tu sesión ha caducado." };
+  const meetingId = String(id).toLowerCase();
+  const notFound = { ok: false as const, error: "No encontramos esta propuesta. Recarga la página." };
+  if (!(await declineLimiter.check(session.user.id)).ok) return { ok: false, error: "Demasiados cambios seguidos. Espera unos minutos." };
+  // RLS says it's theirs; the stored owner must agree.
+  if (!(await ownsMeeting(session.supabase, meetingId))) return notFound;
+  const record = await getMeetingRecord(meetingId);
+  if (!record || record.owner.id !== session.user.id) return notFound;
+  const result = await changeMeeting(record, "owner", { action: "decline", note: "" });
+  if (!result.ok) return { ok: false, error: result.error };
+  after(result.emails);
+  return { ok: true };
 }
 
 export type DeleteAccountResult = { ok: false; error: string };

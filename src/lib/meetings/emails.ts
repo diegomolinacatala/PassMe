@@ -16,7 +16,7 @@ import { renderEmailHtml, renderEmailText, type EmailBody } from "@/lib/email-la
 import { describeWhen, describeWhenInline, describeWhere, displayName, formatDuration, type Meeting } from "./model";
 import { FORMAT_LABELS, isSafeName } from "./schema";
 import { otherParty, type MeetingParty } from "./state";
-import { formatSlot, formatSlotShort, timeZoneCity } from "./time";
+import { addMinutes, formatSlotShort, formatTime, timeZoneCity } from "./time";
 
 export interface MeetingEmail {
   subject: string;
@@ -51,7 +51,7 @@ function footerFor(ctx: MeetingEmailContext, recipient: MeetingParty, extra: str
   return recipient === "owner"
     ? [
         ...extra,
-        "Te llega porque tienes activado «Deja que te propongan reuniones» en tu tarjeta de PassMe.",
+        "Te llega porque tienes activado «Recibir propuestas de reunión» en tu tarjeta de PassMe.",
         `Puedes desactivarlo en tu editor: ${ctx.siteUrl}/dashboard`,
       ]
     : [
@@ -81,7 +81,7 @@ export function proposalEmail(ctx: MeetingEmailContext, respondUrl: string): Mee
   const count = meeting.slots.length;
   const subject = first ? `${proposer} te propone una reunión` : `${proposer} te propone ${count === 1 ? "otra hora" : "otras horas"}`;
   const intro = first
-    ? `${displayName(meeting.guest)} ha visto tu tarjeta de PassMe y te propone ${count === 1 ? "esta hora" : "estas horas"} para reuniros. Elige una y le enviamos la invitación.`
+    ? `${displayName(meeting.guest)} vio tu tarjeta y te propone ${count === 1 ? "una hora. Tócala si te viene bien" : `${count} horas. Toca la que te venga bien`}.`
     : `${proposer} no puede a la hora que propusiste y te ofrece ${count === 1 ? "esta otra" : "estas otras"}. Elige una y os enviamos la invitación a los dos.`;
 
   return render(subject, {
@@ -98,9 +98,11 @@ export function proposalEmail(ctx: MeetingEmailContext, respondUrl: string): Mee
       ["Duración", formatDuration(meeting.durationMinutes)],
     ],
     quote: noteFor(ctx, recipient, proposer, !first),
-    buttonsIntro: count === 1 ? "Si te viene bien, confírmala:" : "Toca la que te venga bien:",
+    buttonsIntro: first ? undefined : count === 1 ? "Si te viene bien, confírmala:" : "Toca la que te venga bien:",
+    // Equal choices: same outlined style, with the length in the label ("mar 6 oct · 10:00–10:30").
+    equalButtons: true,
     buttons: meeting.slots.map((slot, index) => ({
-      label: formatSlot(slot, meeting.timeZone),
+      label: `${formatSlotShort(slot, meeting.timeZone)}–${formatTime(addMinutes(slot, meeting.durationMinutes), meeting.timeZone)}`,
       href: `${respondUrl}?hora=${index}`,
     })),
     links: [
@@ -185,11 +187,11 @@ export function cancelledEmail(ctx: MeetingEmailContext, { wasConfirmed, showNot
   return render(
     wasConfirmed
       ? `Cancelada: reunión con ${cancellerName} ${describeWhenInline(start, meeting.timeZone)}`
-      : `${cancellerName} ha retirado su propuesta de reunión`,
+      : `${cancellerName} ha cancelado su propuesta de reunión`,
     {
       preheader: wasConfirmed ? "Quítala de tu calendario." : "Ya no hace falta que respondas.",
       eyebrow: wasConfirmed ? "Reunión cancelada" : "Agendar reunión",
-      title: wasConfirmed ? `${firstName(cancellerName)} ha cancelado la reunión` : `${firstName(cancellerName)} ha retirado su propuesta`,
+      title: wasConfirmed ? `${firstName(cancellerName)} ha cancelado la reunión` : `${firstName(cancellerName)} ha cancelado su propuesta`,
       paragraphs: [
         wasConfirmed
           ? `La reunión ${describeWhenInline(start, meeting.timeZone)} queda cancelada. Si la añadiste a tu calendario, el archivo adjunto la quita (en Gmail, bórrala tú).`

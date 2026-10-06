@@ -472,26 +472,26 @@ Lo que ve quien escanea. Origen: SCAN-01–10, SCAN-14, SCAN-15, SCAN-17, SCAN-1
 
 Origen: MEET-01, MEET-03, MEET-05, MEET-06, MEET-08, MEET-09, MEET-11–13, MEET-15, MEET-18, MEET-19, MEET-21–23, MEET-25, COH-04. Pregunta D1 y D2 antes de empezar.
 
-**P6.1 · Verbo único** ⚖️ D1 [M] · COH-04, MEET-12
+**✅ P6.1 · Verbo único** ⚖️ D1 [M] · COH-04, MEET-12
 - Aplicar el verbo elegido en el botón de la tarjeta, títulos, emails (`src/lib/meetings/emails.ts`), privacidad y editor. Interruptor del dueño: «Recibir propuestas de reunión».
 - ✔ `rg` del verbo descartado en `src/` = 0.
 
-**P6.2 · Quien propone se queda con algo en la mano** [A] · MEET-01
+**✅ P6.2 · Quien propone se queda con algo en la mano** [A] · MEET-01
 - `src/app/u/[slug]/meeting-actions.ts`: devolver también `guestPath` (`meetingPath(id, "guest")`; en demo `/reunion/demo/invitado`).
 - `meeting-request.tsx` (`SentMessage`): botón `outline` **«Ver o cancelar mi propuesta»** y el texto «Si Alex no responde antes del {primera hora}, la propuesta caduca sola.»
 - ✔ Tras enviar, en el mismo viewport hay un enlace a la página de invitado y desde ella «Cancelar propuesta» funciona.
 - (El email al invitado cuando caduca va en P8.2.)
 
-**P6.3 · «Confirma con un toque» de verdad** [A] · MEET-03
+**✅ P6.3 · «Confirma con un toque» de verdad** [A] · MEET-03
 - `meeting-response.tsx`: con `?hora=N` válido, arriba del todo un bloque compacto: «¿Confirmas el **martes 6** a las **12:30**?», «Con Lucía Martín (Mirador) · 30 min · En persona · Café Central», botón a todo el ancho «Confirmar 12:30», y debajo «Elegir otra de sus horas» (despliega los radios) y la fila «Proponer otras horas · No puedo». La ficha de Lucía y el tema, después. Se mantiene el segundo toque (protege de los antivirus del correo).
 - ✔ En iPhone 15 (393×659), al abrir `/reunion/demo/anfitrion?hora=1`, «Confirmar 12:30» se ve entero sin scroll. Test E2E.
 
-**P6.4 · El selector abre en un día útil** [M] · MEET-05, MEET-22
+**✅ P6.4 · El selector abre en un día útil** [M] · MEET-05, MEET-22
 - `slot-picker.tsx`: abrir en el primer día laborable con ≥ 4 horas libres (desde las 15:00, mañana; si mañana es sábado, el lunes). Sábados y domingos con la etiqueta atenuada (se pueden elegir). Añadir un grupo plegado «Más temprano o más tarde» (8:00–8:30, 20:00–21:00) en `src/lib/meetings/time.ts` (`TIME_GROUPS`), comprobando que el esquema del servidor lo acepta.
 - «Elegir otra fecha»: insertar el día ordenado en la tira y `scrollIntoView({ inline: "center" })` del día activo.
 - ✔ Abriendo el paso 1 un lunes a las 17:50, el día activo es el martes y ninguna hora de la primera fila está apagada. Test unitario con `now` fijo.
 
-**P6.5 · El filtro anti-enlaces no rechaza texto normal** [M] · MEET-06
+**✅ P6.5 · El filtro anti-enlaces no rechaza texto normal** [M] · MEET-06
 - `src/lib/meetings/schema.ts` (`LINKISH_RE`, `PHONEISH_RE`, `NAME_RE`):
   - Dominios: exigir `www.`, `://`, `/` o un TLD de una lista (com, es, net, org, io, app, dev, co, eu, info, me…) **seguido de fin o espacio**. «Expo.Pack» y «S.L.» pasan; «visita www.x.com» y «acme.io/precios» no.
   - Teléfonos: no contar como teléfono una fecha `dd-mm-aaaa`/`dd/mm/aaaa` ni una hora.
@@ -500,35 +500,35 @@ Origen: MEET-01, MEET-03, MEET-05, MEET-06, MEET-08, MEET-09, MEET-11–13, MEET
 - **Seguridad:** este filtro existe porque los emails van a direcciones sin verificar (ver `AGENTS.md`). No lo debilites para enlaces o teléfonos reales: añade tests con los casos que deben seguir fallando.
 - ✔ «Nos vimos en Expo.Pack», «Grupo Aranda S.L.», «Reunión el 27-10-2026» y «Marta (Aranda)» pasan; «visita www.x.com», «llámame al 612345678» y «acme.io/precios» fallan, y el mensaje cita el fragmento. Tests unitarios.
 
-**P6.6 · Paso 2 más corto y que no se pierde** ⚖️ D2 [M] · MEET-08, MEET-09, MEET-23
+**✅ P6.6 · Paso 2 más corto y que no se pierde** ⚖️ D2 [M] · MEET-08, MEET-09, MEET-23
 - Casilla: según D2 (igual que P5.6). Con (a), bajo «Enviar propuesta»: «Al enviar, Alex recibe tu nombre, email y teléfono, y PassMe te escribe solo sobre esta reunión. Más info».
 - Título del paso 2: «¿Cómo te **avisamos**?» con el subtítulo «Te escribimos aquí cuando Alex elija una hora.». El tema, un `textarea` de 2 líneas con el ejemplo «Nos conocimos en… · Me gustaría hablar de…».
 - Historial: `history.pushState` al pasar al paso 2 (`#reunion-2`) y `popstate` vuelve al paso 1; guardar el estado en `sessionStorage` (con `try/catch`) y, al recargar en la misma sesión, reabrir el formulario donde estaba.
 - ✔ En el paso 2, «atrás» del navegador muestra el paso 1 con las horas; recargar en el paso 2 vuelve al paso 2 relleno.
 
-**P6.7 · Lugar con mapas y enlace de vídeo de quien propone** [M] · MEET-11
+**✅ P6.7 · Lugar con mapas y enlace de vídeo de quien propone** [M] · MEET-11
 - Lista blanca de mapas igual que la de vídeo (`maps.app.goo.gl`, `goo.gl/maps`, `google.com/maps`, `maps.apple.com`) para el lugar; en la página firmada y en el `.ics` se muestra como «Cómo llegar». En el paso 1, con Videollamada, campo opcional «Enlace (si ya lo tienes)» con la lista blanca de vídeo existente.
 - **Seguridad:** los emails al invitado siguen sin incluir enlaces escritos por el visitante (texto fijo); los enlaces solo aparecen en páginas firmadas y en el `.ics` del dueño, como hoy con el vídeo. Revisa `AGENTS.md` y `src/lib/meetings/emails.ts` antes de tocarlo.
 - ✔ `https://maps.app.goo.gl/…` se acepta como lugar; un enlace de Teams puesto por la visitante llega a la invitación de los dos.
 
-**P6.8 · «Proponer otras horas» sin empezar de cero** [M] · MEET-13
+**✅ P6.8 · «Proponer otras horas» sin empezar de cero** [M] · MEET-13
 - Tras un «no puedo» o una cancelación, «Proponer otras horas» abre en la misma página firmada el selector (el `CounterPanel` que ya existe) y crea una propuesta nueva con los datos de la anterior (en el servidor, a partir del enlace firmado). Si es demasiado, la alternativa: `/u/<slug>?reunion=1` con nombre, email y empresa precargados vía `rememberDetails`.
 - ✔ De «Alex no puede esta vez» a una propuesta nueva enviada: día + hora + enviar, sin reescribir datos.
 
-**P6.9 · El email que recibe el invitado es el de la tarjeta** [M] · MEET-15
+**✅ P6.9 · El email que recibe el invitado es el de la tarjeta** [M] · MEET-15
 - `src/lib/meetings/model.ts`, `view.ts`, `emails.ts`, `meeting-response.tsx`: usar el primer dato de contacto de tipo email **visible** de la tarjeta; si no hay, el de login. `ConfirmPanel`: «Lucía recibirá la invitación con tu email **alex@estudionorte.com**.»
 - ✔ Con un login distinto del email de la tarjeta, la invitación y el email al invitado muestran el de la tarjeta, y la página lo dice antes de confirmar.
 
-**P6.10 · Un solo punto de entrada para quedar** [M] · MEET-18
+**✅ P6.10 · Un solo punto de entrada para quedar** [M] · MEET-18
 - Si la tarjeta tiene un enlace `booking` **y** reuniones activas: el enlace no se repite en la lista y el paso 1 añade bajo el título «¿Prefieres ver sus huecos libres? Abrir su calendario».
 - En el editor, al añadir un enlace de reservas con las reuniones activas: «Ya recibes propuestas de reunión. Con Calendly o Cal.com, la gente podrá elegir entre los dos.»
 - ✔ Con los dos activos, en la tarjeta hay un único punto de entrada visible para quedar.
 
-**P6.11 · Rechazar desde el editor** [M] · MEET-19
+**✅ P6.11 · Rechazar desde el editor** [M] · MEET-19
 - `meetings-panel.tsx`: en «Te toca responder», la papelera ofrece «Decir que no (le avisamos con un mensaje amable)» → `decline`, y «Quitar sin avisar (es spam)».
 - ✔ Desde el editor se rechaza una propuesta pendiente en 1 toque y el invitado recibe el email de «no puede esta vez».
 
-**P6.12 · Pulido de emails y `.ics`** [B] · MEET-21, MEET-25
+**✅ P6.12 · Pulido de emails y `.ics`** [B] · MEET-21, MEET-25
 - `emails.ts` + `src/lib/email-layout.ts`: todos los botones de hora con el mismo estilo (contorno de tinta) y la duración en el texto («mar 6 oct · 10:00–10:30»); primera línea «Lucía Martín (Mirador) vio tu tarjeta y te propone 2 horas. Toca la que te venga bien.»
 - `.ics` y enlace de Google: misma descripción en página y email, en líneas («Con: …», «Email: …», «Teléfono: …», «Tema: …»), sin paréntesis anidados. Alarma de 1 h en persona y de 10 min en vídeo o llamada.
 - ✔ En el HTML del email ningún botón de hora tiene el fondo naranja; el `.ics` del dueño y su enlace de Google tienen la misma descripción. Tests unitarios.

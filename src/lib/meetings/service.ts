@@ -8,7 +8,7 @@ import { log } from "@/lib/log";
 import { buildIcs, googleCalendarUrl, type CalendarMethod } from "./calendar";
 import { cancelledEmail, confirmedEmail, declinedEmail, proposalEmail, type MeetingEmail, type MeetingEmailContext } from "./emails";
 import { meetingUrl } from "./links";
-import { meetingEvent, type Meeting, type MeetingOwner } from "./model";
+import { meetingEvent, ownerContactEmail, type Meeting, type MeetingOwner } from "./model";
 import { applyChange, otherParty, type MeetingChange, type MeetingParty } from "./state";
 
 /**
@@ -77,7 +77,8 @@ function fallbackAddress(): string {
 }
 
 function emailContext(meeting: Meeting, owner: MeetingOwner): MeetingEmailContext {
-  return { meeting, owner: { name: owner.name, slug: owner.slug, email: owner.email }, siteUrl: getSiteUrl() };
+  // The only owner address an email shows is the one the guest gets.
+  return { meeting, owner: { name: owner.name, slug: owner.slug, email: ownerContactEmail(owner) }, siteUrl: getSiteUrl() };
 }
 
 async function deliver({ kind, to, email, replyTo, attachments, toGuestOf }: Delivery): Promise<void> {
@@ -99,8 +100,14 @@ async function deliver({ kind, to, email, replyTo, attachments, toGuestOf }: Del
 }
 
 /** The meeting as an .ics attachment (method in the content type too: Outlook reads it there). */
+/** The owner as each side's calendar sees them: the guest's copy shows the card's email. */
+function organizer(owner: MeetingOwner, recipient: MeetingParty): { name: string; email: string } {
+  const email = recipient === "guest" ? ownerContactEmail(owner) : owner.email;
+  return { name: owner.name, email: email ?? fallbackAddress() };
+}
+
 function invitation(meeting: Meeting, owner: MeetingOwner, recipient: MeetingParty, method: CalendarMethod): EmailAttachment {
-  const event = meetingEvent(meeting, { name: owner.name, email: owner.email ?? fallbackAddress() }, recipient, { uidDomain: siteHost() });
+  const event = meetingEvent(meeting, organizer(owner, recipient), recipient, { uidDomain: siteHost() });
   return {
     filename: method === "CANCEL" ? "cancelacion.ics" : "invitacion.ics",
     content: buildIcs(event, method),
@@ -129,14 +136,14 @@ export async function notifyNewProposal(meetingId: string): Promise<void> {
 function confirmationTo(party: MeetingParty, meeting: Meeting, owner: MeetingOwner): Delivery | null {
   const manage = meetingUrl(meeting.id, party);
   if (!manage) return null;
-  const event = meetingEvent(meeting, { name: owner.name, email: owner.email ?? fallbackAddress() }, party, { uidDomain: siteHost() });
+  const event = meetingEvent(meeting, organizer(owner, party), party, { uidDomain: siteHost() });
   const other = otherParty(party);
   return {
     kind: "confirmed",
     to: party === "owner" ? owner.email : meeting.guest.email,
     email: confirmedEmail(emailContext(meeting, owner), party, { manage, googleCalendar: googleCalendarUrl(event) }),
     // Once confirmed, replies go straight to the other person.
-    replyTo: other === "owner" ? owner.email : meeting.guest.email,
+    replyTo: other === "owner" ? ownerContactEmail(owner) : meeting.guest.email,
     attachments: [invitation(meeting, owner, party, "PUBLISH")],
     toGuestOf: party === "guest" ? owner.id : undefined,
   };
@@ -163,7 +170,7 @@ function deliveriesFor(before: Meeting, meeting: Meeting, owner: MeetingOwner, a
       const wasConfirmed = before.status === "confirmed";
       // A visitor withdrawing a proposal the owner never answered can't send them words.
       const showNote = actor === "owner" || wasConfirmed || before.proposedBy === "owner";
-      const actorAddress = actor === "owner" ? owner.email : meeting.guest.email;
+      const actorAddress = actor === "owner" ? ownerContactEmail(owner) : meeting.guest.email;
       return [
         {
           kind: "cancelled",

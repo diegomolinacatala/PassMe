@@ -66,7 +66,7 @@ beforeEach(() => {
   ipCounter += 1;
   state.ip = `198.51.100.${ipCounter}`;
   state.after = [];
-  state.card = { fullName: "Diego Molina", acceptsMeetingRequests: true } as Partial<PublicCard>;
+  state.card = { fullName: "Diego Molina", acceptsMeetingRequests: true, links: [] } as Partial<PublicCard>;
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://x.supabase.co");
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "sb_publishable_x");
   vi.stubEnv("PASSME_SIGNING_SECRET", "s".repeat(40));
@@ -104,11 +104,11 @@ describe("proposing a meeting", () => {
 
   it("refuses cards that don't take proposals, full cards and setups without email", async () => {
     useAdmin({ row: meetingRow(), submit: { full: true } });
-    state.card = { fullName: "Diego Molina", acceptsMeetingRequests: false };
+    state.card = { fullName: "Diego Molina", acceptsMeetingRequests: false, links: [] };
     expect(await submitMeetingAction("diego", "qr", { status: "idle" }, form(proposal))).toMatchObject({
       message: "Esta tarjeta ya no acepta propuestas de reunión.",
     });
-    state.card = { fullName: "Diego Molina", acceptsMeetingRequests: true };
+    state.card = { fullName: "Diego Molina", acceptsMeetingRequests: true, links: [] };
     expect(await submitMeetingAction("diego", "qr", { status: "idle" }, form(proposal))).toMatchObject({
       message: expect.stringMatching(/muchas propuestas pendientes/),
     });
@@ -139,6 +139,13 @@ describe("answering a meeting", () => {
     expect(result).toMatchObject({ status: "done", action: "confirm", view: { stage: "confirmed", confirmedStart: TUE_12, party: "owner" } });
     expect(admin.updates[0]).toMatchObject({ status: "confirmed", location: "Café Central" });
     expect(state.after).toHaveLength(1);
+  });
+
+  it("shows the card's visible email (read through the public card) as the one the guest gets", async () => {
+    useAdmin({ row: meetingRow() });
+    state.card = { fullName: "Diego Molina", acceptsMeetingRequests: true, links: [{ kind: "email", value: "hola@estudio.example", label: "" }] };
+    const result = await respondMeetingAction(ID, ownerSig(), { status: "idle" }, form({ intent: "confirm", slot: TUE_12 }));
+    expect(result).toMatchObject({ status: "done", view: { owner: { email: "hola@estudio.example" } } });
   });
 
   it("keeps each side to its own moves and validates what it sends", async () => {

@@ -12,7 +12,7 @@ import { parseClose, parseConfirm, parseCounter } from "@/lib/meetings/schema";
 import { changeMeeting } from "@/lib/meetings/service";
 import { applyChange, type MeetingChange, type MeetingParty, type MeetingStatus } from "@/lib/meetings/state";
 import type { Meeting } from "@/lib/meetings/model";
-import { demoMeetingById, isDemoMeetingId, toMeetingView, type DemoMeetingId, type MeetingView } from "@/lib/meetings/view";
+import { DEMO_CONTACT_EMAIL, demoMeetingById, isDemoMeetingId, toMeetingView, type DemoMeetingId, type MeetingView } from "@/lib/meetings/view";
 import { clientRateKey } from "@/lib/request";
 
 export type MeetingResponseState =
@@ -103,7 +103,7 @@ function demoAnswer(id: DemoMeetingId, party: MeetingParty, formData: FormData):
     closedBy: patch.closed_by === undefined ? meeting.closedBy : patch.closed_by,
     sequence: patch.sequence,
   };
-  const owner = { id: "demo", name: DEMO_CARD.fullName, slug: DEMO_CARD.slug, email: "alex@example.com" };
+  const owner = { id: "demo", name: DEMO_CARD.fullName, slug: DEMO_CARD.slug, email: "alex@example.com", contactEmail: DEMO_CONTACT_EMAIL };
   return { status: "done", action: parsed.change.action, view: toMeetingView(updated, owner, party, now), demo: true };
 }
 
@@ -142,6 +142,6 @@ export async function respondMeetingAction(
   after(result.emails);
   const { meeting } = result.record;
   // A confirmed meeting shows the guest how to reach the owner.
-  const owner = party === "guest" && meeting.status === "confirmed" ? await withOwnerEmail(result.record.owner) : result.record.owner;
+  const owner = party === "owner" || meeting.status === "confirmed" ? await withOwnerEmail(result.record.owner) : result.record.owner;
   return { status: "done", action: parsed.change.action, view: toMeetingView(meeting, owner, party, new Date()) };
 }

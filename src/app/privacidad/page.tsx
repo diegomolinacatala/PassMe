@@ -35,7 +35,7 @@ export default function PrivacyPage() {
         "Estadísticas de tu tarjeta (visitas, clics, contactos guardados). No guardamos direcciones IP ni usamos cookies de seguimiento: una visita se cuenta una vez por sesión del navegador.",
         "Si añades tu pase a Apple Wallet, el identificador del dispositivo y el token de notificaciones que Apple nos envía, solo para poder actualizar el pase.",
         "Si activas «Recibir contactos», los datos que otras personas te dejan (ver el apartado siguiente).",
-        "Si activas «Agendar reunión», las propuestas de reunión que recibes y tus respuestas (ver «Si propones una reunión»).",
+        "Si activas «Recibir propuestas de reunión», las propuestas que recibes y tus respuestas (ver «Si usas “Agendar reunión”»).",
         "Para frenar abusos (spam, fuerza bruta) guardamos contadores asociados a un identificador seudonimizado de tu conexión (un hash con clave secreta de la IP, que no permite recuperarla) durante como mucho un día, y durante 24 horas los intentos de código de acceso asociados a un hash de tu email.",
       ],
     },
@@ -50,7 +50,7 @@ export default function PrivacyPage() {
     },
     {
       id: "reuniones",
-      title: "Si propones una reunión",
+      title: "Si usas «Agendar reunión»",
       body: [
         "Cuando usas «Agendar reunión» en la tarjeta de alguien, guardamos lo que escribes (nombre, email, teléfono si lo das, empresa y tema), las horas que propones y cómo queréis veros. Su dueño lo ve en su editor y en la página de la reunión.",
         "Para organizarla, PassMe hace de intermediario por email. Al dueño le enviamos las horas que propones, cómo queréis veros, tu nombre y tu empresa; el lugar, el tema y tus notas los ve en la página de la reunión. A ti te escribimos solo cuando responde (confirmación, otras horas o un no) o cuando alguno cancela, con un texto fijo de PassMe y, si se confirma, la invitación de calendario (.ics); sus notas las ves en tu página de la reunión. No te enviamos nada más ni te apuntamos a ninguna lista, y limitamos cuántos correos puede recibir una misma dirección.",

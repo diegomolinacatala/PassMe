@@ -2,7 +2,7 @@
 
 import { ArrowUpRight, CalendarCheck2, CalendarClock, Hourglass, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { deleteMeetingAction } from "@/app/dashboard/actions";
+import { declineMeetingAction, deleteMeetingAction } from "@/app/dashboard/actions";
 import { buttonClasses } from "@/components/ui/button";
 import { InlineError } from "@/components/ui/field";
 import { NEW_TAB_SUFFIX } from "@/components/ui/new-tab-hint";
@@ -65,10 +65,22 @@ function byDate(a: MeetingItem, b: MeetingItem): number {
 const ICON_BUTTON =
   "grid size-11 shrink-0 place-items-center rounded-full sm:size-10 text-ink-soft transition-colors hover:bg-danger/10 hover:text-danger disabled:pointer-events-none";
 
-function Item({ item, onDelete }: { item: MeetingItem; onDelete?: () => void }) {
+interface ItemProps {
+  item: MeetingItem;
+  onDelete?: () => void;
+  /** Unanswered proposals: the bin offers a kind "no" (the guest is told) or a silent removal. */
+  onDecline?: () => void;
+}
+
+function Item({ item, onDelete, onDecline }: ItemProps) {
   const { view, href } = item;
   const group = groupOf(view);
   const label = group === "answer" ? "Responder" : "Ver";
+  const [choosing, setChoosing] = useState(false);
+  const firstChoice = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (choosing) firstChoice.current?.focus();
+  }, [choosing]);
   return (
     <li className={cn("flex flex-wrap items-center gap-3 rounded-2xl px-3 py-3", group === "answer" && "bg-signal-wash/70")}>
       {/* Name and actions share a line; with a large font, the actions drop below. */}
@@ -97,10 +109,48 @@ function Item({ item, onDelete }: { item: MeetingItem; onDelete?: () => void }) 
           <ArrowUpRight className="size-3.5" aria-hidden />
         </a>
       ) : null}
-      {onDelete ? (
+      {onDelete && onDecline ? (
+        <button
+          type="button"
+          onClick={() => setChoosing((open) => !open)}
+          aria-expanded={choosing}
+          className={ICON_BUTTON}
+          aria-label={`Rechazar o quitar la propuesta de ${view.guest.name}`}
+          title="Rechazar o quitar"
+        >
+          <Trash2 className="size-4" aria-hidden />
+        </button>
+      ) : onDelete ? (
         <button type="button" onClick={onDelete} className={ICON_BUTTON} aria-label={`Quitar la reunión con ${view.guest.name}`} title="Quitar">
           <Trash2 className="size-4" aria-hidden />
         </button>
+      ) : null}
+      {choosing && onDelete && onDecline ? (
+        <div role="group" aria-label={`Qué hacer con la propuesta de ${view.guest.name}`} className="flex w-full flex-col gap-1.5 sm:flex-row sm:flex-wrap">
+          <button
+            ref={firstChoice}
+            type="button"
+            onClick={() => {
+              setChoosing(false);
+              onDecline();
+            }}
+            className={buttonClasses({ variant: "outline", size: "sm", className: "h-auto min-h-11 justify-start py-2 text-left whitespace-normal" })}
+          >
+            <span>
+              Decir que no <span className="font-normal text-muted">(le avisamos con un mensaje amable)</span>
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setChoosing(false);
+              onDelete();
+            }}
+            className={buttonClasses({ variant: "ghost", size: "sm", className: "min-h-11 justify-start" })}
+          >
+            Quitar sin avisar (es spam)
+          </button>
+        </div>
       ) : null}
     </li>
   );
@@ -118,11 +168,18 @@ export function MeetingsPanel({ items, available, enabled, demo }: MeetingsPanel
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const [removed, setRemoved] = useState<ReadonlySet<string>>(new Set());
+  // Proposals declined from here: shown as such until the next load brings them back declined.
+  const [declined, setDeclined] = useState<ReadonlySet<string>>(new Set());
+  const [status, setStatus] = useState<string | null>(null);
   // Your own list, nobody is told: no confirmation, but "Deshacer" for a few seconds before it's final.
   const [undo, setUndo] = useState<(UndoItem & { id: string }) | null>(null);
   const waiting = useRef<string | null>(null);
   const panel = useRef<HTMLDivElement>(null);
-  const list = items.filter((i) => !removed.has(i.view.id));
+  const list = items
+    .filter((i) => !removed.has(i.view.id))
+    .map((i) =>
+      declined.has(i.view.id) ? { ...i, view: { ...i.view, stage: "declined" as const, status: "declined" as const, closedBy: "owner" as const, actions: [] } } : i,
+    );
   const closed = list.filter((i) => groupOf(i.view) === "closed");
 
   const unhide = (id: string) =>
@@ -152,8 +209,26 @@ export function MeetingsPanel({ items, available, enabled, demo }: MeetingsPanel
     [demo],
   );
 
+  function decline(item: MeetingItem) {
+    setError(null);
+    setStatus(null);
+    const { id } = item.view;
+    const done = () => {
+      setDeclined((prev) => new Set(prev).add(id));
+      setStatus(`Le hemos dicho que no a ${firstName(item.view.guest.name)} con un mensaje amable.${demo ? " (Modo demo: no se ha enviado nada.)" : ""}`);
+      requestAnimationFrame(() => panel.current?.focus());
+    };
+    if (demo) return done();
+    startTransition(async () => {
+      const result = await declineMeetingAction(id);
+      if (result.ok) done();
+      else setError(result.error);
+    });
+  }
+
   function remove(item: MeetingItem) {
     setError(null);
+    setStatus(null);
     if (waiting.current) commit(waiting.current);
     waiting.current = item.view.id;
     setRemoved((prev) => new Set(prev).add(item.view.id));
@@ -187,7 +262,12 @@ export function MeetingsPanel({ items, available, enabled, demo }: MeetingsPanel
                 <ul className="-mx-3 space-y-1">
                   {group.map((item) => (
                     // Unanswered proposals can be cleared (spam); confirmed ones are cancelled from their page.
-                    <Item key={item.view.id} item={item} onDelete={id === "upcoming" ? undefined : () => remove(item)} />
+                    <Item
+                      key={item.view.id}
+                      item={item}
+                      onDelete={id === "upcoming" ? undefined : () => remove(item)}
+                      onDecline={id === "answer" ? () => decline(item) : undefined}
+                    />
                   ))}
                 </ul>
               </div>
@@ -226,6 +306,9 @@ export function MeetingsPanel({ items, available, enabled, demo }: MeetingsPanel
           setUndo(null);
         }}
       />
+      <p role="status" className="mt-3 text-sm text-ok empty:hidden">
+        {status}
+      </p>
       {error ? (
         <InlineError live className="mt-3">
           {error}

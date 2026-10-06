@@ -1,12 +1,23 @@
 "use client";
 
-import { CalendarPlus, X } from "lucide-react";
-import { useId, useMemo, useState } from "react";
+import { CalendarPlus, ChevronDown, X } from "lucide-react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { InlineError } from "@/components/ui/field";
 import { undoKey, UndoNotice, type UndoItem } from "@/components/ui/undo-notice";
 import { cn } from "@/lib/cn";
 import { HORIZON_DAYS, MAX_SLOTS } from "@/lib/meetings/schema";
-import { dateKey, formatDay, formatSlotShort, pickerDay, TIME_GROUPS, timeKey, upcomingDays, zonedTimeToUtc, type PickerDay } from "@/lib/meetings/time";
+import {
+  dateKey,
+  formatDay,
+  formatSlotShort,
+  openingDayKey,
+  pickerDay,
+  TIME_GROUPS,
+  timeKey,
+  upcomingDays,
+  zonedTimeToUtc,
+  type PickerDay,
+} from "@/lib/meetings/time";
 
 interface SlotPickerProps {
   timeZone: string;
@@ -21,7 +32,6 @@ interface SlotPickerProps {
 }
 
 const VISIBLE_DAYS = 14;
-const LAST_TIME = TIME_GROUPS.at(-1)!.times.at(-1)!;
 
 interface DayStripProps {
   days: ReadonlyArray<PickerDay>;
@@ -36,6 +46,15 @@ interface DayStripProps {
 /** Two weeks of days to swipe through, plus "another date" up to the horizon. */
 function DayStrip({ days, active, marked, isFull, minDate, maxDate, onPick }: DayStripProps) {
   const labelId = useId();
+  const scroller = useRef<HTMLDivElement>(null);
+  // The active day sits in the middle of the strip (only the strip scrolls, never the page).
+  useEffect(() => {
+    const strip = scroller.current;
+    const button = strip?.querySelector<HTMLElement>(`[data-day="${active}"]`);
+    if (!strip || !button) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    strip.scrollTo({ left: button.offsetLeft - (strip.clientWidth - button.clientWidth) / 2, behavior: reduce ? "auto" : "smooth" });
+  }, [active]);
   return (
     <div>
       <div className="mb-2 flex items-baseline justify-between gap-3">
@@ -58,13 +77,14 @@ function DayStrip({ days, active, marked, isFull, minDate, maxDate, onPick }: Da
           />
         </label>
       </div>
-      <div role="group" aria-labelledby={labelId} className="-mx-5 flex snap-x scroll-px-5 gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none]">
+      <div ref={scroller} role="group" aria-labelledby={labelId} className="relative -mx-5 flex snap-x scroll-px-5 gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none]">
         {days.map((day) => {
           const selected = day.key === active;
           return (
             <button
               key={day.key}
               type="button"
+              data-day={day.key}
               aria-pressed={selected}
               aria-label={`${day.long}${marked.has(day.key) ? ", con horas elegidas" : ""}`}
               disabled={isFull(day.key)}
@@ -74,7 +94,8 @@ function DayStrip({ days, active, marked, isFull, minDate, maxDate, onPick }: Da
                 selected ? "border-ink bg-ink text-paper" : "border-field-border bg-card text-ink hover:border-ink",
               )}
             >
-              <span className={cn("font-mono text-mark uppercase", selected ? "text-paper/70" : "text-muted")}>{day.label}</span>
+              {/* Weekends are quieter (muted label), weekdays read a step darker. */}
+              <span className={cn("font-mono text-mark uppercase", selected ? "text-paper/70" : day.weekend ? "text-muted" : "text-ink-soft")}>{day.label}</span>
               <span className="font-display text-2xl leading-none">{day.day}</span>
               <span className={cn("text-mark", selected ? "text-paper/70" : "text-muted")}>{day.month}</span>
               {marked.has(day.key) ? (
@@ -95,42 +116,64 @@ interface TimeGridProps {
   onToggle: (time: string) => void;
 }
 
-/** Half-hour chips for one day, morning and afternoon. */
+/** Half-hour chips for one day: morning and afternoon, and early or late times folded. */
 function TimeGrid({ day, isSelected, isPast, onToggle }: TimeGridProps) {
+  const [showMore, setShowMore] = useState(false);
+  const chips = (times: ReadonlyArray<string>) => (
+    <div className="grid grid-cols-4 gap-1.5">
+      {times.map((time) => {
+        const selected = isSelected(time);
+        return (
+          <button
+            key={time}
+            type="button"
+            aria-pressed={selected}
+            aria-label={`${time}, ${day.long}`}
+            disabled={isPast(time) && !selected}
+            onClick={() => onToggle(time)}
+            className={cn(
+              "h-11 rounded-xl border font-mono text-body tabular-nums transition-[background-color,border-color,color,transform] duration-200 active:scale-95 disabled:pointer-events-none disabled:opacity-30",
+              selected ? "border-signal-strong bg-signal-strong text-white shadow-press-signal" : "border-field-border bg-card text-ink hover:border-ink",
+            )}
+          >
+            {time}
+          </button>
+        );
+      })}
+    </div>
+  );
   return (
     <div>
       <p className="mb-2 text-sm font-medium text-ink-soft first-letter:uppercase" aria-live="polite">
         {day.long}
       </p>
       <div className="space-y-3">
-        {TIME_GROUPS.map((group) => (
-          <div key={group.label} role="group" aria-label={`${group.label}, ${day.long}`}>
-            <p className="eyebrow mb-1.5">{group.label}</p>
-            <div className="grid grid-cols-4 gap-1.5">
-              {group.times.map((time) => {
-                const selected = isSelected(time);
-                return (
-                  <button
-                    key={time}
-                    type="button"
-                    aria-pressed={selected}
-                    aria-label={`${time}, ${day.long}`}
-                    disabled={isPast(time) && !selected}
-                    onClick={() => onToggle(time)}
-                    className={cn(
-                      "h-11 rounded-xl border font-mono text-body tabular-nums transition-[background-color,border-color,color,transform] duration-200 active:scale-95 disabled:pointer-events-none disabled:opacity-30",
-                      selected
-                        ? "border-signal-strong bg-signal-strong text-white shadow-press-signal"
-                        : "border-field-border bg-card text-ink hover:border-ink",
-                    )}
-                  >
-                    {time}
-                  </button>
-                );
-              })}
+        {TIME_GROUPS.map((group) => {
+          if (!group.folded) {
+            return (
+              <div key={group.label} role="group" aria-label={`${group.label}, ${day.long}`}>
+                <p className="eyebrow mb-1.5">{group.label}</p>
+                {chips(group.times)}
+              </div>
+            );
+          }
+          // Open by itself when one of its times is already chosen on this day.
+          const open = showMore || group.times.some(isSelected);
+          return (
+            <div key={group.label} role="group" aria-label={`${group.label}, ${day.long}`}>
+              <button
+                type="button"
+                aria-expanded={open}
+                onClick={() => setShowMore((value) => !value)}
+                className="eyebrow -ml-2 inline-flex min-h-9 items-center gap-1 rounded-full px-2 hover:text-ink"
+              >
+                {group.label}
+                <ChevronDown className={cn("size-3.5 transition-transform", open && "rotate-180")} aria-hidden />
+              </button>
+              {open ? <div className="mt-1.5">{chips(group.times)}</div> : null}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -187,9 +230,12 @@ function Proposals({ value, timeZone, chooser, notice, onRemove }: ProposalsProp
 export function SlotPicker({ timeZone, value, onChange, now, chooser, error }: SlotPickerProps) {
   const days = useMemo(() => upcomingDays(new Date(now), timeZone, VISIBLE_DAYS), [now, timeZone]);
   const isPastOn = (key: string, time: string) => (zonedTimeToUtc(key, time, timeZone)?.getTime() ?? 0) <= now;
-  // Start on today, or tomorrow once today's last time has gone.
-  const [activeKey, setActiveKey] = useState(() => (isPastOn(days[0]!.key, LAST_TIME) ? days[1]!.key : days[0]!.key));
-  const [extraDay, setExtraDay] = useState<PickerDay | null>(null);
+  // Back on a day already chosen (step 2 and back, a reload); otherwise a useful day.
+  const firstChosen = value.length > 0 ? dateKey(new Date(value[0]!), timeZone) : null;
+  const [activeKey, setActiveKey] = useState(() => firstChosen ?? openingDayKey(new Date(now), timeZone, days));
+  const [extraDay, setExtraDay] = useState<PickerDay | null>(() =>
+    firstChosen && !days.some((d) => d.key === firstChosen) ? pickerDay(firstChosen) : null,
+  );
   const [notice, setNotice] = useState<string | null>(null);
   // A time removed from its pill can come back with one tap.
   const [undo, setUndo] = useState<(UndoItem & { iso: string }) | null>(null);

@@ -7,6 +7,7 @@ import type { MeetingPatch } from "@/lib/meetings/state";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import type { MeetingRequestRow } from "@/lib/supabase/database.types";
 import type { TypedSupabaseClient } from "@/lib/supabase/server";
+import { getPublicCard } from "./cards";
 import { getOwnerEmail } from "./contact-requests";
 import { isUuid } from "./wallet";
 
@@ -109,9 +110,27 @@ export async function getMeetingRecord(id: string): Promise<MeetingRecord | null
   };
 }
 
-/** The owner's login email (needed for invitations), looked up only when an email goes out. */
+/** Same guard the guest's own address goes through: nothing that could smuggle headers. */
+const PLAIN_EMAIL_RE = /^[^\s@?&=%#/<>"]+@[^\s@?&=%#/<>"]+$/;
+
+/**
+ * The first email on the owner's published card. Read through the public
+ * card (get_public_card), so a hidden link can never reach the guest.
+ */
+async function cardContactEmail(slug: string): Promise<string | null> {
+  const card = await getPublicCard(slug);
+  const value = card?.links.find((link) => link.kind === "email")?.value ?? null;
+  return value && value.length <= 254 && PLAIN_EMAIL_RE.test(value) ? value : null;
+}
+
+/**
+ * The owner's login email (where PassMe writes to them) and the one the guest
+ * sees (`contactEmail`), looked up only when needed.
+ */
 export async function withOwnerEmail(owner: MeetingOwner): Promise<MeetingOwner> {
-  return owner.email ? owner : { ...owner, email: await getOwnerEmail(owner.id) };
+  const email = owner.email ?? (await getOwnerEmail(owner.id));
+  const contactEmail = owner.contactEmail ?? (await cardContactEmail(owner.slug)) ?? email;
+  return { ...owner, email, contactEmail };
 }
 
 /**
@@ -154,6 +173,17 @@ export async function listOwnMeetings(supabase: TypedSupabaseClient): Promise<Ow
     return { available: !missing, meetings: [] };
   }
   return { available: true, meetings: (data as MeetingRequestRow[]).map(rowToMeeting) };
+}
+
+/** Whether the signed-in owner can see this meeting (RLS: their own card's only). */
+export async function ownsMeeting(supabase: TypedSupabaseClient, id: string): Promise<boolean> {
+  if (!isUuid(id)) return false;
+  const { data, error } = await supabase.from("meeting_requests").select("id").eq("id", id).maybeSingle();
+  if (error) {
+    log.warn("meeting ownership check failed", {}, error);
+    return false;
+  }
+  return Boolean(data);
 }
 
 export type DeleteMeetingResult = { ok: true } | { ok: false; reason: "upcoming" | "failed" };

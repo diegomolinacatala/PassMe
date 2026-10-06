@@ -7,7 +7,7 @@ import { getMeetingRecord, withOwnerEmail } from "@/lib/data/meetings";
 import { isSupabaseConfigured } from "@/lib/env";
 import { verifyMeetingSignature } from "@/lib/meetings/links";
 import type { MeetingParty } from "@/lib/meetings/state";
-import { demoMeetingById, isDemoMeetingId, toMeetingView, type MeetingView } from "@/lib/meetings/view";
+import { DEMO_CONTACT_EMAIL, demoMeetingById, isDemoMeetingId, toMeetingView, type MeetingView } from "@/lib/meetings/view";
 
 export const metadata: Metadata = {
   title: "Reunión",
@@ -39,15 +39,15 @@ async function loadView(id: string, signature: string): Promise<{ view: MeetingV
   const now = new Date();
   if (isDemoMeetingId(id) && !isSupabaseConfigured()) {
     const party: MeetingParty = signature === "invitado" ? "guest" : "owner";
-    const owner = { id: "demo", name: DEMO_CARD.fullName, slug: DEMO_CARD.slug, email: "alex@example.com" };
+    const owner = { id: "demo", name: DEMO_CARD.fullName, slug: DEMO_CARD.slug, email: "alex@example.com", contactEmail: DEMO_CONTACT_EMAIL };
     return { view: toMeetingView(demoMeetingById(id, now), owner, party, now), demo: true };
   }
   const party = verifyMeetingSignature(id.toLowerCase(), signature);
   if (!party) return "invalid";
   const record = await getMeetingRecord(id.toLowerCase());
   if (!record) return "gone";
-  const owner =
-    party === "guest" && record.meeting.status === "confirmed" ? await withOwnerEmail(record.owner) : record.owner;
+  // The owner sees which email the guest will get; the guest, once confirmed.
+  const owner = party === "owner" || record.meeting.status === "confirmed" ? await withOwnerEmail(record.owner) : record.owner;
   return { view: toMeetingView(record.meeting, owner, party, now), demo: false };
 }
 
