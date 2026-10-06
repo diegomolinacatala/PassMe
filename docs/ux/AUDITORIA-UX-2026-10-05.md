@@ -539,7 +539,7 @@ Origen: MEET-01, MEET-03, MEET-05, MEET-06, MEET-08, MEET-09, MEET-11–13, MEET
 
 Origen: EDIT-03, EDIT-04, EDIT-07–09, EDIT-12, EDIT-13, EDIT-16, EDIT-17, EDIT-22, EDIT-23, A11Y-11. Pregunta D6.
 
-**P7.1 · Estructura: «Tarjeta · Bandeja · Actividad»** ⚖️ D6 [A] · EDIT-04, EDIT-12, MEET-16
+**✅ P7.1 · Estructura: «Tarjeta · Bandeja · Actividad»** ⚖️ D6 [A] · EDIT-04, EDIT-12, MEET-16
 - Con D6 = (a): bajo la cabecera, un control segmentado fijo **«Tarjeta» · «Bandeja (n)» · «Actividad»** (estado en la URL: `?vista=bandeja`, para enlazarlo desde los emails: el email de contacto nuevo hoy enlaza a `/dashboard#contactos`).
   - «Tarjeta»: 01 Quién eres, 02 Cómo contactarte, 03 Estilo, 04 Tu página (P7.2), 05 Publicación y enlace, y la cartera.
   - «Bandeja»: Reuniones y Contactos recibidos, con contador de pendientes.
@@ -549,12 +549,12 @@ Origen: EDIT-03, EDIT-04, EDIT-07–09, EDIT-12, EDIT-13, EDIT-16, EDIT-17, EDIT
 - Con D6 = (b): índice fijo «01 Quién eres ▾» en la cabecera para saltar entre secciones, y en móvil «Reuniones» y «Contactos recibidos» suben por encima de «Estilo» cuando tienen elementos.
 - ✔ En el iPhone, llegar a responder una reunión o a cerrar sesión cuesta ≤ 2 toques y ningún scroll largo; a 1440×900 la vista previa está siempre visible mientras se edita.
 
-**P7.2 · «Tu página»: las funciones de la página, separadas de publicar** [M] · EDIT-13
+**✅ P7.2 · «Tu página»: las funciones de la página, separadas de publicar** [M] · EDIT-13
 - Nueva sección con dos filas cortas: «{Verbo de D1}» («Te proponen hora y la confirmas desde el email») y «Recibir contactos» («Un formulario para que te dejen sus datos»). «Publicación» se queda con el interruptor de publicar y el enlace.
 - La vista previa «Al escanear» muestra esos botones (sin acción) cuando están activos: hoy `profile-card.tsx` no los pinta en `preview`.
 - ✔ Al activar o desactivar cada opción, la vista previa los muestra u oculta.
 
-**P7.3 · Datos de contacto manejables** [A] · EDIT-07, EDIT-08, A11Y-11
+**✅ P7.3 · Datos de contacto manejables** [A] · EDIT-07, EDIT-08, A11Y-11
 - `links-editor.tsx`:
   - Fila compacta (≤ 72 px en el iPhone): icono · valor · un solo botón «⋯» (44×44) con un menú: «Ocultar de la tarjeta / Mostrar», «Subir al principio», «Cambiar tipo», «Duplicar», «Quitar» (con deshacer, P3.5).
   - Reordenar arrastrando un asa de 44 px (pulsación larga en táctil; flechas de teclado como alternativa accesible). Sin librerías nuevas pesadas: si hace falta una, justifícala en el PR.
@@ -562,28 +562,28 @@ Origen: EDIT-03, EDIT-04, EDIT-07–09, EDIT-12, EDIT-13, EDIT-16, EDIT-17, EDIT
   - Un solo tipo de web: fusionar «Web» y «Enlace» (`custom`) en «Web» con título opcional (si está vacío, se muestra el dominio). Los `custom` existentes se leen como `website` (mismo patrón que `toPatternKind()` con los motivos retirados) y, si cambias el `CHECK`, **migración nueva** y fallback.
 - ✔ Todos los controles ≥ 44 px; pegar `https://www.behance.net/pablo` crea una Web en 2 toques; mover del 15 al 1 en ≤ 2 gestos; la lista de tipos no tiene «Enlace».
 
-**P7.4 · Vista previa siempre a mano en el móvil** [A] · EDIT-03
+**✅ P7.4 · Vista previa siempre a mano en el móvil** [A] · EDIT-03
 - Por debajo de 1024 px, cuando la vista previa sale de la pantalla: una píldora fija de 64 px con la miniatura del pase, encima de la barra de guardar (o en su lugar si no hay cambios). Al tocarla, una hoja inferior con la vista previa completa y sus tres pestañas, sin perder la posición de scroll.
 - ✔ Desde cualquier campo del editor en el iPhone, el pase actualizado se ve con 1 toque.
 
-**P7.5 · Encuadrar la foto** [M] · EDIT-09
+**✅ P7.5 · Encuadrar la foto** [M] · EDIT-09
 - `avatar-field.tsx`: tras elegir la foto, hoja «Encuadra tu foto» con máscara circular, arrastrar y pellizcar (deslizador de zoom en escritorio), «Usar foto» y «Cancelar». El recorte se aplica en el cliente antes de subir (como hoy el recorte central).
 - HEIC sin soporte: «Tu navegador no abre fotos HEIC. Expórtala como JPG o hazle una captura.» Ayuda: «Podrás encuadrarla. Sale en el pase y al guardar tu contacto.»
 - ✔ Se reencuadra antes de usarla; un HEIC no compatible da el mensaje específico.
 
-**P7.6 · Descartar cambios** [M] · EDIT-10
+**✅ P7.6 · Descartar cambios** [M] · EDIT-10
 - `SaveBar`: con cambios, «Descartar» (`ghost`) a la izquierda de «Guardar», usando el `reset` que ya existe en `use-card-draft.ts`.
 - ✔ Con cambios pendientes, 1 toque vuelve al estado guardado.
 
-**P7.7 · Estilo: lo avanzado, plegado** [M] · EDIT-16
+**✅ P7.7 · Estilo: lo avanzado, plegado** [M] · EDIT-16
 - `design-field.tsx`: visibles Tema → Motivo → Letra. Tras «Más opciones de estilo»: «Variación» y «Colores a medida» («Fondo» y «Color de los trazos», con campo de texto para pegar el hex además del selector nativo). Arreglar la ayuda de Variación, que nombra solo 3 de los 6 motivos: «Este motivo no tiene variaciones.»
 - ✔ Estilo plegado mide ≤ 1.000 px en el iPhone y se puede pegar `#1F3A5F`.
 
-**P7.8 · Enlace de la tarjeta: convierte y sugiere** [B] · EDIT-17
+**✅ P7.8 · Enlace de la tarjeta: convierte y sugiere** [B] · EDIT-17
 - `slug-field.tsx`: convertir `_` y `.` en `-` y quitar acentos (`normalize("NFD")`) al escribir. Si está cogido: «Ese ya está cogido. ¿Te vale `pablo-serrano-2` o `pabloserrano`?» con chips que lo aplican (comprobando disponibilidad con la acción existente, respetando su límite de peticiones).
 - ✔ `pablo_serrano` da `pablo-serrano`; un enlace cogido ofrece 2 alternativas libres.
 
-**P7.9 · «Quién eres» más corto e iniciales mejores** [B] · EDIT-22, EDIT-23
+**✅ P7.9 · «Quién eres» más corto e iniciales mejores** [B] · EDIT-22, EDIT-23
 - «Pronombres» y «Ubicación» tras «Añadir más datos» (abierto si ya tienen valor).
 - `src/components/card/avatar.tsx`: con 3 palabras o más, iniciales del nombre y de la primera palabra que no sea partícula (de, del, la, las, los, y): «Pablo Serrano Iglesias de la Fuente» → «PS». Aviso bajo el nombre si no cabe en el pase: «En el pase se verá cortado: prueba con nombre y primer apellido.» (Recuerda: `pass-art.tsx` lo renderiza también Satori; no metas hooks ahí.)
 - ✔ Tests unitarios de iniciales; con los dos campos vacíos, 01 muestra foto, nombre, cargo, empresa y bio.

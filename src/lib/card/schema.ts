@@ -2,7 +2,7 @@ import { z } from "zod";
 import { HEX_COLOR_RE } from "./colors";
 import { PATTERN_SEED_MAX, TYPEFACES } from "./design";
 import { PATTERN_KINDS } from "./pattern";
-import { LINK_KINDS, normalizeLinkValue } from "./links";
+import { LINK_KINDS, normalizeLinkValue, toLinkKind } from "./links";
 import { checkSlug, SLUG_ERRORS } from "./slug";
 import type { CardLink } from "./types";
 
@@ -90,9 +90,6 @@ export const cardInputSchema = z
       if (!normalized.ok) {
         ctx.addIssue({ code: "custom", path: ["links", i, "value"], message: normalized.error });
       }
-      if (link.kind === "custom" && !link.label) {
-        ctx.addIssue({ code: "custom", path: ["links", i, "label"], message: "Ponle un título al enlace." });
-      }
     });
   })
   .transform((card) => ({
@@ -101,7 +98,7 @@ export const cardInputSchema = z
       const normalized = normalizeLinkValue(link.kind, link.value);
       return {
         id: link.id,
-        kind: link.kind,
+        kind: toLinkKind(link.kind),
         value: normalized.ok ? normalized.value : link.value,
         ...(link.label ? { label: link.label } : {}),
         visible: link.visible,
@@ -144,7 +141,7 @@ export function sanitizeStoredLinks(raw: unknown): CardLink[] {
     if (!normalized.ok) continue;
     links.push({
       id: parsed.data.id,
-      kind: parsed.data.kind,
+      kind: toLinkKind(parsed.data.kind),
       value: normalized.value,
       ...(parsed.data.label ? { label: parsed.data.label } : {}),
       visible: parsed.data.visible,

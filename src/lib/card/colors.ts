@@ -140,3 +140,13 @@ export function cardCssVars(accentHex: string, detailHex?: string | null): Recor
     "--card-detail": toHex(p.detail),
   };
 }
+
+/**
+ * A color typed or pasted by hand ("#1f3a5f", "1F3A5F", "#abc") as "#RRGGBB",
+ * or null while it isn't one yet.
+ */
+export function parseHexInput(raw: string): string | null {
+  const text = raw.trim().replace(/^#/, "");
+  const full = /^[0-9a-f]{3}$/i.test(text) ? text.replace(/./g, (c) => c + c) : text;
+  return /^[0-9a-f]{6}$/i.test(full) ? `#${full.toUpperCase()}` : null;
+}

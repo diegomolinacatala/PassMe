@@ -51,3 +51,10 @@ export const DEMO_CONTACT_REQUESTS: ContactRequest[] = [
     createdAt: "2026-09-26T10:30:00.000Z",
   },
 ];
+
+/** Demo mode has no database: these handles play the part of "already taken" in the editor. */
+const DEMO_TAKEN_SLUGS: ReadonlySet<string> = new Set(["alex", "alex-rivera", "pablo-serrano", "pablo-serrano-3", "lucia-ferrer"]);
+
+export function isDemoSlugTaken(slug: string): boolean {
+  return DEMO_TAKEN_SLUGS.has(slug);
+}

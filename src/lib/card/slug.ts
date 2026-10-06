@@ -93,3 +93,34 @@ export function slugCandidate(seed: string, suffix: string): string {
   const padded = base.length < SLUG_MIN_LENGTH ? `${base}-card` : base;
   return `${padded}-${suffix}`.slice(0, SLUG_MAX_LENGTH).replace(/-+$/g, "");
 }
+
+/**
+ * What the slug field keeps while typing: lowercase, no accents ("José" → "jose"),
+ * and "_", "." or spaces become "-" ("pablo_serrano" → "pablo-serrano").
+ * Leading/trailing hyphens are left for the validation message (the person may still be typing).
+ */
+export function normalizeSlugInput(raw: string): string {
+  return raw
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[\s_.]+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-{2,}/g, "-")
+    .slice(0, SLUG_MAX_LENGTH);
+}
+
+function withSuffix(base: string, suffix: string): string {
+  return `${base.slice(0, SLUG_MAX_LENGTH - suffix.length).replace(/-+$/g, "")}${suffix}`;
+}
+
+/**
+ * Candidates to offer when a slug is taken, best first ("pablo-serrano" →
+ * "pablo-serrano-2", "pabloserrano", "pablo-serrano-3"…). Only valid ones,
+ * never the taken slug itself; availability is checked by the caller.
+ */
+export function slugAlternatives(taken: string): string[] {
+  const base = taken.replace(/-\d+$/, "") || taken;
+  const candidates = [withSuffix(base, "-2"), base.replace(/-/g, ""), withSuffix(base, "-3"), withSuffix(base, "-4"), withSuffix(base, "-5")];
+  return [...new Set(candidates)].filter((candidate) => candidate !== taken && checkSlug(candidate).ok);
+}

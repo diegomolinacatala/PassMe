@@ -107,7 +107,6 @@ describe("parseCardInput", () => {
         "detailColor",
         "links.0.value",
         "links.1.id",
-        "links.1.label",
       ]),
     );
   });

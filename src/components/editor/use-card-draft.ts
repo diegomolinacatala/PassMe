@@ -5,6 +5,7 @@ import type { DesignFields } from "@/lib/card/design";
 import type { LinkKind } from "@/lib/card/links";
 import { MAX_LINKS, parseCardInput, type FieldErrors } from "@/lib/card/schema";
 import type { CardLink, OwnerCard, PublicCard } from "@/lib/card/types";
+import { moveItem } from "@/lib/reorder";
 
 export interface CardDraft {
   slug: string;
@@ -111,12 +112,16 @@ type Action =
   | { type: "contactRequests"; value: boolean }
   | { type: "meetingRequests"; value: boolean }
   | { type: "avatar"; path: string | null; url: string | null }
-  | { type: "addLink"; kind: LinkKind; id: string }
+  | { type: "addLink"; kind: LinkKind; id: string; value: string }
+  | { type: "duplicateLink"; id: string; newId: string }
+  | { type: "moveLinkTo"; id: string; index: number }
   | { type: "updateLink"; id: string; patch: Partial<Omit<CardLink, "id">> }
   | { type: "removeLink"; id: string }
   | { type: "restoreLink"; link: CardLink; index: number }
-  | { type: "moveLink"; id: string; direction: -1 | 1 }
-  | { type: "reset"; draft: CardDraft };
+  | { type: "reset"; draft: CardDraft }
+  // Back to the saved state ("Descartar"), or to a draft that was just discarded ("Deshacer").
+  | { type: "discard" }
+  | { type: "replace"; draft: CardDraft };
 
 interface State {
   draft: CardDraft;
@@ -142,8 +147,20 @@ function reducer(state: State, action: Action): State {
       if (draft.links.length >= MAX_LINKS) return state;
       return {
         ...state,
-        draft: { ...draft, links: [...draft.links, { id: action.id, kind: action.kind, value: "", visible: true }] },
+        draft: { ...draft, links: [...draft.links, { id: action.id, kind: action.kind, value: action.value, visible: true }] },
       };
+    case "duplicateLink": {
+      const index = draft.links.findIndex((l) => l.id === action.id);
+      if (index < 0 || draft.links.length >= MAX_LINKS) return state;
+      const links = [...draft.links];
+      links.splice(index + 1, 0, { ...draft.links[index]!, id: action.newId });
+      return { ...state, draft: { ...draft, links } };
+    }
+    case "moveLinkTo": {
+      const index = draft.links.findIndex((l) => l.id === action.id);
+      if (index < 0 || index === action.index) return state;
+      return { ...state, draft: { ...draft, links: moveItem(draft.links, index, action.index) } };
+    }
     case "updateLink":
       return {
         ...state,
@@ -157,16 +174,12 @@ function reducer(state: State, action: Action): State {
       links.splice(Math.min(Math.max(action.index, 0), links.length), 0, action.link);
       return { ...state, draft: { ...draft, links } };
     }
-    case "moveLink": {
-      const index = draft.links.findIndex((l) => l.id === action.id);
-      const target = index + action.direction;
-      if (index < 0 || target < 0 || target >= draft.links.length) return state;
-      const links = [...draft.links];
-      [links[index], links[target]] = [links[target]!, links[index]!];
-      return { ...state, draft: { ...draft, links } };
-    }
     case "reset":
       return { draft: action.draft, saved: action.draft };
+    case "discard":
+      return { ...state, draft: state.saved };
+    case "replace":
+      return { ...state, draft: action.draft };
   }
 }
 
@@ -188,16 +201,23 @@ export function useCardDraft(initial: CardDraft) {
       setAcceptsContactRequests: (value: boolean) => dispatch({ type: "contactRequests", value }),
       setAcceptsMeetingRequests: (value: boolean) => dispatch({ type: "meetingRequests", value }),
       setAvatar: (path: string | null, url: string | null) => dispatch({ type: "avatar", path, url }),
-      addLink: (kind: LinkKind) => {
+      addLink: (kind: LinkKind, value = "") => {
         const id = newLinkId();
-        dispatch({ type: "addLink", kind, id });
+        dispatch({ type: "addLink", kind, id, value });
         return id;
       },
+      duplicateLink: (id: string) => {
+        const newId = newLinkId();
+        dispatch({ type: "duplicateLink", id, newId });
+        return newId;
+      },
+      moveLinkTo: (id: string, index: number) => dispatch({ type: "moveLinkTo", id, index }),
       updateLink: (id: string, patch: Partial<Omit<CardLink, "id">>) => dispatch({ type: "updateLink", id, patch }),
       removeLink: (id: string) => dispatch({ type: "removeLink", id }),
       restoreLink: (link: CardLink, index: number) => dispatch({ type: "restoreLink", link, index }),
-      moveLink: (id: string, direction: -1 | 1) => dispatch({ type: "moveLink", id, direction }),
       markSaved: (draft: CardDraft) => dispatch({ type: "reset", draft }),
+      discard: () => dispatch({ type: "discard" }),
+      replaceDraft: (draft: CardDraft) => dispatch({ type: "replace", draft }),
     }),
     [],
   );

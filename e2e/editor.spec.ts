@@ -20,6 +20,7 @@ test.describe("editor (demo mode)", () => {
   });
 
   test("validates contacts inline", async ({ page }) => {
+    await page.getByRole("button", { name: "Elegir tipo…" }).click();
     await page.getByRole("button", { name: "WhatsApp", exact: true }).click();
     const input = page.getByLabel("WhatsApp: valor");
     await expect(input).toBeFocused();
@@ -36,7 +37,8 @@ test.describe("editor (demo mode)", () => {
     const panel = page.locator("[role=tabpanel]:visible");
     await expect(panel.getByText("alex@example.com")).toBeVisible();
 
-    await page.getByRole("button", { name: "Ocultar de la tarjeta" }).first().click();
+    await page.getByRole("button", { name: "Opciones de Email" }).click();
+    await page.getByRole("menuitem", { name: "Ocultar de la tarjeta" }).click();
     await expect(panel.getByText("alex@example.com")).toHaveCount(0);
   });
 
@@ -50,6 +52,7 @@ test.describe("editor (demo mode)", () => {
     await expect(page.getByRole("radio", { name: "Corriente" })).toBeChecked();
 
     // Variations re-roll the motif and can be undone; no number is ever shown.
+    await page.getByRole("button", { name: "Más opciones de estilo" }).click();
     const previous = page.getByRole("button", { name: "Volver a la variación anterior" });
     await expect(previous).toBeDisabled();
     await page.getByRole("button", { name: "Otra variación" }).click();

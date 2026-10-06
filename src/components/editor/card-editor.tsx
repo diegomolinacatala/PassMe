@@ -1,29 +1,34 @@
 "use client";
 
-import { CircleAlert, CircleCheck, LoaderCircle, TriangleAlert } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition, type ReactNode } from "react";
+import { Plus, TriangleAlert } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { saveCardAction } from "@/app/dashboard/actions";
-import { Button } from "@/components/ui/button";
 import { InlineError } from "@/components/ui/field";
 import { describeErrors } from "@/lib/card/save-errors";
+import { passNameOverflows } from "@/lib/card/name";
 import { LIMITS, type FieldErrors } from "@/lib/card/schema";
 import type { OwnerCard } from "@/lib/card/types";
 import type { ContactRequest } from "@/lib/card/contact";
 import { isPlaceholderSlug, suggestSlug } from "@/lib/card/slug";
 import type { CardStats } from "@/lib/data/cards";
+import { needsOwnerAnswer, unseenContacts } from "@/lib/pending";
 import { cn } from "@/lib/cn";
 import type { Platform } from "@/lib/platform";
 import { AccountPanel } from "./account-panel";
 import { AvatarField } from "./avatar-field";
 import { ContactsPanel } from "./contacts-panel";
 import { DesignField } from "./design-field";
+import { EditorIndex, type IndexEntry } from "./editor-index";
 import { Section, SwitchRow, TextField } from "./fields";
 import { LinksEditor } from "./links-editor";
 import { MeetingsPanel, type MeetingItem } from "./meetings-panel";
 import { PendingNotices } from "./pending-notices";
+import { PreviewDock } from "./preview-dock";
 import { PreviewPanel } from "./preview-panel";
 import { WelcomeContext } from "./welcome-panel";
 import { QuickActions } from "./quick-actions";
+import { SaveBar, useEditorScrollPadding, type SaveStatus } from "./save-bar";
+import { sectionLayout, SECTION_KEYS, type SectionKey } from "./sections";
 import { SlugField } from "./slug-field";
 import { StatsPanel } from "./stats-panel";
 import {
@@ -51,16 +56,10 @@ interface CardEditorProps {
   welcome?: ReactNode;
 }
 
-type SaveStatus =
-  | { kind: "idle" }
-  | { kind: "saved"; at: number }
-  // Saved, but the database couldn't store the new design yet (a migration is pending).
-  | { kind: "partial" }
-  | { kind: "error"; message: string }
-  | { kind: "demo" };
-
 /** How long "Guardado" stays on screen before the bar slides away. */
 const SAVED_NOTICE_MS = 3000;
+/** How long "Cambios descartados · Deshacer" stays. */
+const DISCARDED_NOTICE_MS = 8000;
 
 /** Brings the first (or the next) field marked invalid into view and focuses it. */
 function focusInvalid(root: HTMLElement | null, after?: Element | null) {
@@ -98,6 +97,10 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, pla
   const [saving, startSaving] = useTransition();
   const root = useRef<HTMLElement>(null);
   const [welcomeOpen, setWelcomeOpen] = useState(true);
+  // Open from the start when the card already uses them; once open, it stays open (clearing a field doesn't hide it).
+  const [moreDetailsOpen, setMoreDetailsOpen] = useState(() => Boolean(initialCard.location || initialCard.pronouns));
+  const moreDetails = useRef<HTMLDivElement>(null);
+  const mobilePreview = useRef<HTMLDivElement>(null);
   const welcomeContext = useMemo(
     () => ({
       onDismiss: () => {
@@ -108,6 +111,7 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, pla
     }),
     [],
   );
+  useEditorScrollPadding();
   // Bumped on every save that fails validation: the effect below takes the person to the field.
   const [errorJump, setErrorJump] = useState(0);
 
@@ -161,10 +165,25 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, pla
 
   // "Guardado" says its piece and the bar goes away.
   useEffect(() => {
-    if (status.kind !== "saved" && status.kind !== "demo") return;
-    const timer = window.setTimeout(() => setStatus({ kind: "idle" }), SAVED_NOTICE_MS);
+    if (status.kind !== "saved" && status.kind !== "demo" && status.kind !== "discarded") return;
+    const delay = status.kind === "discarded" ? DISCARDED_NOTICE_MS : SAVED_NOTICE_MS;
+    const timer = window.setTimeout(() => setStatus({ kind: "idle" }), delay);
     return () => window.clearTimeout(timer);
   }, [status]);
+
+  // One tap back to the saved card; "Deshacer" brings the discarded changes back.
+  const discard = useCallback(() => {
+    setStatus({ kind: "discarded", draft });
+    editor.discard();
+    setTouched(new Set());
+    setSubmitted(false);
+    setServerResult(null);
+  }, [draft, editor]);
+  const undoDiscard = useCallback(() => {
+    if (status.kind !== "discarded") return;
+    editor.replaceDraft(status.draft);
+    setStatus({ kind: "idle" });
+  }, [editor, status]);
 
   // Cmd/Ctrl+S saves; warn before leaving with unsaved changes.
   useEffect(() => {
@@ -203,6 +222,23 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, pla
     : dirty
       ? "Tienes cambios sin guardar: guarda para que el pase los incluya."
       : null;
+
+  // Where each section goes, and the index to jump between them (D6 b: one page, no tabs).
+  const layout = useMemo(
+    () => sectionLayout({ reuniones: meetings.items.length > 0, contactos: contacts.requests.length > 0 }),
+    [meetings.items.length, contacts.requests.length],
+  );
+  const indexEntries: IndexEntry[] = useMemo(() => {
+    const badges: Partial<Record<SectionKey, number>> = {
+      reuniones: meetings.items.filter(({ view }) => needsOwnerAnswer(view)).length,
+      contactos: unseenContacts(contacts.requests, contacts.seenAt).length,
+    };
+    return SECTION_KEYS.map((key) => ({ ...layout[key], badge: badges[key] }));
+  }, [contacts.requests, contacts.seenAt, layout, meetings.items]);
+  const sectionProps = (key: SectionKey) => {
+    const { id, title, number, mobileNumber, orderClass } = layout[key];
+    return { anchor: id, title, number, mobileNumber, className: orderClass };
+  };
 
   // With the welcome on top, its title is the page's H1 and the editor's an H2 (until it closes).
   const EditorHeading = welcome && welcomeOpen ? "h2" : "h1";
@@ -252,13 +288,19 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, pla
         </div>
       ) : null}
 
-      <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,1fr)_400px] xl:gap-12">
-        <div className="min-w-0 space-y-6">
-          {/* On phones the live preview sits on top; on desktop it lives in the sticky aside. */}
-          <div className="lg:hidden">
+      <EditorIndex entries={indexEntries} />
+
+      {/*
+        Phones: one column where every section is placed with `order` (the inbox goes up when it has
+        something). Desktop: the form on the left, the sticky preview and the rest on the right.
+      */}
+      <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start lg:gap-8 xl:gap-12">
+        <div className="contents lg:block lg:min-w-0 lg:space-y-6">
+          {/* On phones the live preview sits on top; on desktop it lives in the sticky column. */}
+          <div ref={mobilePreview} className="max-lg:order-1 lg:hidden">
             <PreviewPanel card={preview} />
           </div>
-          <Section number="01" title="Quién eres" description="Lo básico que aparece en tu tarjeta y en el pase.">
+          <Section {...sectionProps("quien")} description="Lo básico que aparece en tu tarjeta y en el pase.">
             <div className="space-y-5">
               <AvatarField
                 userId={initialCard.id}
@@ -275,23 +317,42 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, pla
               {textField("fullName", "Nombre y apellidos", LIMITS.fullName, {
                 autoComplete: "name",
                 required: true,
+                hint: passNameOverflows(draft.fullName) ? "En el pase se verá cortado: prueba con nombre y primer apellido." : undefined,
               })}
               <div className="grid gap-5 sm:grid-cols-2">
                 {textField("headline", "Cargo", LIMITS.headline, { autoComplete: "organization-title" })}
                 {textField("company", "Empresa", LIMITS.company, { autoComplete: "organization" })}
-                {textField("location", "Ubicación", LIMITS.location, { placeholder: "Valencia, ES" })}
-                {textField("pronouns", "Pronombres", LIMITS.pronouns, { hint: "Se muestran como una etiqueta." })}
               </div>
               {textField("bio", "Sobre ti", LIMITS.bio, {
                 multiline: true,
                 placeholder: "Una o dos frases: a qué te dedicas y de qué te gusta hablar.",
               })}
+              {/* Few people use these: tucked away unless they already have a value. */}
+              {moreDetailsOpen || draft.location || draft.pronouns ? (
+                <div ref={moreDetails} className="grid gap-5 sm:grid-cols-2">
+                  {textField("location", "Ubicación", LIMITS.location, { placeholder: "Valencia, ES" })}
+                  {textField("pronouns", "Pronombres", LIMITS.pronouns, { hint: "Se muestran como una etiqueta." })}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  aria-expanded={false}
+                  onClick={() => {
+                    setMoreDetailsOpen(true);
+                    requestAnimationFrame(() => moreDetails.current?.querySelector("input")?.focus());
+                  }}
+                  className="inline-flex min-h-11 items-center gap-2 rounded-full border border-field-border px-4 text-sm font-medium text-ink-soft transition-colors hover:border-ink hover:text-ink"
+                >
+                  <Plus className="size-4" aria-hidden />
+                  Añadir más datos
+                  <span className="font-normal text-muted">· ubicación, pronombres</span>
+                </button>
+              )}
             </div>
           </Section>
 
           <Section
-            number="02"
-            title="Cómo contactarte"
+            {...sectionProps("contactar")}
             description="Añade todos los datos que quieras y oculta los que no quieras enseñar. Lo que ocultes no lo verá nadie."
           >
             <LinksEditor
@@ -303,15 +364,15 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, pla
               onUpdate={editor.updateLink}
               onRemove={editor.removeLink}
               onRestore={editor.restoreLink}
-              onMove={editor.moveLink}
+              onMoveTo={editor.moveLinkTo}
+              onDuplicate={editor.duplicateLink}
               takesMeetings={draft.acceptsMeetingRequests}
             />
           </Section>
 
           <Section
-            number="03"
-            title="Estilo"
-            description="Motivo, colores y letra de tu pase y de tu tarjeta. El texto se ajusta solo para que se lea."
+            {...sectionProps("estilo")}
+            description="Tema, motivo y letra de tu pase y de tu tarjeta."
           >
             <DesignField
               value={{
@@ -326,7 +387,26 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, pla
             />
           </Section>
 
-          <Section number="04" title="Publicación">
+          <Section
+            {...sectionProps("escanear")}
+            description="Lo que puede hacer quien abre tu tarjeta, además de guardar tu contacto."
+          >
+            <SwitchRow
+              checked={draft.acceptsMeetingRequests}
+              onChange={editor.setAcceptsMeetingRequests}
+              label="Recibir propuestas de reunión"
+              description="Te proponen hora y la confirmas desde el email."
+            />
+            <SwitchRow
+              checked={draft.acceptsContactRequests}
+              onChange={editor.setAcceptsContactRequests}
+              label="Recibir contactos"
+              description="Un formulario para que te dejen sus datos."
+              className="mt-5 border-t hairline pt-5"
+            />
+          </Section>
+
+          <Section {...sectionProps("publicacion")}>
             <SwitchRow
               checked={draft.isPublished}
               onChange={editor.setPublished}
@@ -347,20 +427,6 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, pla
               suggestion={isPlaceholderSlug(draft.slug) ? suggestSlug(draft.fullName) : null}
               onChange={(v) => editor.setField("slug", v)}
             />
-            <SwitchRow
-              checked={draft.acceptsMeetingRequests}
-              onChange={editor.setAcceptsMeetingRequests}
-              label="Recibir propuestas de reunión"
-              description="Tu tarjeta muestra «Agendar reunión»: quien te escanee propone día y hora, y a ti te llega un email para confirmarla con un toque. Os enviamos la invitación a los dos."
-              className="mt-6 border-t hairline pt-5"
-            />
-            <SwitchRow
-              checked={draft.acceptsContactRequests}
-              onChange={editor.setAcceptsContactRequests}
-              label="Recibir contactos"
-              description="Tu tarjeta muestra «Déjale tu contacto» para que quien te escanee te deje su nombre, email o teléfono. Lo verás en «Contactos recibidos»."
-              className="mt-5 border-t hairline pt-5"
-            />
           </Section>
         </div>
 
@@ -368,13 +434,12 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, pla
           Desktop: the column scrolls on its own (it's taller than the screen), so the
           preview stays in reach and the lower panels don't wait for the page's end.
         */}
-        <aside className="min-w-0 space-y-6 lg:sticky lg:top-6 lg:-mx-3 lg:max-h-[calc(100dvh-1.5rem)] lg:overflow-y-auto lg:overscroll-contain lg:px-3 lg:pb-28 lg:[scrollbar-width:thin]">
+        <div className="contents lg:sticky lg:top-20 lg:-mx-3 lg:block lg:max-h-[calc(100dvh-5.5rem)] lg:min-w-0 lg:space-y-6 lg:overflow-y-auto lg:overscroll-contain lg:px-3 lg:pb-28 lg:[scrollbar-width:thin]">
           <div className="hidden lg:block">
             <PreviewPanel card={preview} />
           </div>
           <Section
-            number="05"
-            title="A la cartera"
+            {...sectionProps("cartera")}
             description="Tu tarjeta como un pase más, junto a tus tarjetas y billetes: se abre sin conexión y sin buscarla, y se actualiza sola cuando cambias algo."
           >
             <WalletPanel
@@ -388,10 +453,10 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, pla
               isPublished={savedPublished}
             />
           </Section>
-          <Section number="06" title="Reuniones">
+          <Section {...sectionProps("reuniones")}>
             <MeetingsPanel items={meetings.items} available={meetings.available} enabled={savedAcceptsMeetings} demo={demo} />
           </Section>
-          <Section number="07" title="Contactos recibidos">
+          <Section {...sectionProps("contactos")}>
             <ContactsPanel
               requests={contacts.requests}
               available={contacts.available}
@@ -399,142 +464,26 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, pla
               demo={demo}
             />
           </Section>
-          <Section number="08" title="Actividad">
+          <Section {...sectionProps("actividad")}>
             <StatsPanel stats={stats} links={draft.links} demo={demo} />
           </Section>
-          <Section number="09" title="Cuenta">
+          <Section {...sectionProps("cuenta")}>
             <AccountPanel email={email} demo={demo} hasContacts={contacts.requests.length > 0} />
           </Section>
-        </aside>
+        </div>
       </div>
 
+      <PreviewDock card={preview} anchor={mobilePreview} />
       <SaveBar
         dirty={dirty}
         saving={saving}
         status={status}
         errorCount={submitted ? errorCount : 0}
         onSave={save}
+        onDiscard={discard}
+        onUndoDiscard={undoDiscard}
         onNextError={() => focusInvalid(root.current, document.activeElement)}
       />
     </main>
-  );
-}
-
-const subscribeNoop = () => () => {};
-
-/** "⌘S" on Apple devices, "Ctrl S" elsewhere (null while rendering on the server). */
-function useSaveShortcut(): string | null {
-  return useSyncExternalStore(
-    subscribeNoop,
-    () => (/Mac|iPhone|iPad|iPod/.test(navigator.userAgent) ? "⌘S" : "Ctrl S"),
-    () => null,
-  );
-}
-
-/** Keeps a focused field from ending up under the fixed bar (WCAG 2.4.11). */
-function useScrollPadding(bar: HTMLElement | null, visible: boolean) {
-  useEffect(() => {
-    if (!visible || !bar) return;
-    const html = document.documentElement;
-    const apply = () => {
-      html.style.scrollPaddingBottom = `${bar.offsetHeight + 16}px`;
-    };
-    apply();
-    const observer = new ResizeObserver(apply);
-    observer.observe(bar);
-    return () => {
-      observer.disconnect();
-      html.style.scrollPaddingBottom = "";
-    };
-  }, [bar, visible]);
-}
-
-interface SaveBarProps {
-  dirty: boolean;
-  saving: boolean;
-  status: SaveStatus;
-  errorCount: number;
-  onSave: () => void;
-  onNextError: () => void;
-}
-
-/**
- * Slides up with the first change and stays while there's something to say:
- * unsaved changes, saving, an error, or "Guardado" for a moment. Otherwise it
- * isn't there, so it never covers the welcome, the QR or a field.
- */
-function SaveBar({ dirty, saving, status, errorCount, onSave, onNextError }: SaveBarProps) {
-  const [bar, setBar] = useState<HTMLDivElement | null>(null);
-  const shortcut = useSaveShortcut();
-  const visible = dirty || saving || (status.kind === "error" ? errorCount > 0 : status.kind !== "idle");
-  useScrollPadding(bar, visible);
-
-  const message = saving
-    ? "Guardando…"
-    : status.kind === "error" && (dirty || errorCount > 0)
-      ? status.message
-      : dirty
-        ? "Cambios sin guardar"
-        : status.kind === "partial"
-          ? "Guardado, salvo algunas opciones nuevas: falta actualizar la base de datos."
-          : status.kind === "saved"
-            ? "Guardado. Los pases se actualizarán en unos segundos."
-            : status.kind === "demo"
-              ? "Modo demo: los cambios no se guardan."
-              : "Todo guardado";
-
-  const tone =
-    status.kind === "error" && (dirty || errorCount > 0) ? "error" : dirty ? "dirty" : status.kind === "partial" ? "warn" : "ok";
-
-  return (
-    <div
-      ref={setBar}
-      // Out of the tab order and hidden from screen readers while it's off screen.
-      inert={!visible}
-      aria-hidden={!visible}
-      className={cn(
-        "pointer-events-none fixed inset-x-0 bottom-0 z-30 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] transition-[transform,opacity] duration-200 ease-[var(--ease-out-expo)] sm:px-6 sm:pb-5",
-        visible ? "translate-y-0 opacity-100" : "translate-y-full opacity-0",
-      )}
-    >
-      {/* On desktop the bar sits under the form column, clear of the preview. */}
-      <div className="mx-auto max-w-[1240px] lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-8 lg:px-2 xl:gap-12">
-        <div
-          className={cn(
-            "flex items-center gap-3 rounded-object border py-2 pr-2 pl-5 shadow-object backdrop-blur-md transition-colors duration-300 max-lg:mx-auto max-lg:max-w-[640px]",
-            visible && "pointer-events-auto",
-            tone === "dirty" ? "border-ink bg-ink text-paper" : "hairline bg-card/90 text-ink",
-          )}
-        >
-          {tone === "error" ? <CircleAlert className="size-4 shrink-0 text-danger" aria-hidden /> : null}
-          {tone === "warn" ? <TriangleAlert className="size-4 shrink-0 text-signal-deep" aria-hidden /> : null}
-          {tone === "ok" ? <CircleCheck className="size-4 shrink-0 text-ok" aria-hidden /> : null}
-          {tone === "dirty" ? <span className="size-2 shrink-0 animate-pulse rounded-full bg-signal" aria-hidden /> : null}
-          <p className="line-clamp-2 min-w-0 flex-1 text-sm" role="status" aria-live="polite">
-            {message}
-          </p>
-          {tone === "error" && errorCount > 1 ? (
-            <Button variant="ghost" size="sm" onClick={onNextError} className="shrink-0">
-              Ver
-            </Button>
-          ) : null}
-          {shortcut ? (
-            <span className="hidden font-mono text-mark tracking-widest opacity-60 sm:inline" aria-hidden>
-              {shortcut}
-            </span>
-          ) : null}
-          <Button
-            variant={tone === "dirty" ? "signal" : "ink"}
-            size="sm"
-            onClick={onSave}
-            disabled={saving || (!dirty && tone !== "error")}
-            className="shrink-0"
-          >
-            {saving ? <LoaderCircle className="size-4 animate-spin" aria-hidden /> : null}
-            {saving ? "Guardando…" : "Guardar"}
-          </Button>
-        </div>
-      </div>
-    </div>
   );
 }

@@ -27,7 +27,7 @@ Diego puede cambiar cualquiera: están aisladas en sus PRs.
 | P4 | `feat/ux-p4-crear` | ✅ hecho y subido |
 | P5 | `feat/ux-p5-tarjeta` | ✅ hecho y subido |
 | P6 | `feat/ux-p6-reuniones` | ✅ hecho y subido |
-| P7 | `feat/ux-p7-editor` | pendiente |
+| P7 | `feat/ux-p7-editor` | ✅ hecho y subido |
 | P8 | `feat/ux-p8-…` | pendiente |
 
 ## Notas de implementación
@@ -78,6 +78,15 @@ Diego puede cambiar cualquiera: están aisladas en sus PRs.
 - **P6.10**: con reuniones activas, el enlace de reservas sale de la lista de la tarjeta y aparece en el paso 1 («Abrir su calendario», con el mismo registro de clics). La tarjeta demo no tiene enlace de reservas, así que el E2E solo cubre el aviso del editor.
 - **P6.11**: `declineMeetingAction` comprueba la sesión, que la reunión es suya (RLS y dueño guardado) y aplica el mismo cambio y emails que «No puedo» (`changeMeeting`), con su propio límite (20 cada 10 min). Lo rechazado pasa a «Anteriores» sin recargar.
 - **P6.12**: las alarmas son de 60 min en persona y 10 min en vídeo o llamada. La descripción del calendario sale de una sola función (`meetingDescription`) para el `.ics`, el enlace de Google del email y el de la página.
+- **P7.1 (D6 b)**: barra fija con el índice («01 Quién eres ▾»): es un desplegable de enlaces (no un menú ARIA), marca la sección actual y suma los pendientes (reuniones por responder y contactos sin ver). Pone `scroll-padding-top` para que los saltos y el foco no queden debajo. Las secciones están en `src/components/editor/sections.ts`. En el móvil, «Reuniones» y «Contactos recibidos» suben tras «Cómo contactarte» si tienen **algún** elemento (también reuniones pasadas); los números cambian según el ancho. Para poder intercalarlas, las dos columnas son `display: contents` en el móvil (con `order`), y la columna derecha pasa de `<aside>` a `<div>`. En escritorio, la columna derecha baja a `top-20` para no quedar bajo la barra. «Cerrar sesión»: índice → «Cuenta» (2 toques), además del menú de la cabecera.
+- **P7.2**: la sección se llama **«Al escanear»** (como la pestaña de la vista previa) y no «Tu página», porque el glosario retira «página». «Publicación» pasa a «Publicación y enlace». En la pestaña «Al escanear», bajo la tarjeta, salen las filas quietas de «Déjale tu contacto» y «Agendar reunión» (en el mismo orden que la página pública).
+- **P7.3**: sin migración. `custom` sigue en `LINK_KINDS` y en el `CHECK`; `toLinkKind()` lo convierte en `website` al leer (`sanitizeStoredLinks`) y al guardar (`cardInputSchema`), y ya no se exige título. Sin título, `linkTitle()` enseña el dominio (también en los pases y en la etiqueta de la vCard). La detección es `detectLink()` (`src/lib/card/link-detect.ts`); `@usuario` no se adivina (podría ser Instagram, X…) y pide elegir el tipo. Las filas miden 56 px salvo Web y Enlace de reservas, que llevan una segunda línea para el título. Arrastrar: hook propio (`use-drag-reorder.ts`, Pointer Events, sin librerías): pulsación larga de 250 ms en táctil, el asa tiene `touch-action: none` (un deslizamiento que empieza en el asa no hace scroll), la página se desplaza sola cerca de los bordes, y con el teclado flechas/Inicio/Fin y un aviso `aria-live`. El menú «⋯» sí es un menú ARIA.
+- **P7.4**: la píldora «Ver el pase» va a la derecha; la hoja es un `<dialog>` modal (Escape y «Cerrar», el foco vuelve a la píldora). La barra de guardar y la píldora publican su alto en `--savebar-h` y `--pill-h`, y el editor pone `scroll-padding-bottom` con los dos.
+- **P7.5**: hecho entero (arrastrar, pellizcar, deslizador de zoom también en el móvil, y flechas/+/− con el teclado). No hay zoom con la rueda del ratón (React registra `wheel` como pasivo). HEIC se reconoce por tipo o extensión: si el navegador lo abre (Safari), se encuadra normal; si no, sale el mensaje.
+- **P7.6**: además de «Descartar», «Deshacer» durante 8 s (el foco va ahí).
+- **P7.7**: «Más opciones de estilo» se abre solo si los colores no son de un tema. El campo hex acepta `#1F3A5F`, `1F3A5F` y `#ABC`. Para que Estilo plegado quepa en 1.000 px en el móvil, la letra se elige en una fila de 4 y la descripción es más corta.
+- **P7.8**: `checkSlugAction` no tiene límite de peticiones (es una consulta con sesión); las sugerencias hacen como mucho 4 comprobaciones más por enlace cogido. En demo, unos pocos enlaces hacen de «cogidos» (`isDemoSlugTaken`: `alex`, `alex-rivera`, `pablo-serrano`, `pablo-serrano-3`, `lucia-ferrer`) y el resto dice «¡Disponible!».
+- **P7.9**: «Añadir más datos» se abre y ya no se cierra (vaciar el campo no lo esconde). `initials()`, `nameFontSize()` y `passNameOverflows()` están en `src/lib/card/name.ts` (`pass-art.tsx` solo importa `nameFontSize`; el menú de cuenta usa las mismas iniciales). El aviso de nombre largo es una estimación (230 pt de ancho y 0,45 em por letra).
 
 ## Notas para retomar
 

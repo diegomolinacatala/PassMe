@@ -1,4 +1,8 @@
+import { initials } from "@/lib/card/name";
 import { cn } from "@/lib/cn";
+
+// Re-exported: the pass renderers and the editor import it from here.
+export { initials };
 
 interface AvatarProps {
   name: string;
@@ -6,14 +10,6 @@ interface AvatarProps {
   /** Diameter in px. */
   size: number;
   className?: string;
-}
-
-export function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "·";
-  const first = parts[0]![0] ?? "";
-  const last = parts.length > 1 ? (parts[parts.length - 1]![0] ?? "") : "";
-  return `${first}${last}`.toUpperCase();
 }
 
 /** Round avatar; falls back to serif initials on a translucent disc. */

@@ -6,20 +6,39 @@ import { cn } from "@/lib/cn";
 
 interface SectionProps {
   number: string;
+  /** Its number on phones, when the order there is different. */
+  mobileNumber?: string;
   title: string;
   description?: string;
   children: ReactNode;
   aside?: ReactNode;
+  /** Anchor for the editor's index (the section takes the focus when it jumps there). */
+  anchor?: string;
+  className?: string;
 }
 
 /** Numbered editor section — the "01 / Identidad" rhythm used across the product. */
-export function Section({ number, title, description, children, aside }: SectionProps) {
+export function Section({ number, mobileNumber, title, description, children, aside, anchor, className }: SectionProps) {
   const id = useId();
   return (
-    <section aria-labelledby={id} className="rounded-panel border hairline bg-card/70 p-5 sm:p-7">
+    <section
+      id={anchor}
+      tabIndex={anchor ? -1 : undefined}
+      aria-labelledby={id}
+      className={cn("rounded-panel border hairline bg-card/70 p-5 outline-none sm:p-7", className)}
+    >
       <header className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <p className="eyebrow text-signal-deep">{number}</p>
+          <p className="eyebrow text-signal-deep">
+            {mobileNumber && mobileNumber !== number ? (
+              <>
+                <span className="lg:hidden">{mobileNumber}</span>
+                <span className="max-lg:hidden">{number}</span>
+              </>
+            ) : (
+              number
+            )}
+          </p>
           <h2 id={id} className="mt-1 font-display text-[1.9rem] leading-none tracking-tight">
             {title}
           </h2>

@@ -1,11 +1,12 @@
 "use client";
 
-import { Check, Dices, Pipette, Undo2, WandSparkles } from "lucide-react";
+import { Check, ChevronDown, Dices, Pipette, Undo2, WandSparkles } from "lucide-react";
 import { useId, useState, type CSSProperties, type ReactNode } from "react";
 import { initials } from "@/components/card/avatar";
 import { CHOICE_FOCUS, CHOICE_INPUT } from "@/components/ui/choice";
 import { containerUnit, CSS_FONTS, editorialLines, PassArt } from "@/components/card/pass-art";
-import { cardPalette, contrastRatio, parseHex, toHex } from "@/lib/card/colors";
+import { cardPalette, contrastRatio, parseHex, parseHexInput, toHex } from "@/lib/card/colors";
+import { inputClasses } from "@/components/ui/field";
 import {
   CARD_THEMES,
   randomPatternSeed,
@@ -43,7 +44,7 @@ export function DesignField({ value, card, onChange }: DesignFieldProps) {
   const name = card.fullName || "Tu nombre";
 
   return (
-    <div className="space-y-9">
+    <div className="space-y-6">
       <Group label="Tema" hint={activeTheme ? activeTheme.name : "Personalizado"}>
         <div role="radiogroup" aria-label="Tema del pase" className="grid grid-cols-4 gap-x-2.5 gap-y-3 min-[400px]:grid-cols-5 sm:gap-x-3">
           {CARD_THEMES.map((theme) => (
@@ -58,7 +59,7 @@ export function DesignField({ value, card, onChange }: DesignFieldProps) {
       </Group>
 
       <Group label="Motivo" hint={PATTERN_LABELS[value.pattern].description}>
-        <div role="radiogroup" aria-label="Motivo del pase" className="grid grid-cols-2 gap-x-3 gap-y-4">
+        <div role="radiogroup" aria-label="Motivo del pase" className="grid grid-cols-2 gap-x-3 gap-y-3">
           {PATTERN_KINDS.map((kind) => (
             <MotifOption
               key={kind}
@@ -71,15 +72,10 @@ export function DesignField({ value, card, onChange }: DesignFieldProps) {
             />
           ))}
         </div>
-        <VariationControl
-          seed={value.patternSeed}
-          enabled={hasVariations(value.pattern)}
-          onChange={(patternSeed) => onChange({ patternSeed })}
-        />
       </Group>
 
       <Group label="Letra" hint={TYPEFACE_LABELS[value.typeface].description}>
-        <div role="radiogroup" aria-label="Letra del nombre" className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div role="radiogroup" aria-label="Letra del nombre" className="grid grid-cols-4 gap-2 sm:gap-3">
           {TYPEFACES.map((typeface) => (
             <TypefaceOption
               key={typeface}
@@ -93,19 +89,26 @@ export function DesignField({ value, card, onChange }: DesignFieldProps) {
         </div>
       </Group>
 
-      <Group label="Tintas a medida" hint={`Texto ${design.isDark ? "blanco" : "oscuro"} automático`}>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <InkPicker label="Fondo" hex={value.accentColor} onChange={(hex) => onChange({ accentColor: hex })} />
-          <InkPicker
-            label="Detalle"
-            hex={design.detail}
-            isAuto={value.detailColor === null}
-            warning={detailWarning(value)}
-            onChange={(hex) => onChange({ detailColor: hex })}
-            onAuto={() => onChange({ detailColor: null })}
-          />
-        </div>
-      </Group>
+      <MoreOptions defaultOpen={!activeTheme}>
+        <VariationControl
+          seed={value.patternSeed}
+          enabled={hasVariations(value.pattern)}
+          onChange={(patternSeed) => onChange({ patternSeed })}
+        />
+        <Group label="Colores a medida" hint={`Texto ${design.isDark ? "blanco" : "oscuro"} automático`}>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <InkPicker label="Fondo" hex={value.accentColor} onChange={(hex) => onChange({ accentColor: hex })} />
+            <InkPicker
+              label="Color de los trazos"
+              hex={design.detail}
+              isAuto={value.detailColor === null}
+              warning={detailWarning(value)}
+              onChange={(hex) => onChange({ detailColor: hex })}
+              onAuto={() => onChange({ detailColor: null })}
+            />
+          </div>
+        </Group>
+      </MoreOptions>
     </div>
   );
 }
@@ -118,10 +121,33 @@ function detailWarning(value: DesignFields): string | null {
   return contrastRatio(bg, detail) < 1.6 ? "Casi no se ve sobre el fondo: usamos uno automático." : null;
 }
 
+/** Variation and custom colors: folded, so the section is theme → motif → typeface at a glance. */
+function MoreOptions({ defaultOpen, children }: { defaultOpen: boolean; children: ReactNode }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const id = useId();
+  return (
+    <div className="border-t hairline pt-3">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={() => setOpen((value) => !value)}
+        className="-mx-2 inline-flex min-h-11 items-center gap-2 rounded-full px-2 text-sm font-medium text-ink-soft transition-colors hover:text-ink"
+      >
+        <ChevronDown className={cn("size-4 transition-transform duration-200", open && "rotate-180")} aria-hidden />
+        Más opciones de estilo
+      </button>
+      <div id={id} hidden={!open} className="mt-4 space-y-8">
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function Group({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
     <div>
-      <div className="mb-3 flex items-baseline justify-between gap-3">
+      <div className="mb-2.5 flex items-baseline justify-between gap-3">
         <p className="text-sm font-medium text-ink">{label}</p>
         {hint ? <p className="truncate text-right text-xs text-muted">{hint}</p> : null}
       </div>
@@ -230,14 +256,14 @@ function VariationControl({ seed, enabled, onChange }: VariationControlProps) {
   const previous = history.at(-1);
 
   return (
-    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-dashed border-line-strong px-4 py-3">
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-dashed border-line-strong px-4 py-3">
       {/* Wide enough to read; below that, the buttons wrap under it. */}
       <div className="min-w-0 flex-[1_1_15rem]">
         <p className="text-sm font-medium text-ink">Variación</p>
         <p className="mt-0.5 text-xs text-muted">
           {enabled
             ? "Cada tirada dibuja tu motivo de otra forma. Nadie más tiene la tuya."
-            : "Este motivo es siempre igual: prueba Arco, Corriente o Persiana para tirar los dados."}
+            : "Este motivo no tiene variaciones."}
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
@@ -300,7 +326,7 @@ function TypefaceOption({ typeface, selected, design, name, onSelect }: Typeface
     <Choice name="design-typeface" label={TYPEFACE_LABELS[typeface].name} selected={selected} onSelect={onSelect} className="gap-1.5 rounded-xl">
       <span
         className={cn(
-          "flex h-16 items-center overflow-hidden rounded-xl px-3 shadow-hairline transition-transform duration-300 ease-[var(--ease-spring)] group-hover:-translate-y-0.5",
+          "flex h-14 items-center overflow-hidden rounded-xl px-2.5 shadow-hairline transition-transform duration-300 ease-[var(--ease-spring)] group-hover:-translate-y-0.5",
           selected && "ring-2 ring-ink ring-offset-2 ring-offset-card",
         )}
         style={{ backgroundColor: design.background, color: design.foreground }}
@@ -335,12 +361,16 @@ interface InkPickerProps {
 function InkPicker({ label, hex, onChange, isAuto, onAuto, warning }: InkPickerProps) {
   const id = useId();
   const current = hex.toUpperCase();
+  // What's typed in the hex field while it isn't a complete color yet (null: show the current one).
+  const [typed, setTyped] = useState<string | null>(null);
+  const invalid = typed !== null && typed.trim() !== "" && parseHexInput(typed) === null;
   return (
     <div className="rounded-2xl border hairline bg-card px-3 py-2.5">
-      <div className="flex flex-wrap items-center gap-3">
+      <p className="mb-2 text-sm font-medium text-ink">{label}</p>
+      <div className="flex flex-wrap items-center gap-2">
         <label
           htmlFor={id}
-          className="relative grid size-10 shrink-0 cursor-pointer place-items-center rounded-full shadow-hairline focus-within:ring-2 focus-within:ring-signal focus-within:ring-offset-2"
+          className="relative grid size-11 shrink-0 cursor-pointer place-items-center rounded-full shadow-hairline focus-within:ring-2 focus-within:ring-signal focus-within:ring-offset-2"
           style={{ backgroundColor: current, color: toHex(cardPalette(current).foreground) }}
         >
           <Pipette className="size-4" aria-hidden />
@@ -349,22 +379,38 @@ function InkPicker({ label, hex, onChange, isAuto, onAuto, warning }: InkPickerP
             type="color"
             value={current.toLowerCase()}
             onChange={(e) => onChange(e.target.value.toUpperCase())}
-            aria-label={`Color de ${label.toLowerCase()}`}
+            aria-label={`${label}: elegir color`}
             className="absolute inset-0 cursor-pointer opacity-0"
           />
         </label>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-ink">{label}</p>
-          <p className="eyebrow">{isAuto ? `Auto · ${current}` : current}</p>
-        </div>
+        <input
+          value={typed ?? current}
+          onChange={(e) => {
+            setTyped(e.target.value);
+            const parsed = parseHexInput(e.target.value);
+            if (parsed) onChange(parsed);
+          }}
+          onBlur={() => setTyped(null)}
+          maxLength={7}
+          autoCapitalize="characters"
+          autoCorrect="off"
+          spellCheck={false}
+          aria-label={`${label}: código de color`}
+          aria-invalid={invalid}
+          aria-describedby={invalid ? `${id}-hex` : undefined}
+          className={inputClasses({ size: "sm", className: "w-[7.5rem] min-w-0 flex-1 font-mono uppercase" })}
+        />
         {onAuto ? (
           <button
             type="button"
-            onClick={onAuto}
+            onClick={() => {
+              setTyped(null);
+              onAuto();
+            }}
             aria-pressed={isAuto}
-            title="Elegir el detalle automáticamente"
+            title="Elegir el color automáticamente"
             className={cn(
-              "inline-flex min-h-11 items-center gap-1.5 rounded-full px-3.5 text-sm font-medium transition-colors sm:min-h-10",
+              "inline-flex min-h-11 items-center gap-1.5 rounded-full px-3.5 text-sm font-medium transition-colors",
               isAuto ? "bg-ink text-paper" : "border border-line-strong text-ink-soft hover:border-ink hover:text-ink",
             )}
           >
@@ -373,6 +419,11 @@ function InkPicker({ label, hex, onChange, isAuto, onAuto, warning }: InkPickerP
           </button>
         ) : null}
       </div>
+      {invalid ? (
+        <p id={`${id}-hex`} className="mt-2 text-xs text-danger">
+          Escribe el color como #1F3A5F.
+        </p>
+      ) : null}
       {warning ? <p className="mt-2 text-xs text-danger">{warning}</p> : null}
     </div>
   );

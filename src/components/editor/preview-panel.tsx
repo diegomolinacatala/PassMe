@@ -1,6 +1,7 @@
 "use client";
 
-import { useId, useRef, useState, type KeyboardEvent } from "react";
+import { ArrowRight, CalendarClock, HandHeart } from "lucide-react";
+import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { ProfileCard } from "@/components/card/profile-card";
 import { WalletPass } from "@/components/card/wallet-pass";
 import type { PublicCard } from "@/lib/card/types";
@@ -73,6 +74,7 @@ export function PreviewPanel({ card }: { card: PublicCard }) {
         {tab === "web" ? (
           <div className="w-full max-w-[360px] min-w-0 origin-top scale-[0.94]">
             <ProfileCard card={card} preview />
+            <PreviewActions card={card} />
           </div>
         ) : (
           <div key={tab} className="w-full max-w-[330px] min-w-0 animate-rise">
@@ -85,6 +87,44 @@ export function PreviewPanel({ card }: { card: PublicCard }) {
           ? "Esto es lo que ve quien escanea tu QR. Solo aparecen los datos visibles."
           : "Vista aproximada: cada cartera dibuja el pase a su manera."}
       </p>
+    </div>
+  );
+}
+
+/** A still copy of a public card's action row ("Déjale tu contacto", "Agendar reunión"): it looks the same but does nothing. */
+function StillAction({ icon, title, subtitle }: { icon: ReactNode; title: string; subtitle: string }) {
+  return (
+    <div className="flex w-full items-center gap-4 rounded-panel border hairline bg-card px-5 py-4 text-left shadow-soft">
+      <span className="grid size-11 shrink-0 place-items-center rounded-full bg-signal-wash text-signal-deep">{icon}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-medium">{title}</span>
+        <span className="block text-sm text-muted">{subtitle}</span>
+      </span>
+      <ArrowRight className="size-4 shrink-0 text-muted" aria-hidden />
+    </div>
+  );
+}
+
+/** What the switches in "Al escanear" add under the card, in the same order as the public page. */
+function PreviewActions({ card }: { card: PublicCard }) {
+  if (!card.acceptsContactRequests && !card.acceptsMeetingRequests) return null;
+  const firstName = card.fullName.split(" ")[0] || "ti";
+  return (
+    <div className="mt-4 space-y-3">
+      {card.acceptsContactRequests ? (
+        <StillAction
+          icon={<HandHeart className="size-5" aria-hidden />}
+          title={`Déjale tu contacto a ${firstName}`}
+          subtitle="Así también tiene el tuyo. Tardas 20 segundos."
+        />
+      ) : null}
+      {card.acceptsMeetingRequests ? (
+        <StillAction
+          icon={<CalendarClock className="size-5" aria-hidden />}
+          title={`Agendar reunión con ${firstName}`}
+          subtitle={`Propón día y hora. ${firstName} confirma con un toque.`}
+        />
+      ) : null}
     </div>
   );
 }

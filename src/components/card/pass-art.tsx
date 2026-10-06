@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import type { ResolvedDesign, Typeface } from "@/lib/card/design";
+import { nameFontSize } from "@/lib/card/name";
 import { fadesUnderText, type PatternBox, type PatternFocus } from "@/lib/card/pattern";
 import { DeferredPatternSvg } from "./deferred-pattern-svg";
 import { PatternSvg } from "./pattern-svg";
@@ -57,16 +58,6 @@ interface PassArtProps {
   pixelSize?: { width: number; height: number };
   /** Browser only: draw the pattern after hydration instead of shipping it in the HTML. */
   deferPattern?: boolean;
-}
-
-/** Big names get smaller type; very long ones wrap onto a second line. */
-export function nameFontSize(name: string): number {
-  const length = name.trim().length;
-  if (length <= 10) return 42;
-  if (length <= 14) return 37;
-  if (length <= 18) return 32;
-  if (length <= 24) return 28;
-  return 25;
 }
 
 /**

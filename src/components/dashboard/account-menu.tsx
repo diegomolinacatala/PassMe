@@ -1,5 +1,6 @@
 "use client";
 
+import { initials as cardInitials } from "@/lib/card/name";
 import { ArrowUpRight, LogOut, UserRound } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { ShareLinkButton } from "@/components/ui/share-link-button";
@@ -13,10 +14,9 @@ interface AccountMenuProps {
   shareUrl: string;
 }
 
+/** Same initials as the pass; nothing while the card has no name yet. */
 function initials(name: string): string {
-  const words = name.trim().split(/\s+/).filter(Boolean);
-  const letters = words.length > 1 ? [words[0]![0], words.at(-1)![0]] : [words[0]?.[0]];
-  return letters.filter(Boolean).join("").toUpperCase();
+  return name.trim() ? cardInitials(name) : "";
 }
 
 const ITEM =

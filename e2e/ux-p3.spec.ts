@@ -67,7 +67,8 @@ test.describe("deleting and removing", () => {
     const values = page.getByLabel(/: valor$/);
     const first = await values.first().getAttribute("aria-label");
     const count = await values.count();
-    await page.getByRole("button", { name: /^Quitar / }).first().click();
+    await page.getByRole("button", { name: /^Opciones de / }).first().click();
+    await page.getByRole("menuitem", { name: "Quitar" }).click();
     await expect(values).toHaveCount(count - 1);
     const status = page.getByRole("status").filter({ hasText: "Email quitado" });
     await expect(status).toBeVisible();

@@ -376,9 +376,10 @@ const DEFS: Record<LinkKind, LinkKindDef> = {
     href: (v) => v,
     display: prettyUrl,
   },
+  // Retired: merged into "Web" (stored ones are read as `website`, see toLinkKind). Kept so old data still parses.
   custom: {
     kind: "custom",
-    label: "Otra web",
+    label: "Web",
     group: "web",
     placeholder: "https://…",
     inputMode: "url",
@@ -387,6 +388,18 @@ const DEFS: Record<LinkKind, LinkKindDef> = {
     display: prettyUrl,
   },
 };
+
+/** Kinds offered when adding or changing a contact detail (no retired ones). */
+export const EDITABLE_LINK_KINDS: ReadonlyArray<LinkKind> = LINK_KINDS.filter((kind) => kind !== "custom");
+
+/**
+ * Maps retired kinds to their successor on read and on save: "Otra web"
+ * (`custom`) was merged into "Web" (`website`), whose title is optional.
+ * Same idea as `toPatternKind()` for retired motifs; the DB CHECK still accepts it.
+ */
+export function toLinkKind(kind: LinkKind): LinkKind {
+  return kind === "custom" ? "website" : kind;
+}
 
 export function isLinkKind(value: unknown): value is LinkKind {
   return typeof value === "string" && (LINK_KINDS as readonly string[]).includes(value);
@@ -405,9 +418,18 @@ export function linkHref(kind: LinkKind, value: string): string {
   return DEFS[kind].href(value);
 }
 
-/** Title shown for a link: the custom label if present, else the kind's name. */
-export function linkTitle(link: { kind: LinkKind; label?: string }): string {
-  return link.label?.trim() || DEFS[link.kind].label;
+/**
+ * Title shown for a link: the custom label if present; for a web without one,
+ * its domain ("behance.net"); else the kind's name.
+ */
+export function linkTitle(link: { kind: LinkKind; label?: string; value?: string }): string {
+  const label = link.label?.trim();
+  if (label) return label;
+  if ((link.kind === "website" || link.kind === "custom") && link.value) {
+    const host = parseHttpUrl(link.value)?.hostname.replace(/^www\./i, "");
+    if (host) return host;
+  }
+  return DEFS[link.kind].label;
 }
 
 export function linkDisplay(kind: LinkKind, value: string): string {

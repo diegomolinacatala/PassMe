@@ -75,7 +75,8 @@ test.describe("editor", () => {
 
   test("removing a contact detail keeps the focus in the list", async ({ page }) => {
     await page.goto("/dashboard");
-    await page.getByRole("button", { name: /^Quitar / }).first().click();
+    await page.getByRole("button", { name: /^Opciones de / }).first().click();
+    await page.getByRole("menuitem", { name: "Quitar" }).click();
     const focused = await page.evaluate(() => document.activeElement?.tagName ?? "BODY");
     expect(focused).not.toBe("BODY");
   });

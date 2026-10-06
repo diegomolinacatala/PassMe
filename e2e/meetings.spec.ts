@@ -230,6 +230,7 @@ test("the privacy policy explains meeting proposals", async ({ page }) => {
 
 test("a booking link joins «Agendar reunión» instead of competing with it", async ({ page }) => {
   await page.goto("/dashboard");
+  await page.getByRole("button", { name: "Elegir tipo…" }).click();
   await page.getByRole("button", { name: "Enlace de reservas", exact: true }).click();
   await expect(page.getByText("Ya recibes propuestas de reunión.")).toBeVisible();
 });
