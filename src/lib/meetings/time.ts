@@ -4,8 +4,9 @@
  * must agree on what "Tuesday at 10:00 in Madrid" means.
  *
  * Instants travel as ISO strings in UTC; every proposal also carries the IANA
- * time zone it was made in, and is always shown in that zone (the two people
- * just met, so they're normally in the same place).
+ * time zone it was made in (the visitor's). Since P8.1 the card also has the
+ * owner's zone: each side sees its own, and the other's in brackets when they
+ * differ ("10:00 (09:00, hora de Canarias)").
  */
 
 export const DEFAULT_TIME_ZONE = "Europe/Madrid";
@@ -213,10 +214,100 @@ export function formatSlotShort(iso: string, timeZone: string): string {
   return `${get("weekday")} ${get("day")} ${get("month")} · ${formatTime(iso, timeZone)}`;
 }
 
-/** "Madrid" for "Europe/Madrid", "Nueva York"-style names are left as the zone's city. */
-export function timeZoneCity(timeZone: string): string {
-  const city = timeZone.split("/").pop() ?? timeZone;
-  return city.replace(/_/g, " ");
+/** Spanish names for the zones people here meet in; never "Canary" or "New York". */
+const ZONE_NAMES: Record<string, string> = {
+  "Europe/Madrid": "Madrid",
+  "Atlantic/Canary": "Canarias",
+  "Africa/Ceuta": "Ceuta",
+  "Europe/Lisbon": "Lisboa",
+  "Atlantic/Madeira": "Madeira",
+  "Atlantic/Azores": "Azores",
+  "Europe/London": "Londres",
+  "Europe/Dublin": "Dublín",
+  "Europe/Paris": "París",
+  "Europe/Brussels": "Bruselas",
+  "Europe/Amsterdam": "Ámsterdam",
+  "Europe/Berlin": "Berlín",
+  "Europe/Zurich": "Zúrich",
+  "Europe/Rome": "Roma",
+  "Europe/Vienna": "Viena",
+  "Europe/Prague": "Praga",
+  "Europe/Warsaw": "Varsovia",
+  "Europe/Stockholm": "Estocolmo",
+  "Europe/Copenhagen": "Copenhague",
+  "Europe/Oslo": "Oslo",
+  "Europe/Helsinki": "Helsinki",
+  "Europe/Athens": "Atenas",
+  "Europe/Istanbul": "Estambul",
+  "Europe/Moscow": "Moscú",
+  "Europe/Andorra": "Andorra",
+  "Africa/Casablanca": "Casablanca",
+  "America/New_York": "Nueva York",
+  "America/Chicago": "Chicago",
+  "America/Denver": "Denver",
+  "America/Los_Angeles": "Los Ángeles",
+  "America/Toronto": "Toronto",
+  "America/Mexico_City": "Ciudad de México",
+  "America/Guatemala": "Guatemala",
+  "America/El_Salvador": "El Salvador",
+  "America/Costa_Rica": "Costa Rica",
+  "America/Panama": "Panamá",
+  "America/Havana": "La Habana",
+  "America/Santo_Domingo": "Santo Domingo",
+  "America/Puerto_Rico": "Puerto Rico",
+  "America/Bogota": "Bogotá",
+  "America/Caracas": "Caracas",
+  "America/Lima": "Lima",
+  "America/Guayaquil": "Guayaquil",
+  "America/La_Paz": "La Paz",
+  "America/Santiago": "Santiago de Chile",
+  "America/Argentina/Buenos_Aires": "Buenos Aires",
+  "America/Buenos_Aires": "Buenos Aires",
+  "America/Montevideo": "Montevideo",
+  "America/Asuncion": "Asunción",
+  "America/Sao_Paulo": "São Paulo",
+  "Asia/Dubai": "Dubái",
+  "Asia/Tokyo": "Tokio",
+  "Asia/Shanghai": "Shanghái",
+  "Asia/Singapore": "Singapur",
+  "Australia/Sydney": "Sídney",
+  UTC: "UTC",
+  "Etc/UTC": "UTC",
+};
+
+/**
+ * "hora de Madrid", "hora de Canarias"… For zones outside the list, Intl's own
+ * Spanish name ("hora de Japón"), so no English city ever shows.
+ */
+export function timeZoneLabel(timeZone: string): string {
+  const known = ZONE_NAMES[timeZone];
+  if (known) return known === "UTC" ? "hora UTC" : `hora de ${known}`;
+  for (const timeZoneName of ["longGeneric", "long"] as const) {
+    try {
+      const name = new Intl.DateTimeFormat(LOCALE, { timeZone, timeZoneName })
+        .formatToParts(new Date())
+        .find((part) => part.type === "timeZoneName")?.value;
+      if (name && !/^GMT|^UTC/.test(name)) return name;
+    } catch {
+      // Unknown zone or option: try the next one.
+    }
+  }
+  return "hora local";
+}
+
+/** Whether clocks in `a` and `b` read differently at `iso`. */
+export function zonesDiffer(iso: string, a: string, b: string): boolean {
+  if (a === b || !isTimeZone(a) || !isTimeZone(b)) return false;
+  const date = new Date(iso);
+  return dateKey(date, a) !== dateKey(date, b) || timeKey(date, a) !== timeKey(date, b);
+}
+
+/** `iso` as `other` reads it ("09:00, hora de Canarias"), or null when it's the same as in `timeZone`. */
+export function otherZoneTime(iso: string, timeZone: string, other: string | null | undefined): string | null {
+  if (!other || !zonesDiffer(iso, timeZone, other)) return null;
+  const date = new Date(iso);
+  const sameDay = dateKey(date, timeZone) === dateKey(date, other);
+  return `${sameDay ? formatTime(iso, other) : formatSlotShort(iso, other)}, ${timeZoneLabel(other)}`;
 }
 
 export function addMinutes(iso: string, minutes: number): string {

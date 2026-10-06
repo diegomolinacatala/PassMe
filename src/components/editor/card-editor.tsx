@@ -21,10 +21,12 @@ import { DesignField } from "./design-field";
 import { EditorIndex, type IndexEntry } from "./editor-index";
 import { Section, SwitchRow, TextField } from "./fields";
 import { LinksEditor } from "./links-editor";
+import { MeetingSettingsField } from "./meeting-settings-field";
 import { MeetingsPanel, type MeetingItem } from "./meetings-panel";
 import { PendingNotices } from "./pending-notices";
 import { PreviewDock } from "./preview-dock";
 import { PreviewPanel } from "./preview-panel";
+import { PublishSwitch } from "./publish-switch";
 import { WelcomeContext } from "./welcome-panel";
 import { QuickActions } from "./quick-actions";
 import { SaveBar, useEditorScrollPadding, type SaveStatus } from "./save-bar";
@@ -397,6 +399,17 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, pla
               label="Recibir propuestas de reunión"
               description="Te proponen hora y la confirmas desde el email."
             />
+            {draft.acceptsMeetingRequests && draft.meetingSettings ? (
+              <MeetingSettingsField
+                value={draft.meetingSettings}
+                onChange={editor.setMeetingSettings}
+                errors={{
+                  "meetingSettings.end": fieldError("meetingSettings.end") ?? "",
+                  "meetingSettings.videoLink": fieldError("meetingSettings.videoLink") ?? "",
+                  "meetingSettings.place": fieldError("meetingSettings.place") ?? "",
+                }}
+              />
+            ) : null}
             <SwitchRow
               checked={draft.acceptsContactRequests}
               onChange={editor.setAcceptsContactRequests}
@@ -407,15 +420,10 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, pla
           </Section>
 
           <Section {...sectionProps("publicacion")}>
-            <SwitchRow
+            <PublishSwitch
               checked={draft.isPublished}
+              savedPublished={savedPublished}
               onChange={editor.setPublished}
-              label="Tarjeta publicada"
-              description={
-                draft.isPublished
-                  ? "Tu tarjeta es visible para quien tenga el enlace o escanee tu QR."
-                  : "Despublicada: quien abra tu enlace o escanee tu QR verá que no está disponible."
-              }
               className="mb-6 border-b hairline pb-5"
             />
             <SlugField

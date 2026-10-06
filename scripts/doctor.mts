@@ -104,6 +104,10 @@ if (!sbUrl || !sbKey) {
     if (meetings?.ok) ok("Migración 20261002120000 aplicada (Agendar reunión).");
     else fail("Falta la migración 20261002120000_meeting_requests.sql.");
 
+    const settings = await http(`${sbUrl}/rest/v1/profiles?select=time_zone,meeting_settings&limit=1`, { headers: adminHeaders });
+    if (settings?.ok) ok("Migración 20261006120000 aplicada (zona horaria y ajustes de reuniones).");
+    else fail("Falta la migración 20261006120000_owner_timezone_meeting_settings.sql.");
+
     const bucket = await http(`${sbUrl}/storage/v1/bucket/avatars`, { headers: adminHeaders });
     if (bucket?.ok) {
       const info = (await bucket.json()) as { public?: boolean };

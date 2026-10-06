@@ -1,14 +1,16 @@
 import "server-only";
 import { createSharedRateLimiter } from "@/lib/data/rate-limits";
-import { getMeetingRecord, updateMeeting, withOwnerEmail, type MeetingRecord } from "@/lib/data/meetings";
+import { getMeetingRecord, listUnansweredGuestProposals, updateMeeting, withOwnerEmail, type MeetingRecord } from "@/lib/data/meetings";
 import { isEmailConfigured, sendEmail, type EmailAttachment } from "@/lib/email";
 import { getSigningSecret } from "@/lib/config.server";
 import { getSiteUrl, isSupabaseConfigured } from "@/lib/env";
 import { log } from "@/lib/log";
 import { buildIcs, googleCalendarUrl, type CalendarMethod } from "./calendar";
-import { cancelledEmail, confirmedEmail, declinedEmail, proposalEmail, type MeetingEmail, type MeetingEmailContext } from "./emails";
+import { cancelledEmail, confirmedEmail, declinedEmail, expiredEmail, proposalEmail, type MeetingEmail, type MeetingEmailContext } from "./emails";
+import { EXPIRY_NOTICE_WINDOW_MS, expiredWithin } from "./expiry";
 import { meetingUrl } from "./links";
 import { meetingEvent, ownerContactEmail, type Meeting, type MeetingOwner } from "./model";
+import { HORIZON_DAYS } from "./schema";
 import { applyChange, otherParty, type MeetingChange, type MeetingParty } from "./state";
 
 /**
@@ -27,6 +29,8 @@ const ownerProposalLimiter = createSharedRateLimiter({ name: "meeting-email-owne
 // visitor's (unverified) address are capped per address and per card owner.
 const guestAddressLimiter = createSharedRateLimiter({ name: "meeting-email-guest", limit: 5, windowMs: DAY_MS });
 const ownerToGuestsLimiter = createSharedRateLimiter({ name: "meeting-email-to-guests", limit: 40, windowMs: DAY_MS });
+// One «ha caducado» per meeting: the cron's look-back overlaps from one day to the next.
+const expiryNoticeLimiter = createSharedRateLimiter({ name: "meeting-email-expired", limit: 1, windowMs: 3 * DAY_MS });
 
 /**
  * All meeting emails share one daily budget, kept below the email plan's
@@ -50,7 +54,7 @@ export function meetingsAvailable(): boolean {
   return getSigningSecret() !== null && isEmailConfigured();
 }
 
-type EmailKind = "proposal" | "confirmed" | "declined" | "cancelled";
+type EmailKind = "proposal" | "confirmed" | "declined" | "cancelled" | "expired";
 
 interface Delivery {
   kind: EmailKind;
@@ -78,7 +82,11 @@ function fallbackAddress(): string {
 
 function emailContext(meeting: Meeting, owner: MeetingOwner): MeetingEmailContext {
   // The only owner address an email shows is the one the guest gets.
-  return { meeting, owner: { name: owner.name, slug: owner.slug, email: ownerContactEmail(owner) }, siteUrl: getSiteUrl() };
+  return {
+    meeting,
+    owner: { name: owner.name, slug: owner.slug, email: ownerContactEmail(owner), ...(owner.timeZone ? { timeZone: owner.timeZone } : {}) },
+    siteUrl: getSiteUrl(),
+  };
 }
 
 async function deliver({ kind, to, email, replyTo, attachments, toGuestOf }: Delivery): Promise<void> {
@@ -217,4 +225,28 @@ export async function changeMeeting(
     record: { meeting: updated, owner: record.owner },
     emails: () => emails().catch((error: unknown) => log.error("meeting emails failed", { id }, error)),
   };
+}
+
+/**
+ * Daily cron: tells each visitor whose proposal ran out of times unanswered
+ * (fixed text, «Proponer otras horas» back to the card). Goes through the
+ * same per-address, per-owner and global caps as every guest email.
+ * Returns how many proposals qualified.
+ */
+export async function notifyExpiredProposals(now: Date = new Date()): Promise<number> {
+  if (!isEmailConfigured()) return 0;
+  const candidates = await listUnansweredGuestProposals(now, HORIZON_DAYS + 2);
+  const expired = candidates.filter(({ meeting }) => expiredWithin(meeting, now, EXPIRY_NOTICE_WINDOW_MS));
+  const siteUrl = getSiteUrl();
+  for (const { meeting, owner, takesProposals } of expired) {
+    if (!(await expiryNoticeLimiter.check(meeting.id)).ok) continue;
+    const proposeAgain = takesProposals ? `${siteUrl}/u/${encodeURIComponent(owner.slug)}?reunion=1` : null;
+    await deliver({
+      kind: "expired",
+      to: meeting.guest.email,
+      email: expiredEmail({ meeting, owner: { name: owner.name, slug: owner.slug, email: null }, siteUrl }, { proposeAgain }),
+      toGuestOf: owner.id,
+    });
+  }
+  return expired.length;
 }

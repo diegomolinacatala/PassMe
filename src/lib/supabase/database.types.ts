@@ -32,6 +32,9 @@ export type Database = {
           is_published: boolean;
           accepts_contact_requests: boolean;
           accepts_meeting_requests: boolean;
+          /** 20261006120000: absent until the migration runs. */
+          time_zone?: string;
+          meeting_settings?: Json;
           created_at: string;
           updated_at: string;
         };
@@ -54,6 +57,8 @@ export type Database = {
           is_published?: boolean;
           accepts_contact_requests?: boolean;
           accepts_meeting_requests?: boolean;
+          time_zone?: string;
+          meeting_settings?: Json;
           created_at?: string;
           updated_at?: string;
         };
@@ -76,6 +81,8 @@ export type Database = {
           is_published?: boolean;
           accepts_contact_requests?: boolean;
           accepts_meeting_requests?: boolean;
+          time_zone?: string;
+          meeting_settings?: Json;
           created_at?: string;
           updated_at?: string;
         };

@@ -2,7 +2,7 @@ import { ArrowUpRight, CircleCheck } from "lucide-react";
 import { BrandMotif } from "@/components/brand/brand-motif";
 import { PhoneShowcase } from "@/components/landing/phone-showcase";
 import { DesignSection } from "@/components/landing/design-section";
-import { AlwaysUpdated, ContactMarquee, FinalCta, HowItWorks, PrivacySection } from "@/components/landing/sections";
+import { AlwaysUpdated, ContactMarquee, FinalCta, HowItWorks, PrivacySection, QuickQuestions } from "@/components/landing/sections";
 import { SiteFooter } from "@/components/landing/site-footer";
 import { SiteHeader } from "@/components/landing/site-header";
 import { LinkButton } from "@/components/ui/button";
@@ -48,8 +48,8 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
                 Tu tarjeta de visita, <em className="text-signal">en la cartera</em> del móvil.
               </h1>
               <p className="mt-8 max-w-xl text-lg leading-relaxed text-ink-soft sm:text-xl">
-                Doble clic al botón lateral, enseñas el QR y tu contacto aparece en su teléfono. Sin apps que instalar, sin
-                papel y sin darle tu número a quien no quieras.
+                Enseñas un QR y tu contacto aparece en su móvil, sea iPhone o Android. Nadie instala nada, y tú eliges qué
+                datos se ven.
               </p>
               <div className="mt-10 flex flex-wrap items-center gap-3">
                 <LinkButton href={ctaHref} variant="signal" size="lg">
@@ -94,6 +94,7 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
         <DesignSection />
         <PrivacySection />
         <AlwaysUpdated card={demo} googleWallet={googleWallet} />
+        <QuickQuestions />
         <FinalCta ctaHref={ctaHref} googleWallet={googleWallet} />
       </main>
       <SiteFooter googleWallet={googleWallet} />

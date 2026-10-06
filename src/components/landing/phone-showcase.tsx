@@ -3,9 +3,9 @@ import { themeDesign } from "@/lib/card/design";
 import type { PublicCard } from "@/lib/card/types";
 
 /**
- * Hero object: a phone showing the Apple pass, a Google pass tucked behind
- * (only once Google Wallet is live), and the side button that you
- * double-press to bring the wallet up.
+ * Hero object: a phone showing the Apple pass and a Google pass tucked behind
+ * (only once Google Wallet is live). The QR on it is real (it opens /u/demo),
+ * so on a desktop we invite people to scan it with their phone.
  */
 export function PhoneShowcase({ card, googleWallet }: { card: PublicCard; googleWallet: boolean }) {
   const backCard: PublicCard = { ...card, ...themeDesign("cafe", "pliegue", 311_724) };
@@ -26,15 +26,8 @@ export function PhoneShowcase({ card, googleWallet }: { card: PublicCard; google
       {/* Phone */}
       <div className="crop-marks relative animate-float [--tilt:3deg]">
         <div className="relative rounded-[52px] bg-ink p-[11px] shadow-object">
-          {/* Side button with the double-press hint */}
+          {/* Side button */}
           <span className="absolute top-36 -right-[5px] h-20 w-[5px] rounded-r-md bg-ink" aria-hidden="true" />
-          <span className="absolute top-[9.5rem] -right-[4.75rem] hidden items-center gap-2 lg:flex" aria-hidden="true">
-            <span className="relative flex size-3">
-              <span className="absolute inset-0 animate-ping rounded-full bg-signal/60" />
-              <span className="relative size-3 rounded-full bg-signal" />
-            </span>
-            <span className="eyebrow text-ink">×2</span>
-          </span>
 
           <div className="relative overflow-hidden rounded-[42px] bg-paper-deep px-3.5 pt-3 pb-8">
             {/* Status bar + dynamic island */}
@@ -61,6 +54,7 @@ export function PhoneShowcase({ card, googleWallet }: { card: PublicCard; google
           </div>
         </div>
       </div>
+      <p className="mt-8 hidden text-center font-medium text-ink lg:block">Pruébalo: escanéalo con tu móvil →</p>
     </div>
   );
 }

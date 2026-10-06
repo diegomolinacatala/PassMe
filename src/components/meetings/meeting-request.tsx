@@ -18,7 +18,8 @@ import { cn } from "@/lib/cn";
 import { firstName, formatDuration } from "@/lib/meetings/model";
 import { DEFAULT_DURATION, FORMAT_LABELS, MEETING_DURATIONS, MEETING_LIMITS, type MeetingDuration, type MeetingFormat } from "@/lib/meetings/schema";
 import { clearMeetingForm, readMeetingForm, writeMeetingForm, type MeetingFormWhen, type MeetingFormWho } from "@/lib/meetings/form-storage";
-import { formatDay, formatSlotShort, formatTime, localTimeZone, timeZoneCity } from "@/lib/meetings/time";
+import { slotAllowed, type MeetingRules } from "@/lib/meetings/settings";
+import { formatDay, formatSlotShort, formatTime, localTimeZone, timeZoneLabel } from "@/lib/meetings/time";
 import { Segmented } from "./form-bits";
 import { FORMAT_ICONS, useClientNow } from "./shared";
 import { SlotPicker } from "./slot-picker";
@@ -30,6 +31,10 @@ interface MeetingRequestProps {
   captchaSiteKey: string | null;
   /** The card's booking link (Calendly…), offered here instead of in the card's list. */
   booking: { href: string; linkId: string } | null;
+  /** The owner's zone (P8.1): the picker works in it. Undefined before the migration: the visitor's own. */
+  ownerTimeZone?: string;
+  /** What the owner takes (P8.4); null = no limits. The server checks it again. */
+  rules: MeetingRules | null;
 }
 
 /** What the visitor chose in step 1. */
@@ -43,6 +48,17 @@ const STEP_ONE_FIELDS = new Set(["slots", "duration", "format", "location"]);
 const STEP_TWO_HASH = "#reunion-2";
 const EMPTY_WHEN: When = { slots: [], duration: DEFAULT_DURATION, format: "in_person", location: "", link: "" };
 const EMPTY_WHO: Who = { name: "", email: "", phone: "", company: "", topic: "", consent: false };
+
+/** Step 1 as the owner's settings allow it: their usual length, an accepted format, and no times they don't take. */
+function allowedWhen(when: When, rules: MeetingRules | null, timeZone: string, now: number, fresh = false): When {
+  if (!rules) return when;
+  return {
+    ...when,
+    duration: fresh ? rules.duration : when.duration,
+    format: rules.formats.includes(when.format) ? when.format : rules.formats[0]!,
+    slots: when.slots.filter((slot) => slotAllowed(slot, rules, timeZone, new Date(now))),
+  };
+}
 
 function SentMessage({ owner, slug, source, state, slots, timeZone, saved }: {
   owner: string;
@@ -114,12 +130,17 @@ interface StepWhenProps {
   when: When;
   onChange: (patch: Partial<When>) => void;
   timeZone: string;
+  /** The visitor's own zone, when it isn't the one the picker works in. */
+  viewerTimeZone: string;
+  /** True when the picker works in the owner's zone. */
+  ownersZone: boolean;
+  rules: MeetingRules | null;
   now: number;
   errors: FieldErrors;
   onNext: () => void;
 }
 
-function StepWhen({ owner, slug, booking, when, onChange, timeZone, now, errors, onNext }: StepWhenProps) {
+function StepWhen({ owner, slug, booking, when, onChange, timeZone, viewerTimeZone, ownersZone, rules, now, errors, onNext }: StepWhenProps) {
   const heading = useRef<HTMLHeadingElement>(null);
   const picker = useRef<HTMLDivElement>(null);
   const [flash, setFlash] = useState(false);
@@ -147,7 +168,7 @@ function StepWhen({ owner, slug, booking, when, onChange, timeZone, now, errors,
           ¿Cuándo os <em className="text-signal">veis?</em>
         </h3>
         <p className="mt-1 text-sm text-muted">
-          Propón hasta tres horas (hora de {timeZoneCity(timeZone)}). {owner} recibe un email y elige una.
+          Propón hasta tres horas ({timeZoneLabel(timeZone)}{ownersZone ? `, la de ${owner}` : ""}). {owner} recibe un email y elige una.
         </p>
         {booking ? (
           <p className="mt-2 text-sm text-ink-soft">
@@ -166,7 +187,16 @@ function StepWhen({ owner, slug, booking, when, onChange, timeZone, now, errors,
           flash && "ring-2 ring-signal",
         )}
       >
-        <SlotPicker timeZone={timeZone} value={when.slots} onChange={(slots) => onChange({ slots })} now={now} chooser={owner} error={errors.slots} />
+        <SlotPicker
+          timeZone={timeZone}
+          viewerTimeZone={viewerTimeZone}
+          rules={rules}
+          value={when.slots}
+          onChange={(slots) => onChange({ slots })}
+          now={now}
+          chooser={owner}
+          error={errors.slots}
+        />
       </div>
       <Segmented<MeetingDuration>
         label="Duración"
@@ -177,7 +207,7 @@ function StepWhen({ owner, slug, booking, when, onChange, timeZone, now, errors,
       <Segmented<MeetingFormat>
         label="Cómo"
         value={when.format}
-        options={(Object.keys(FORMAT_LABELS) as MeetingFormat[]).map((f) => {
+        options={(Object.keys(FORMAT_LABELS) as MeetingFormat[]).filter((f) => !rules || rules.formats.includes(f)).map((f) => {
           const Icon = FORMAT_ICONS[f];
           return { value: f, label: FORMAT_LABELS[f], icon: <Icon className="size-4 shrink-0" aria-hidden /> };
         })}
@@ -352,12 +382,12 @@ function StepWho({ owner, ownerFullName, when, who, onChange, timeZone, errors, 
  * them by email and confirms one with a tap. Two short steps (when → who),
  * collapsed by default so the card stays the star of the page.
  */
-export function MeetingRequest({ slug, ownerName, source, captchaSiteKey, booking }: MeetingRequestProps) {
+export function MeetingRequest({ slug, ownerName, source, captchaSiteKey, booking, ownerTimeZone, rules }: MeetingRequestProps) {
   const { saved, markSent, open: showPanel } = useCardPage();
   // Taken when the panel first opens: "now" and the visitor's time zone for the slot picker.
   const [open, setOpen] = useState<{ now: number; timeZone: string } | null>(null);
   const [step, setStep] = useState<1 | 2>(1);
-  const [when, setWhen] = useState<When>(EMPTY_WHEN);
+  const [when, setWhen] = useState<When>(() => (rules ? { ...EMPTY_WHEN, duration: rules.duration, format: rules.formats.includes(EMPTY_WHEN.format) ? EMPTY_WHEN.format : rules.formats[0]! } : EMPTY_WHEN));
   const [who, setWho] = useState<Who>(EMPTY_WHO);
   // Back in this tab (reload, back button) or sent here to try again (?reunion=1): pick up where it was.
   const clientNow = useClientNow();
@@ -369,7 +399,7 @@ export function MeetingRequest({ slug, ownerName, source, captchaSiteKey, bookin
     const retry = new URLSearchParams(window.location.search).get("reunion") === "1";
     if (stored || retry) {
       const known = readStoredDraft()?.draft;
-      setWhen(stored?.when ?? EMPTY_WHEN);
+      setWhen(allowedWhen(stored?.when ?? EMPTY_WHEN, rules, ownerTimeZone ?? localTimeZone(), clientNow, !stored));
       setWho({
         ...EMPTY_WHO,
         name: known?.fullName ?? "",
@@ -501,7 +531,10 @@ export function MeetingRequest({ slug, ownerName, source, captchaSiteKey, bookin
                   touch(Object.keys(patch));
                   if (patch.slots?.length) setStepError(null);
                 }}
-                timeZone={open.timeZone}
+                timeZone={ownerTimeZone ?? open.timeZone}
+                viewerTimeZone={open.timeZone}
+                ownersZone={Boolean(ownerTimeZone)}
+                rules={rules}
                 now={open.now}
                 errors={errors}
                 onNext={() => {
@@ -521,7 +554,7 @@ export function MeetingRequest({ slug, ownerName, source, captchaSiteKey, bookin
                     setWho((prev) => ({ ...prev, ...patch }));
                     touch(Object.keys(patch));
                   }}
-                  timeZone={open.timeZone}
+                  timeZone={ownerTimeZone ?? open.timeZone}
                   errors={errors}
                   onBack={toStepOne}
                 />

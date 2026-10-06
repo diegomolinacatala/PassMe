@@ -60,9 +60,11 @@ export function buildGenericClass(config: GoogleWalletConfig) {
 export interface GooglePassInput {
   card: PublicCard;
   profileId: string;
+  /** The card is unpublished: the object goes INACTIVE until it's published again. */
+  paused?: boolean;
 }
 
-export function buildGenericObject(config: GoogleWalletConfig, { card, profileId }: GooglePassInput) {
+export function buildGenericObject(config: GoogleWalletConfig, { card, profileId, paused = false }: GooglePassInput) {
   const design = resolveDesign(card);
   const logoUri = card.avatarUrl ?? `${getSiteUrl()}/brand/wallet-logo.png`;
   const heroUri = `${profileUrl(card.slug)}/hero?v=${artVersion(card, "hero")}`;
@@ -88,7 +90,7 @@ export function buildGenericObject(config: GoogleWalletConfig, { card, profileId
   return {
     id: googleObjectId(config, profileId),
     classId: googleClassId(config),
-    state: "ACTIVE",
+    state: paused ? "INACTIVE" : "ACTIVE",
     cardTitle: localized(card.company || "PassMe"),
     header: localized(card.fullName),
     ...(card.headline ? { subheader: localized(card.headline) } : {}),

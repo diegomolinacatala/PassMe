@@ -21,7 +21,12 @@ export interface MeetingView {
   durationMinutes: number;
   format: MeetingFormat;
   location: string;
+  /** The zone this side reads times in (the owner's own since P8.1, the visitor's from their proposal). */
   timeZone: string;
+  /** The other side's zone, shown in brackets when it reads differently. */
+  otherTimeZone: string;
+  /** Owner only: their default link or place, prefilled when confirming a meeting that has none. */
+  suggestedLocation: string;
   topic: string;
   guest: { name: string; company: string; email: string | null; phone: string | null };
   owner: { name: string; slug: string; email: string | null };
@@ -32,6 +37,7 @@ export interface MeetingView {
 
 export function toMeetingView(meeting: Meeting, owner: MeetingOwner, party: MeetingParty, now: Date): MeetingView {
   const confirmed = meeting.status === "confirmed";
+  const ownerZone = owner.timeZone ?? meeting.timeZone;
   return {
     id: meeting.id,
     party,
@@ -44,7 +50,9 @@ export function toMeetingView(meeting: Meeting, owner: MeetingOwner, party: Meet
     durationMinutes: meeting.durationMinutes,
     format: meeting.format,
     location: meeting.location,
-    timeZone: meeting.timeZone,
+    timeZone: party === "owner" ? ownerZone : meeting.timeZone,
+    otherTimeZone: party === "owner" ? meeting.timeZone : ownerZone,
+    suggestedLocation: party === "owner" && !meeting.location ? suggestedLocation(meeting.format, owner.defaults) : "",
     topic: meeting.topic,
     guest: {
       name: meeting.guest.name,
@@ -165,4 +173,9 @@ export function demoMeetingById(id: DemoMeetingId, now: Date): Meeting {
 /** What the editor's "Reuniones" panel shows in demo mode: one to answer, one confirmed. */
 export function demoOwnerMeetings(now: Date): Meeting[] {
   return [demoMeetingById("demo", now), demoMeetingById("demo-confirmada", now)];
+}
+
+function suggestedLocation(format: MeetingFormat, defaults: MeetingOwner["defaults"]): string {
+  if (!defaults) return "";
+  return format === "video" ? defaults.videoLink : format === "in_person" ? defaults.place : "";
 }

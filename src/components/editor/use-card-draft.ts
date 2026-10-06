@@ -5,6 +5,8 @@ import type { DesignFields } from "@/lib/card/design";
 import type { LinkKind } from "@/lib/card/links";
 import { MAX_LINKS, parseCardInput, type FieldErrors } from "@/lib/card/schema";
 import type { CardLink, OwnerCard, PublicCard } from "@/lib/card/types";
+import type { MeetingSettings } from "@/lib/meetings/settings";
+import { localTimeZone } from "@/lib/meetings/time";
 import { moveItem } from "@/lib/reorder";
 
 export interface CardDraft {
@@ -25,6 +27,8 @@ export interface CardDraft {
   isPublished: boolean;
   acceptsContactRequests: boolean;
   acceptsMeetingRequests: boolean;
+  /** Null while the migration is pending: the settings aren't shown or sent. */
+  meetingSettings: MeetingSettings | null;
   links: CardLink[];
 }
 
@@ -49,6 +53,7 @@ export function draftFromCard(card: OwnerCard): CardDraft {
     isPublished: card.isPublished,
     acceptsContactRequests: card.acceptsContactRequests,
     acceptsMeetingRequests: card.acceptsMeetingRequests,
+    meetingSettings: card.meetingSettings ?? null,
     links: card.links,
   };
 }
@@ -72,6 +77,9 @@ export function draftToInput(draft: CardDraft) {
     isPublished: draft.isPublished,
     acceptsContactRequests: draft.acceptsContactRequests,
     acceptsMeetingRequests: draft.acceptsMeetingRequests,
+    ...(draft.meetingSettings ? { meetingSettings: draft.meetingSettings } : {}),
+    // P8.1: the owner's zone travels with every save (validated on the server).
+    timeZone: localTimeZone(),
     links: draft.links,
   };
 }
@@ -108,6 +116,7 @@ function newLinkId(): string {
 type Action =
   | { type: "field"; field: TextField; value: string }
   | { type: "design"; patch: Partial<DesignFields> }
+  | { type: "meetingSettings"; patch: Partial<MeetingSettings> }
   | { type: "published"; value: boolean }
   | { type: "contactRequests"; value: boolean }
   | { type: "meetingRequests"; value: boolean }
@@ -141,6 +150,8 @@ function reducer(state: State, action: Action): State {
       return { ...state, draft: { ...draft, acceptsContactRequests: action.value } };
     case "meetingRequests":
       return { ...state, draft: { ...draft, acceptsMeetingRequests: action.value } };
+    case "meetingSettings":
+      return draft.meetingSettings ? { ...state, draft: { ...draft, meetingSettings: { ...draft.meetingSettings, ...action.patch } } } : state;
     case "avatar":
       return { ...state, draft: { ...draft, avatarPath: action.path, avatarUrl: action.url } };
     case "addLink":
@@ -200,6 +211,7 @@ export function useCardDraft(initial: CardDraft) {
       setPublished: (value: boolean) => dispatch({ type: "published", value }),
       setAcceptsContactRequests: (value: boolean) => dispatch({ type: "contactRequests", value }),
       setAcceptsMeetingRequests: (value: boolean) => dispatch({ type: "meetingRequests", value }),
+      setMeetingSettings: (patch: Partial<MeetingSettings>) => dispatch({ type: "meetingSettings", patch }),
       setAvatar: (path: string | null, url: string | null) => dispatch({ type: "avatar", path, url }),
       addLink: (kind: LinkKind, value = "") => {
         const id = newLinkId();

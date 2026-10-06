@@ -1,10 +1,12 @@
 import { timingSafeEqual } from "node:crypto";
 import type { NextRequest } from "next/server";
 import { log } from "@/lib/log";
+import { notifyExpiredProposals } from "@/lib/meetings/service";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 function isAuthorized(header: string | null, secret: string): boolean {
   const expected = Buffer.from(`Bearer ${secret}`);
@@ -24,11 +26,19 @@ export async function GET(request: NextRequest) {
   const admin = createAdminSupabase();
   if (!admin) return Response.json({ ok: false, error: "not_configured" }, { status: 503 });
 
+  // Before the cleanup: tell visitors whose proposal ran out unanswered (best effort).
+  let expiredProposals = 0;
+  try {
+    expiredProposals = await notifyExpiredProposals(new Date());
+  } catch (error) {
+    log.error("expired proposal emails failed", {}, error);
+  }
+
   const { data, error } = await admin.rpc("cleanup_expired_data");
   if (error) {
     log.error("cleanup_expired_data failed", {}, error);
     return Response.json({ ok: false }, { status: 500 });
   }
-  log.info("cleanup_expired_data", { removed: data });
-  return Response.json({ ok: true, removed: data });
+  log.info("cleanup_expired_data", { removed: data, expiredProposals });
+  return Response.json({ ok: true, removed: data, expiredProposals });
 }

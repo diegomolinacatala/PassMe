@@ -16,7 +16,7 @@ import { renderEmailHtml, renderEmailText, type EmailBody } from "@/lib/email-la
 import { describeWhen, describeWhenInline, describeWhere, displayName, formatDuration, type Meeting } from "./model";
 import { FORMAT_LABELS, isSafeName } from "./schema";
 import { otherParty, type MeetingParty } from "./state";
-import { addMinutes, formatSlotShort, formatTime, timeZoneCity } from "./time";
+import { addMinutes, formatSlotShort, formatTime, timeZoneLabel, zonesDiffer } from "./time";
 
 export interface MeetingEmail {
   subject: string;
@@ -26,8 +26,23 @@ export interface MeetingEmail {
 
 export interface MeetingEmailContext {
   meeting: Meeting;
-  owner: { name: string; slug: string; email: string | null };
+  owner: { name: string; slug: string; email: string | null; timeZone?: string };
   siteUrl: string;
+}
+
+/** The zone each side reads times in: the owner's own (P8.1), the visitor's from their proposal. */
+function zoneOf(ctx: MeetingEmailContext, party: MeetingParty): string {
+  return party === "owner" ? (ctx.owner.timeZone ?? ctx.meeting.timeZone) : ctx.meeting.timeZone;
+}
+
+/** "Las horas están en hora de Madrid (Marta las ve en hora de Canarias)." */
+function zoneLine(ctx: MeetingEmailContext, recipient: MeetingParty, at: string): string {
+  const own = zoneOf(ctx, recipient);
+  const other = zoneOf(ctx, otherParty(recipient));
+  const otherName = firstName(nameOf(ctx, otherParty(recipient)));
+  return zonesDiffer(at, own, other)
+    ? `Las horas están en ${timeZoneLabel(own)} (${otherName} las ve en ${timeZoneLabel(other)}).`
+    : `Las horas están en ${timeZoneLabel(own)}.`;
 }
 
 function render(subject: string, body: EmailBody): MeetingEmail {
@@ -77,6 +92,7 @@ export function proposalEmail(ctx: MeetingEmailContext, respondUrl: string): Mee
   const { meeting } = ctx;
   const recipient = otherParty(meeting.proposedBy);
   const proposer = nameOf(ctx, meeting.proposedBy);
+  const tz = zoneOf(ctx, recipient);
   const first = meeting.sequence === 0;
   const count = meeting.slots.length;
   const subject = first ? `${proposer} te propone una reunión` : `${proposer} te propone ${count === 1 ? "otra hora" : "otras horas"}`;
@@ -85,7 +101,7 @@ export function proposalEmail(ctx: MeetingEmailContext, respondUrl: string): Mee
     : `${proposer} no puede a la hora que propusiste y te ofrece ${count === 1 ? "esta otra" : "estas otras"}. Elige una y os enviamos la invitación a los dos.`;
 
   return render(subject, {
-    preheader: `${formatSlotShort(meeting.slots[0]!, meeting.timeZone)}${count > 1 ? ` y ${count - 1} más` : ""}. Confirma con un toque.`,
+    preheader: `${formatSlotShort(meeting.slots[0]!, tz)}${count > 1 ? ` y ${count - 1} más` : ""}. Confirma con un toque.`,
     eyebrow: "Agendar reunión",
     title: first ? `${proposer} quiere reunirse contigo` : subject,
     paragraphs: [
@@ -102,14 +118,14 @@ export function proposalEmail(ctx: MeetingEmailContext, respondUrl: string): Mee
     // Equal choices: same outlined style, with the length in the label ("mar 6 oct · 10:00–10:30").
     equalButtons: true,
     buttons: meeting.slots.map((slot, index) => ({
-      label: `${formatSlotShort(slot, meeting.timeZone)}–${formatTime(addMinutes(slot, meeting.durationMinutes), meeting.timeZone)}`,
+      label: `${formatSlotShort(slot, tz)}–${formatTime(addMinutes(slot, meeting.durationMinutes), tz)}`,
       href: `${respondUrl}?hora=${index}`,
     })),
     links: [
       { label: "Proponer otras horas", href: `${respondUrl}?accion=otra` },
       { label: "No puedo", href: `${respondUrl}?accion=no` },
     ],
-    footer: footerFor(ctx, recipient, [`Las horas son de ${timeZoneCity(meeting.timeZone)}.`, ...(recipient === "guest" ? [NO_REPLY] : [])]),
+    footer: footerFor(ctx, recipient, [zoneLine(ctx, recipient, meeting.slots[0]!), ...(recipient === "guest" ? [NO_REPLY] : [])]),
   });
 }
 
@@ -122,6 +138,7 @@ export function confirmedEmail(
   const { meeting } = ctx;
   const start = meeting.confirmedStart!;
   const other = otherParty(recipient);
+  const tz = zoneOf(ctx, recipient);
   const otherName = nameOf(ctx, other);
   const contact =
     other === "guest"
@@ -129,7 +146,7 @@ export function confirmedEmail(
       : (ctx.owner.email ?? "");
 
   const details: Array<readonly [string, string]> = [
-    ["Cuándo", describeWhen(start, meeting.durationMinutes, meeting.timeZone)],
+    ["Cuándo", describeWhen(start, meeting.durationMinutes, tz, zoneOf(ctx, other))],
     ["Cómo", describeWhere(meeting)],
     ["Con", other === "guest" ? displayName(meeting.guest) : otherName],
   ];
@@ -137,10 +154,10 @@ export function confirmedEmail(
   if (meeting.topic && recipient === "owner") details.push(["Tema", meeting.topic]);
 
   const videoPending = meeting.format === "video" && !meeting.location;
-  return render(`Confirmada: reunión con ${otherName} ${describeWhenInline(start, meeting.timeZone)}`, {
-    preheader: `${formatSlotShort(start, meeting.timeZone)} con ${otherName}. La invitación va adjunta.`,
+  return render(`Confirmada: reunión con ${otherName} ${describeWhenInline(start, tz)}`, {
+    preheader: `${formatSlotShort(start, tz)} con ${otherName}. La invitación va adjunta.`,
     eyebrow: "Reunión confirmada",
-    title: `Hecho: ${firstName(otherName)} y tú os veis ${describeWhenInline(start, meeting.timeZone)}`,
+    title: `Hecho: ${firstName(otherName)} y tú os veis ${describeWhenInline(start, tz)}`,
     paragraphs: [
       "Te adjuntamos la invitación para añadirla a tu calendario (Apple Calendar, Outlook o Gmail).",
       ...(videoPending ? ["Es una videollamada: pasaos el enlace respondiendo a este correo."] : []),
@@ -184,9 +201,10 @@ export function cancelledEmail(ctx: MeetingEmailContext, { wasConfirmed, showNot
   const recipient = otherParty(canceller);
   const cancellerName = nameOf(ctx, canceller);
   const start = meeting.confirmedStart ?? meeting.slots[0]!;
+  const tz = zoneOf(ctx, recipient);
   return render(
     wasConfirmed
-      ? `Cancelada: reunión con ${cancellerName} ${describeWhenInline(start, meeting.timeZone)}`
+      ? `Cancelada: reunión con ${cancellerName} ${describeWhenInline(start, tz)}`
       : `${cancellerName} ha cancelado su propuesta de reunión`,
     {
       preheader: wasConfirmed ? "Quítala de tu calendario." : "Ya no hace falta que respondas.",
@@ -194,11 +212,33 @@ export function cancelledEmail(ctx: MeetingEmailContext, { wasConfirmed, showNot
       title: wasConfirmed ? `${firstName(cancellerName)} ha cancelado la reunión` : `${firstName(cancellerName)} ha cancelado su propuesta`,
       paragraphs: [
         wasConfirmed
-          ? `La reunión ${describeWhenInline(start, meeting.timeZone)} queda cancelada. Si la añadiste a tu calendario, el archivo adjunto la quita (en Gmail, bórrala tú).`
+          ? `La reunión ${describeWhenInline(start, tz)} queda cancelada. Si la añadiste a tu calendario, el archivo adjunto la quita (en Gmail, bórrala tú).`
           : "Ya no hace falta que respondas a las horas que te propuso.",
       ],
       quote: noteFor(ctx, recipient, cancellerName, showNote),
       footer: footerFor(ctx, recipient, wasConfirmed ? [`Responde a este correo para hablar con ${cancellerName}.`] : []),
     },
   );
+}
+
+/**
+ * To the visitor, from the daily cron: their proposal ran out of times with no
+ * answer. Fixed text only (their address is unverified); the button opens the
+ * card's meeting form again, or there's none if the card no longer takes them.
+ */
+export function expiredEmail(ctx: MeetingEmailContext, links: { proposeAgain: string | null }): MeetingEmail {
+  const name = firstName(ownerName(ctx));
+  return render(`Tu propuesta a ${name} ha caducado`, {
+    preheader: "Las horas que propusiste ya han pasado.",
+    eyebrow: "Agendar reunión",
+    title: `${name} no ha respondido a tiempo`,
+    paragraphs: [
+      "Las horas que propusiste ya han pasado sin que las confirmara, así que tu propuesta ha caducado.",
+      links.proposeAgain
+        ? "Si aún queréis veros, propón otras horas desde su tarjeta."
+        : "Ahora mismo su tarjeta no recibe propuestas de reunión.",
+    ],
+    buttons: links.proposeAgain ? [{ label: "Proponer otras horas", href: links.proposeAgain }] : undefined,
+    footer: footerFor(ctx, "guest", [NO_REPLY]),
+  });
 }

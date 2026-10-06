@@ -122,7 +122,15 @@ export default async function PublicCardPage({ params, searchParams }: PageProps
                     <ContactForm slug={card.slug} ownerName={card.fullName} source={source} captchaSiteKey={captchaSiteKey} />
                   ) : null}
                   {takesMeetings ? (
-                    <MeetingRequest slug={card.slug} ownerName={card.fullName} source={source} captchaSiteKey={captchaSiteKey} booking={booking} />
+                    <MeetingRequest
+                      slug={card.slug}
+                      ownerName={card.fullName}
+                      source={source}
+                      captchaSiteKey={captchaSiteKey}
+                      booking={booking}
+                      ownerTimeZone={card.timeZone}
+                      rules={card.meetingRules ?? null}
+                    />
                   ) : null}
                 </div>
               ) : null}

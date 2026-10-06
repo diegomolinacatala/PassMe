@@ -214,3 +214,73 @@ describe("email limits", () => {
     expect(service.meetingsAvailable()).toBe(false);
   });
 });
+
+describe("expired proposals (P8.2, daily cron)", () => {
+  const NOW = new Date("2099-10-08T09:00:00.000Z");
+  const hoursAgo = (h: number) => new Date(NOW.getTime() - h * 3_600_000).toISOString();
+
+  function cronAdmin(profile: Record<string, unknown>) {
+    const hits = new Map<string, number>();
+    const rows = [
+      meetingRow({ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", slots: [hoursAgo(30), hoursAgo(2)], guest_email: "marta@example.com" }),
+      // Still has a time to come: not expired.
+      meetingRow({ id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", slots: [hoursAgo(5), hoursAgo(-3)], guest_email: "ana@example.com" }),
+      // Ran out three days ago: told back then (or the cron was down), never now.
+      meetingRow({ id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", slots: [hoursAgo(72)], guest_email: "luis@example.com" }),
+    ];
+    const fake = fakeSupabase((q) => {
+      if (q.table === "rpc:rate_limit_hit") {
+        const { p_key, p_limit } = q.calls[0]![1][0] as { p_key: string; p_limit: number };
+        const count = (hits.get(p_key) ?? 0) + 1;
+        hits.set(p_key, count);
+        return { data: [{ allowed: count <= p_limit, retry_after: 0 }] };
+      }
+      if (q.table === "meeting_requests") return { data: rows };
+      if (q.table === "profiles") return { data: [{ id: OWNER, slug: "diego", full_name: "Diego Molina", ...profile }] };
+      return {};
+    });
+    state.admin = fake.client;
+    return fake;
+  }
+
+  it("picks a visitor's unanswered proposal whose last time started in the look-back window", async () => {
+    const { expiredWithin } = await import("@/lib/meetings/expiry");
+    const base = { status: "pending" as const, proposedBy: "guest" as const };
+    expect(expiredWithin({ ...base, slots: [hoursAgo(2)] }, NOW)).toBe(true);
+    expect(expiredWithin({ ...base, slots: [hoursAgo(35)] }, NOW)).toBe(true);
+    expect(expiredWithin({ ...base, slots: [hoursAgo(37)] }, NOW)).toBe(false);
+    expect(expiredWithin({ ...base, slots: [hoursAgo(2), hoursAgo(-1)] }, NOW)).toBe(false);
+    // The owner's counter-proposal or a closed one isn't the visitor's to hear about.
+    expect(expiredWithin({ ...base, proposedBy: "owner", slots: [hoursAgo(2)] }, NOW)).toBe(false);
+    expect(expiredWithin({ ...base, status: "declined", slots: [hoursAgo(2)] }, NOW)).toBe(false);
+  });
+
+  it("emails only the expired one, with fixed text and a way back to the card, once", async () => {
+    const fake = cronAdmin({ is_published: true, accepts_meeting_requests: true });
+    const sent = mockResend();
+    expect(await service.notifyExpiredProposals(NOW)).toBe(1);
+    const emails = sent();
+    expect(emails).toHaveLength(1);
+    expect(emails[0]!.to).toEqual(["marta@example.com"]);
+    expect(emails[0]!.subject).toBe("Tu propuesta a Diego ha caducado");
+    expect(emails[0]!.html).toContain("Proponer otras horas");
+    expect(emails[0]!.html).toContain("https://getpassme.com/u/diego?reunion=1");
+    // Free text from the proposal never reaches the visitor's (unverified) address.
+    expect(emails[0]!.text).not.toContain("Un café");
+    expect(emails[0]!.text).not.toContain("Café Central");
+    const select = fake.queries.find((q) => q.table === "meeting_requests")!;
+    expect(select.calls).toEqual(expect.arrayContaining([["eq", ["status", "pending"]], ["eq", ["proposed_by", "guest"]]]));
+
+    // The next day's run overlaps the window: Marta isn't told twice (Ana's last time has passed by then).
+    await service.notifyExpiredProposals(new Date(NOW.getTime() + 20 * 3_600_000));
+    expect(sent().map((e) => e.to[0])).toEqual(["marta@example.com", "ana@example.com"]);
+  });
+
+  it("leaves the button out when the card no longer takes proposals", async () => {
+    cronAdmin({ is_published: true, accepts_meeting_requests: false });
+    const sent = mockResend();
+    await service.notifyExpiredProposals(NOW);
+    expect(sent()[0]!.html).not.toContain("reunion=1");
+    expect(sent()[0]!.text).toContain("no recibe propuestas");
+  });
+});

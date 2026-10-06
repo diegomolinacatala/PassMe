@@ -1,7 +1,7 @@
 import "server-only";
 import { DEMO_CARD } from "@/lib/card/demo";
 import type { OwnerCard } from "@/lib/card/types";
-import { getAppleWalletConfig, getGoogleWalletConfig } from "@/lib/config.server";
+import { getAppleWalletConfig, getGoogleWalletConfig, isGoogleWalletLive } from "@/lib/config.server";
 import { isSupabaseConfigured } from "@/lib/env";
 import { toPublicCard } from "@/lib/data/cards";
 import {
@@ -84,7 +84,7 @@ export async function buildApplePassForCard(card: OwnerCard): Promise<GeneratedA
   ]);
 
   const buffer = await createApplePass(
-    { card: toPublicCard(card), serialNumber: card.id, authenticationToken, avatar },
+    { card: toPublicCard(card), serialNumber: card.id, authenticationToken, avatar, paused: !card.isPublished },
     config,
   );
   return { buffer, slug: card.slug };
@@ -105,7 +105,12 @@ export async function buildGoogleSaveUrlForProfile(profileId: string): Promise<s
   const config = getGoogleWalletConfig();
   if (!config) throw new PassError(503, "not_configured", "Google Wallet no está configurado todavía.");
   const card = await loadOwnerCard(profileId);
-  return createGoogleSaveUrl(config, { card: toPublicCard(card), profileId: card.id });
+  return createGoogleSaveUrl(config, { card: toPublicCard(card), profileId: card.id, paused: googlePaused(card) });
+}
+
+/** Only touch the Google object's state once Google Wallet is live (GOOGLE_WALLET_LIVE). */
+function googlePaused(card: OwnerCard): boolean {
+  return !card.isPublished && isGoogleWalletLive();
 }
 
 export async function buildDemoGoogleSaveUrl(): Promise<string> {
@@ -116,7 +121,8 @@ export async function buildDemoGoogleSaveUrl(): Promise<string> {
 
 /**
  * After the owner saves: nudge Apple devices to re-download the pass and
- * update the Google Wallet object. Best effort, runs in `after()`.
+ * update the Google Wallet object. Best effort, runs in `after()`. Also how
+ * unpublishing pauses the passes (voided / INACTIVE) and publishing restores them.
  */
 export async function notifyWalletsOfUpdate(profileId: string): Promise<void> {
   const admin = createAdminSupabase();
@@ -144,7 +150,7 @@ export async function notifyWalletsOfUpdate(profileId: string): Promise<void> {
       (async () => {
         const card = await getCardById(admin, profileId);
         if (!card?.fullName) return;
-        const result = await syncGoogleObject(google, { card: toPublicCard(card), profileId });
+        const result = await syncGoogleObject(google, { card: toPublicCard(card), profileId, paused: googlePaused(card) });
         if (result !== "not_saved") log.info("google pass sync", { profileId, result });
       })(),
     );

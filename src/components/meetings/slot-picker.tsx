@@ -6,6 +6,7 @@ import { InlineError } from "@/components/ui/field";
 import { undoKey, UndoNotice, type UndoItem } from "@/components/ui/undo-notice";
 import { cn } from "@/lib/cn";
 import { HORIZON_DAYS, MAX_SLOTS } from "@/lib/meetings/schema";
+import { inRange, slotAllowed, type MeetingRules } from "@/lib/meetings/settings";
 import {
   dateKey,
   formatDay,
@@ -16,11 +17,18 @@ import {
   timeKey,
   upcomingDays,
   zonedTimeToUtc,
+  zonesDiffer,
   type PickerDay,
+  type TimeGroup,
 } from "@/lib/meetings/time";
 
 interface SlotPickerProps {
+  /** The zone days and times are shown in (the owner's, on a card). */
   timeZone: string;
+  /** The viewer's own zone: each chosen time also says what their clock will read, when it differs. */
+  viewerTimeZone?: string;
+  /** The owner's days, hours and notice (P8.4): anything else isn't offered. */
+  rules?: MeetingRules | null;
   /** Selected times (ISO, UTC). */
   value: ReadonlyArray<string>;
   onChange: (value: string[]) => void;
@@ -111,13 +119,14 @@ function DayStrip({ days, active, marked, isFull, minDate, maxDate, onPick }: Da
 
 interface TimeGridProps {
   day: PickerDay;
+  groups: ReadonlyArray<TimeGroup>;
   isSelected: (time: string) => boolean;
   isPast: (time: string) => boolean;
   onToggle: (time: string) => void;
 }
 
 /** Half-hour chips for one day: morning and afternoon, and early or late times folded. */
-function TimeGrid({ day, isSelected, isPast, onToggle }: TimeGridProps) {
+function TimeGrid({ day, groups, isSelected, isPast, onToggle }: TimeGridProps) {
   const [showMore, setShowMore] = useState(false);
   const chips = (times: ReadonlyArray<string>) => (
     <div className="grid grid-cols-4 gap-1.5">
@@ -148,7 +157,7 @@ function TimeGrid({ day, isSelected, isPast, onToggle }: TimeGridProps) {
         {day.long}
       </p>
       <div className="space-y-3">
-        {TIME_GROUPS.map((group) => {
+        {groups.map((group) => {
           if (!group.folded) {
             return (
               <div key={group.label} role="group" aria-label={`${group.label}, ${day.long}`}>
@@ -182,13 +191,14 @@ function TimeGrid({ day, isSelected, isPast, onToggle }: TimeGridProps) {
 interface ProposalsProps {
   value: ReadonlyArray<string>;
   timeZone: string;
+  viewerTimeZone?: string;
   chooser: string;
   notice: string | null;
   onRemove: (iso: string) => void;
 }
 
 /** The chosen times as removable pills. */
-function Proposals({ value, timeZone, chooser, notice, onRemove }: ProposalsProps) {
+function Proposals({ value, timeZone, viewerTimeZone, chooser, notice, onRemove }: ProposalsProps) {
   return (
     <div className="rounded-2xl border border-dashed border-line-strong px-3.5 py-3" aria-live="polite">
       <div className="flex items-baseline justify-between gap-3">
@@ -209,7 +219,14 @@ function Proposals({ value, timeZone, chooser, notice, onRemove }: ProposalsProp
                 className="group inline-flex min-h-9 items-center gap-1.5 rounded-full bg-ink py-1 pr-2 pl-3 text-sm text-paper transition-colors hover:bg-ink-soft"
                 aria-label={`Quitar ${formatDay(iso, timeZone)} a las ${timeKey(new Date(iso), timeZone)}`}
               >
-                {formatSlotShort(iso, timeZone)}
+                <span className="flex flex-col items-start text-left leading-tight">
+                  {formatSlotShort(iso, timeZone)}
+                  {viewerTimeZone && zonesDiffer(iso, timeZone, viewerTimeZone) ? (
+                    <span className="text-xs text-paper/75">
+                      ({dateKey(new Date(iso), timeZone) === dateKey(new Date(iso), viewerTimeZone) ? timeKey(new Date(iso), viewerTimeZone) : formatSlotShort(iso, viewerTimeZone)} donde estás tú)
+                    </span>
+                  ) : null}
+                </span>
                 <X className="size-3.5 opacity-60 transition-opacity group-hover:opacity-100" aria-hidden />
               </button>
             </li>
@@ -227,12 +244,26 @@ function Proposals({ value, timeZone, chooser, notice, onRemove }: ProposalsProp
  * horizon) and half-hour chips. Tapping a time adds it; tapping it again, or
  * its pill, removes it.
  */
-export function SlotPicker({ timeZone, value, onChange, now, chooser, error }: SlotPickerProps) {
+export function SlotPicker({ timeZone, viewerTimeZone, rules, value, onChange, now, chooser, error }: SlotPickerProps) {
   const days = useMemo(() => upcomingDays(new Date(now), timeZone, VISIBLE_DAYS), [now, timeZone]);
-  const isPastOn = (key: string, time: string) => (zonedTimeToUtc(key, time, timeZone)?.getTime() ?? 0) <= now;
-  // Back on a day already chosen (step 2 and back, a reload); otherwise a useful day.
+  // Only the owner's hours are offered; their days and notice close the rest.
+  const groups = useMemo(
+    () => (rules ? TIME_GROUPS.map((g) => ({ ...g, times: g.times.filter((t) => inRange(t, rules)) })).filter((g) => g.times.length > 0) : TIME_GROUPS),
+    [rules],
+  );
+  const isPastOn = (key: string, time: string) => {
+    const instant = zonedTimeToUtc(key, time, timeZone);
+    if (!instant || instant.getTime() <= now) return true;
+    return rules ? !slotAllowed(instant.toISOString(), rules, timeZone, new Date(now)) : false;
+  };
+  const isFull = (key: string) => groups.every((g) => g.times.every((t) => isPastOn(key, t)));
+  // Back on a day already chosen (step 2 and back, a reload); otherwise a useful day that's open.
   const firstChosen = value.length > 0 ? dateKey(new Date(value[0]!), timeZone) : null;
-  const [activeKey, setActiveKey] = useState(() => firstChosen ?? openingDayKey(new Date(now), timeZone, days));
+  const [activeKey, setActiveKey] = useState(() => {
+    if (firstChosen) return firstChosen;
+    const opening = openingDayKey(new Date(now), timeZone, days);
+    return isFull(opening) ? (days.find((d) => !isFull(d.key))?.key ?? opening) : opening;
+  });
   const [extraDay, setExtraDay] = useState<PickerDay | null>(() =>
     firstChosen && !days.some((d) => d.key === firstChosen) ? pickerDay(firstChosen) : null,
   );
@@ -272,13 +303,14 @@ export function SlotPicker({ timeZone, value, onChange, now, chooser, error }: S
         days={strip}
         active={active.key}
         marked={marked}
-        isFull={(key) => TIME_GROUPS.every((g) => g.times.every((t) => isPastOn(key, t)))}
+        isFull={isFull}
         minDate={days[0]!.key}
         maxDate={dateKey(new Date(now + (HORIZON_DAYS - 1) * 86_400_000), timeZone)}
         onPick={pick}
       />
       <TimeGrid
         day={active}
+        groups={groups}
         isSelected={(time) => selected.has(`${active.key} ${time}`)}
         isPast={(time) => isPastOn(active.key, time)}
         onToggle={toggle}
@@ -286,6 +318,7 @@ export function SlotPicker({ timeZone, value, onChange, now, chooser, error }: S
       <Proposals
         value={value}
         timeZone={timeZone}
+        viewerTimeZone={viewerTimeZone}
         chooser={chooser}
         notice={notice}
         onRemove={(iso) => {

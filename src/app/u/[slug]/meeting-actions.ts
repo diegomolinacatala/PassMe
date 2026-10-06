@@ -7,6 +7,7 @@ import type { FieldErrors } from "@/lib/card/schema";
 import { checkSlug } from "@/lib/card/slug";
 import { verifyCaptcha } from "@/lib/captcha";
 import { getPublicCard } from "@/lib/data/cards";
+import { proposalOutsideRules } from "@/lib/meetings/settings";
 import { submitMeetingRequest } from "@/lib/data/meetings";
 import { createSharedRateLimiter } from "@/lib/data/rate-limits";
 import { isSupabaseConfigured } from "@/lib/env";
@@ -81,6 +82,9 @@ export async function submitMeetingAction(
 
   const card = await getPublicCard(cleanSlug);
   if (!card?.acceptsMeetingRequests) return { status: "error", message: CLOSED };
+  // The owner's settings (P8.4), checked here whatever the browser sent.
+  const outside = proposalOutsideRules(card, data);
+  if (outside) return { status: "error", message: "Revisa los campos marcados.", errors: outside };
   if (!(await cardLimiter.check(cleanSlug)).ok) {
     return { status: "error", message: "Esta tarjeta ha recibido muchas propuestas en poco tiempo. Prueba dentro de un rato." };
   }

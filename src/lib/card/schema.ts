@@ -1,12 +1,17 @@
 import { z } from "zod";
+import { meetingSettingsSchema } from "@/lib/meetings/settings";
+import { canonicalTimeZone } from "@/lib/meetings/time";
 import { HEX_COLOR_RE } from "./colors";
 import { PATTERN_SEED_MAX, TYPEFACES } from "./design";
 import { PATTERN_KINDS } from "./pattern";
 import { LINK_KINDS, normalizeLinkValue, toLinkKind } from "./links";
 import { checkSlug, SLUG_ERRORS } from "./slug";
+import { line, paragraph, toFieldErrors, tooLong, type FieldErrors } from "./text";
 import type { CardLink } from "./types";
 
 export const MAX_LINKS = 20;
+/** Mirrors profiles_time_zone_format (migration 20261006120000). */
+const TIME_ZONE_RE = /^[A-Za-z][A-Za-z0-9_+-]*(\/[A-Za-z0-9_+-]+){0,2}$/;
 export const LIMITS = {
   fullName: 80,
   headline: 80,
@@ -19,32 +24,7 @@ export const LIMITS = {
 } as const;
 
 const LINK_ID_RE = /^[A-Za-z0-9_-]{6,40}$/;
-// Control characters, plus the invisible and bidirectional ones that can disguise text
-// (zero-width space, LRM/RLM, embeddings and isolates, BOM). ZWJ/ZWNJ stay: emoji and scripts use them.
-const CONTROL_CHARS_RE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u200B\u200E\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g;
-
-const tooLong = (max: number) => `Máximo ${max} caracteres.`;
-
-/** Single-line text: strips control chars and collapses whitespace. */
-export const line = (max: number) =>
-  z
-    .string()
-    .transform((s) => s.replace(CONTROL_CHARS_RE, "").replace(/\s+/g, " ").trim())
-    .pipe(z.string().max(max, tooLong(max)));
-
-/** Multi-line text (bio): keeps newlines but caps consecutive blank lines. */
-export const paragraph = (max: number) =>
-  z
-    .string()
-    .transform((s) =>
-      s
-        .replace(/\r\n?/g, "\n")
-        .replace(CONTROL_CHARS_RE, "")
-        .replace(/[ \t]+/g, " ")
-        .replace(/\n{3,}/g, "\n\n")
-        .trim(),
-    )
-    .pipe(z.string().max(max, tooLong(max)));
+export { line, paragraph, toFieldErrors, type FieldErrors } from "./text";
 
 const linkSchema = z.object({
   id: z.string().regex(LINK_ID_RE, "Id de enlace no válido."),
@@ -73,6 +53,18 @@ export const cardInputSchema = z
     // Optional so an editor tab opened before this field existed can still save.
     acceptsContactRequests: z.boolean().optional(),
     acceptsMeetingRequests: z.boolean().optional(),
+    // The owner's zone, from their browser on each save. An unknown one is ignored (the column keeps its value).
+    timeZone: z
+      .string()
+      .max(64)
+      // Same shape as the profiles_time_zone_format CHECK: a zone it would refuse must never block a save.
+      .transform((zone) => {
+        const canonical = canonicalTimeZone(zone);
+        return canonical && TIME_ZONE_RE.test(canonical) ? canonical : undefined;
+      })
+      .optional(),
+    // «Ajustes de reuniones»: absent from editors opened before the migration.
+    meetingSettings: meetingSettingsSchema.optional(),
     links: z.array(linkSchema).max(MAX_LINKS, `Máximo ${MAX_LINKS} enlaces.`),
   })
   .superRefine((card, ctx) => {
@@ -108,18 +100,6 @@ export const cardInputSchema = z
 
 export type CardInput = z.input<typeof cardInputSchema>;
 export type ValidCardInput = z.output<typeof cardInputSchema>;
-
-/** Flat `path -> message` map (e.g. `links.2.value`) for inline form errors. */
-export type FieldErrors = Record<string, string>;
-
-export function toFieldErrors(error: z.ZodError): FieldErrors {
-  const errors: FieldErrors = {};
-  for (const issue of error.issues) {
-    const key = issue.path.map(String).join(".") || "_form";
-    errors[key] ??= issue.message;
-  }
-  return errors;
-}
 
 export type ParseCardResult =
   | { ok: true; data: ValidCardInput }

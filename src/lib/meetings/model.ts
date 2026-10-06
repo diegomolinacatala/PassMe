@@ -1,7 +1,7 @@
 import type { CalendarEvent } from "./calendar";
 import { FORMAT_LABELS, type MeetingFormat } from "./schema";
 import type { MeetingParty, MeetingState } from "./state";
-import { addMinutes, formatDay, formatTime, timeZoneCity } from "./time";
+import { addMinutes, formatDay, formatTime, otherZoneTime, timeZoneLabel } from "./time";
 
 /** A meeting proposal as the app works with it (see meeting_requests). */
 export interface Meeting extends MeetingState {
@@ -30,6 +30,10 @@ export interface MeetingOwner {
   id: string;
   name: string;
   slug: string;
+  /** The owner's zone (P8.1); undefined while the migration is pending, so their side reads the visitor's. */
+  timeZone?: string;
+  /** Their «Ajustes de reuniones» defaults (P8.4), offered on their own confirm form only. */
+  defaults?: { videoLink: string; place: string };
   /** Login email: where PassMe writes to the owner. */
   email: string | null;
   /**
@@ -65,10 +69,11 @@ export function describeWhere(meeting: { format: MeetingFormat; location: string
   }
 }
 
-/** "martes, 7 de octubre · 10:00–10:30 (hora de Madrid)" */
-export function describeWhen(start: string, durationMinutes: number, timeZone: string): string {
+/** "martes, 7 de octubre · 10:00–10:30 (hora de Madrid; 09:00, hora de Canarias)": the other zone only if it differs. */
+export function describeWhen(start: string, durationMinutes: number, timeZone: string, otherTimeZone?: string | null): string {
   const end = addMinutes(start, durationMinutes);
-  return `${formatDay(start, timeZone)} · ${formatTime(start, timeZone)}–${formatTime(end, timeZone)} (hora de ${timeZoneCity(timeZone)})`;
+  const other = otherZoneTime(start, timeZone, otherTimeZone);
+  return `${formatDay(start, timeZone)} · ${formatTime(start, timeZone)}–${formatTime(end, timeZone)} (${timeZoneLabel(timeZone)}${other ? `; ${other}` : ""})`;
 }
 
 /** "el martes 7 de octubre a las 10:00" */

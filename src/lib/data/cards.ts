@@ -1,4 +1,6 @@
 import "server-only";
+import { parseMeetingSettings, rulesOf } from "@/lib/meetings/settings";
+import { canonicalTimeZone } from "@/lib/meetings/time";
 import { randomBytes } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { cache } from "react";
@@ -27,7 +29,14 @@ const MISSING_COLUMN_CODES = new Set(["PGRST204", "42703"]);
 
 type DesignWrite = Pick<
   Database["public"]["Tables"]["profiles"]["Update"],
-  "detail_color" | "pattern" | "pattern_seed" | "typeface" | "accepts_contact_requests" | "accepts_meeting_requests"
+  | "detail_color"
+  | "pattern"
+  | "pattern_seed"
+  | "typeface"
+  | "accepts_contact_requests"
+  | "accepts_meeting_requests"
+  | "time_zone"
+  | "meeting_settings"
 >;
 type DbError = { code?: string; message?: string } | null;
 
@@ -38,11 +47,13 @@ type DbError = { code?: string; message?: string } | null;
  *   20260929130000_contact_requests.sql → accepts_contact_requests
  *   20261001120000_motif_refresh.sql    → the 2026-10 motifs (arco, corriente, persiana, pliegue)
  *   20261002120000_meeting_requests.sql → accepts_meeting_requests
+ *   20261006120000_owner_timezone_meeting_settings.sql → time_zone, meeting_settings
  */
 function unsupportedDesignFields(error: DbError): ReadonlyArray<keyof DesignWrite> {
   if (!error?.code) return [];
   const message = error.message ?? "";
   if (MISSING_COLUMN_CODES.has(error.code)) {
+    if (/time_zone|meeting_settings/.test(message)) return ["time_zone", "meeting_settings"];
     if (/accepts_contact_requests/.test(message)) return ["accepts_contact_requests"];
     if (/accepts_meeting_requests/.test(message)) return ["accepts_meeting_requests"];
     if (/detail_color|pattern/.test(message)) return ["detail_color", "pattern", "pattern_seed", "typeface"];
@@ -101,7 +112,14 @@ export function toPublicCard(card: OwnerCard | PublicCard): PublicCard {
     links: card.links.filter((l) => l.visible),
     acceptsContactRequests: card.acceptsContactRequests,
     acceptsMeetingRequests: card.acceptsMeetingRequests,
+    timeZone: card.timeZone,
+    meetingRules: card.meetingRules ?? null,
   };
+}
+
+/** Undefined while migration 20261006120000 is pending (the column isn't there). */
+function storedTimeZone(value: unknown): string | undefined {
+  return canonicalTimeZone(value) ?? undefined;
 }
 
 interface DesignColumns {
@@ -146,7 +164,15 @@ export function rowToOwnerCard(row: ProfileRow): OwnerCard {
     acceptsMeetingRequests: row.accepts_meeting_requests === true,
     isPublished: row.is_published,
     updatedAt: row.updated_at,
+    ...ownerMeetingFields(row),
   };
+}
+
+/** Zone and meeting settings, or nothing at all while migration 20261006120000 is pending. */
+function ownerMeetingFields(row: ProfileRow): Pick<OwnerCard, "timeZone" | "meetingSettings" | "meetingRules"> {
+  if (row.meeting_settings === undefined) return { timeZone: storedTimeZone(row.time_zone), meetingSettings: null, meetingRules: null };
+  const settings = parseMeetingSettings(row.meeting_settings);
+  return { timeZone: storedTimeZone(row.time_zone), meetingSettings: settings, meetingRules: rulesOf(settings) };
 }
 
 interface PublicCardJson extends DesignColumns {
@@ -160,6 +186,9 @@ interface PublicCardJson extends DesignColumns {
   avatar_path?: string | null;
   accepts_contact_requests?: boolean;
   accepts_meeting_requests?: boolean;
+  time_zone?: string;
+  /** The settings without the private defaults (get_public_card strips them). */
+  meeting_rules?: Json;
   links?: Json;
 }
 
@@ -179,6 +208,8 @@ function jsonToPublicCard(json: PublicCardJson): PublicCard | null {
     links: sanitizeStoredLinks(json.links).filter((l) => l.visible),
     acceptsContactRequests: json.accepts_contact_requests === true,
     acceptsMeetingRequests: json.accepts_meeting_requests === true,
+    timeZone: storedTimeZone(json.time_zone),
+    meetingRules: json.meeting_rules === undefined ? null : rulesOf(parseMeetingSettings(json.meeting_rules)),
   };
 }
 
@@ -333,6 +364,8 @@ function designColumns(input: ValidCardInput): DesignWrite {
     typeface: input.typeface,
     ...(input.acceptsContactRequests === undefined ? {} : { accepts_contact_requests: input.acceptsContactRequests }),
     ...(input.acceptsMeetingRequests === undefined ? {} : { accepts_meeting_requests: input.acceptsMeetingRequests }),
+    ...(input.timeZone ? { time_zone: input.timeZone } : {}),
+    ...(input.meetingSettings ? { meeting_settings: input.meetingSettings as unknown as Json } : {}),
   };
 }
 
@@ -390,7 +423,8 @@ export async function saveOwnerCard(
     slugChanged: current.slug !== data.slug,
     previousSlug: current.slug,
     changed: current.updated_at !== data.updated_at,
-    designPending: dropped.length > 0,
+    // The zone goes with every save: missing it (migration pending) isn't news for the owner.
+    designPending: dropped.some((field) => field !== "time_zone"),
   };
 }
 

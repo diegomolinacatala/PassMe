@@ -17,7 +17,7 @@ import { linkHref } from "@/lib/card/links";
 import { describeWhere, displayName, firstName, formatDuration, hasMapLink } from "@/lib/meetings/model";
 import { MEETING_LIMITS } from "@/lib/meetings/schema";
 import type { MeetingAction } from "@/lib/meetings/state";
-import { addMinutes, formatDay, formatTime, timeZoneCity } from "@/lib/meetings/time";
+import { addMinutes, formatDay, formatTime, otherZoneTime, timeZoneLabel } from "@/lib/meetings/time";
 import { viewGoogleCalendarUrl, type MeetingView } from "@/lib/meetings/view";
 import { FORMAT_ICONS, useClientNow } from "./shared";
 import { SlotPicker } from "./slot-picker";
@@ -159,6 +159,7 @@ function Summary({ view }: { view: MeetingView }) {
             <span className="first-letter:uppercase">
               {formatDay(start, view.timeZone)}, {formatTime(start, view.timeZone)}–{formatTime(addMinutes(start, view.durationMinutes), view.timeZone)}
             </span>
+            <OtherZone iso={start} view={view} />
           </Fact>
         ) : null}
         <Fact label="Cómo">
@@ -259,7 +260,7 @@ function ConfirmPanel({
   onMode,
   returnFocus,
 }: PanelProps & { selected: string | null; onSelect: (slot: string) => void; onMode: (mode: Mode) => void; returnFocus: Mode | null }) {
-  const [location, setLocation] = useState(view.location);
+  const [location, setLocation] = useState(view.location || view.suggestedLocation);
   const counterButton = useRef<HTMLButtonElement>(null);
   const declineButton = useRef<HTMLButtonElement>(null);
   // Back from "Proponer otras horas" or "No puedo": focus returns to the button that opened it.
@@ -273,7 +274,7 @@ function ConfirmPanel({
         <input type="hidden" name="intent" value="confirm" />
         <fieldset>
           <legend className="mb-2 text-sm font-medium text-ink-soft">
-            Elige una hora <span className="font-normal text-muted">(hora de {timeZoneCity(view.timeZone)})</span>
+            Elige una hora <span className="font-normal text-muted">({timeZoneLabel(view.timeZone)})</span>
           </legend>
           <div className="space-y-2">
             {view.openSlots.map((slot) => {
@@ -299,6 +300,7 @@ function ConfirmPanel({
                     <span className="block font-mono text-sm text-muted tabular-nums">
                       {formatTime(slot, view.timeZone)}–{formatTime(addMinutes(slot, view.durationMinutes), view.timeZone)}
                     </span>
+                    <OtherZone iso={slot} view={view} />
                   </span>
                 </label>
               );
@@ -392,7 +394,7 @@ function QuickConfirm({ view, act, pending, slot, onExpand, onMode }: PanelProps
       <form action={act} className="space-y-3">
         <input type="hidden" name="intent" value="confirm" />
         <input type="hidden" name="slot" value={slot} />
-        <input type="hidden" name="location" value={view.location} />
+        <input type="hidden" name="location" value={view.location || view.suggestedLocation} />
         <h2 ref={heading} tabIndex={-1} className="font-display text-2xl leading-tight outline-none">
           ¿Confirmas el <strong className="font-medium">{shortDay(slot, view.timeZone)}</strong> a las{" "}
           <strong className="font-medium text-signal-deep">{time}</strong>?
@@ -442,7 +444,7 @@ function CounterPanel({ view, act, pending, errors, onBack }: PanelProps & { onB
             Proponer otras horas
           </h2>
           <p className="mt-1 text-sm text-muted">
-            Hasta tres (hora de {timeZoneCity(view.timeZone)}). {other} recibirá un email para elegir una.
+            Hasta tres ({timeZoneLabel(view.timeZone)}). {other} recibirá un email para elegir una.
           </p>
         </div>
         {now > 0 ? (
@@ -705,4 +707,12 @@ export function MeetingResponse({ id, signature, initial, preset, demo }: Meetin
       <Footer view={view} />
     </div>
   );
+}
+
+/** "(09:00, hora de Canarias, la de Marta)" under a time, only when the other side's clock reads differently. */
+function OtherZone({ iso, view }: { iso: string; view: MeetingView }) {
+  const other = otherZoneTime(iso, view.timeZone, view.otherTimeZone);
+  if (!other) return null;
+  const name = view.party === "owner" ? view.guest.name : view.owner.name;
+  return <span className="block text-xs text-muted">({other}, la de {name.split(/\s+/)[0]})</span>;
 }

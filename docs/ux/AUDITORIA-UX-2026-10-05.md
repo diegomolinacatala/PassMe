@@ -594,13 +594,13 @@ Origen: EDIT-03, EDIT-04, EDIT-07–09, EDIT-12, EDIT-13, EDIT-16, EDIT-17, EDIT
 
 Cambios de más calado. Cada uno, si es grande, en su propio PR.
 
-**P8.1 · Zona horaria del dueño** [A] · MEET-02
+**✅ P8.1 · Zona horaria del dueño** [A] · MEET-02
 - Migración nueva: columna de zona horaria en la tarjeta (por defecto `Europe/Madrid`), tomada del navegador al guardar en el editor. Fallback sin la migración: `Europe/Madrid`.
 - El selector del visitante trabaja en la hora del dueño («hora de Madrid, la de Alex») y, si la del visitante es distinta, añade bajo cada pastilla «(09:00 donde estás tú)». Emails y páginas: cada parte ve su zona y, si difieren, la otra entre paréntesis.
 - Nombres de zona en español (`Intl.DateTimeFormat("es-ES", { timeZone, timeZoneName: "longGeneric" })` o un mapa corto: Canarias, Nueva York, Ciudad de México, Londres, Lisboa…). Hoy salen «Canary», «New York».
 - ✔ Visitante en `Atlantic/Canary`, dueño en `Europe/Madrid`: el email y la página del dueño muestran la hora de Madrid (o las dos); nunca aparece un nombre de zona en inglés.
 
-**P8.2 · Avisar al invitado cuando su propuesta caduca** [M] · MEET-01 (parte 2)
+**✅ P8.2 · Avisar al invitado cuando su propuesta caduca** [M] · MEET-01 (parte 2)
 - Email de texto fijo al caducar (desde el cron diario de limpieza), dentro de los topes existentes por dirección y del presupuesto global (`MEETING_EMAIL_DAILY_BUDGET`): asunto «Tu propuesta a Alex ha caducado», botón «Proponer otras horas».
 - ✔ Test del cron con una propuesta caducada.
 
@@ -609,22 +609,22 @@ Cambios de más calado. Cada uno, si es grande, en su propio PR.
 - Reunión confirmada: «Cambiar hora» junto a «Cancelar reunión», que reutiliza el flujo de contrapropuesta con el mismo UID y deja la reunión pendiente hasta que el otro elija (revisar `allowedActions` en `state.ts`).
 - ✔ En Gmail, al confirmar aparece el evento sin tocar nada; al cancelar desaparece; mover la hora actualiza el mismo evento (Diego lo verifica con cuentas reales).
 
-**P8.4 · Ajustes de reuniones** [M] · MEET-17
+**✅ P8.4 · Ajustes de reuniones** [M] · MEET-17
 - Migración nueva. Bajo el interruptor, «Ajustes de reuniones» plegado: formatos aceptados (En persona / Videollamada / Llamada), días (L–V por defecto) y franja (9:00–19:00), duración habitual (30 min), enlace de videollamada por defecto (lista blanca), lugar habitual, antelación mínima (2 h). El selector del visitante solo ofrece lo permitido, y el servidor lo valida.
 - ✔ Con «solo L–V 9–14» guardado, el selector no ofrece sábados ni tardes; con «Llamada» desmarcada no aparece esa opción.
 
-**P8.5 · Despublicar con confirmación y pase en pausa** [M] · LIFE-09
+**✅ P8.5 · Despublicar con confirmación y pase en pausa** [M] · LIFE-09 (sin `voided`: ver `PROGRESO-UX.md`)
 - Diálogo al desactivar «Publicada»: «¿Despublicar tu tarjeta? Quien escanee tu QR (también los impresos) verá que no está disponible y tu pase quedará en pausa. Puedes volver a publicarla cuando quieras.» [Despublicar] [Cancelar].
 - Al despublicar: push del pase de Apple con `voided: true` y un aviso «Tarjeta en pausa»; en Google, `state: "INACTIVE"` (si `GOOGLE_WALLET_LIVE`). Al republicar, restaurarlo. Al borrar la cuenta, empujar el pase anulado antes de borrar los registros. (Ya está en el backlog de `CLAUDE.md`: «que despublicar desactive los pases».)
 - ✔ Tras despublicar, el pase aparece anulado en el iPhone y vuelve a activo al republicar (Diego lo verifica).
 
-**P8.6 · Landing: Android, alternativas y preguntas** [M] · LIFE-13, LIFE-16
+**✅ P8.6 · Landing: Android, alternativas y preguntas** [M] · LIFE-13, LIFE-16
 - Subtítulo del hero sin gestos de una sola plataforma: «Enseñas un QR y tu contacto aparece en su móvil, sea iPhone o Android. Nadie instala nada, y tú eliges qué datos se ven.» Paso 03: «En iPhone, doble clic al botón lateral…» solo si 3.3.1 lo confirma; si no, «Abres la Cartera…».
 - Antes del CTA final, «Preguntas rápidas» (`<details>`, cerradas): ¿La otra persona necesita una app? · ¿En qué se diferencia de NameDrop o de un Linktree? · ¿Cuánto cuesta? · ¿Qué datos guardáis? · ¿Y si me arrepiento?
 - En escritorio, bajo el teléfono de muestra: «Pruébalo: escanéalo con tu móvil →» (el QR ya es real).
 - ✔ El hero no menciona gestos de una sola plataforma; existen las 5 preguntas; la pista se ve a 1440 px.
 
-**P8.7 · Textos legales legibles** [B] · LIFE-15
+**✅ P8.7 · Textos legales legibles** [B] · LIFE-15
 - `src/components/legal/legal-page.tsx` + `src/lib/legal.ts`: bloque «En 30 segundos» tras la introducción (4 viñetas: solo pedimos tu email; lo oculto no se ve; sin cookies de seguimiento ni IPs en las estadísticas; lo borras todo con un botón), índice con anclas a todas las secciones (`id` en cada una) y fecha actualizada («octubre de 2026»).
 - ✔ El índice salta a cada sección en el móvil y la fecha coincide con el último cambio.
 
@@ -674,4 +674,4 @@ Cuando estén fusionados P1–P7, repite la auditoría con la misma metodología
 - [ ] axe sin violaciones (incluidas `moderate`) en todas las rutas y estados de error.
 - [ ] `rg` del glosario: ningún término descartado en textos visibles.
 - [ ] En cada pantalla, como mucho un botón `signal`.
-- [ ] `npm run lint`, `typecheck`, `test` y `e2e:demo` en verde.
+- [x] `npm run lint`, `typecheck`, `test` y `e2e:demo` en verde (rama P8, que lleva P1–P8: 435 unitarios y de base de datos, 338 E2E).

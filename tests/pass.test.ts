@@ -246,3 +246,35 @@ describe("avatar downloads", () => {
     expect(await fetchAvatar("https://x.supabase.co/storage/v1/object/public/avatars/u/c.png")).toBeNull();
   });
 });
+
+describe("paused passes (P8.5: unpublished card)", () => {
+  it("says the Apple pass is paused while the card is unpublished (without voiding it)", () => {
+    const json = buildApplePassJson({ card, serialNumber: "x", paused: true }, appleConfig);
+    // Voiding could be permanent in Wallet; unpublishing isn't.
+    expect(json).not.toHaveProperty("voided");
+    expect(json.storeCard.auxiliaryFields[0]).toEqual({ key: "status", label: "ESTADO", value: "Tarjeta en pausa" });
+    // Store cards show at most four secondary + auxiliary fields: the status is never the one dropped.
+    expect(json.storeCard.secondaryFields.length + json.storeCard.auxiliaryFields.length).toBeLessThanOrEqual(4);
+  });
+
+  it("restores a normal pass once the card is published again", () => {
+    for (const json of [
+      buildApplePassJson({ card, serialNumber: "x", paused: false }, appleConfig),
+      buildApplePassJson({ card, serialNumber: "x" }, appleConfig),
+    ]) {
+      expect(json).not.toHaveProperty("voided");
+      expect(json.storeCard.auxiliaryFields.map((f) => f.key)).not.toContain("status");
+    }
+  });
+
+  it("sets the Google object INACTIVE only when paused", () => {
+    const googleConfig: GoogleWalletConfig = {
+      issuerId: "3388000000012345678",
+      serviceAccountEmail: "wallet@passme-test.iam.gserviceaccount.com",
+      privateKey: "unused",
+      classSuffix: "passme_card_v1",
+    };
+    expect(buildGenericObject(googleConfig, { card, profileId: DEMO_CARD.id, paused: true }).state).toBe("INACTIVE");
+    expect(buildGenericObject(googleConfig, { card, profileId: DEMO_CARD.id }).state).toBe("ACTIVE");
+  });
+});

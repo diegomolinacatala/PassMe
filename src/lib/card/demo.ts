@@ -1,4 +1,5 @@
 import type { ContactRequest } from "./contact";
+import { DEFAULT_MEETING_SETTINGS, rulesOf, type MeetingSettings } from "@/lib/meetings/settings";
 import type { OwnerCard } from "./types";
 
 /**
@@ -6,6 +7,14 @@ import type { OwnerCard } from "./types";
  * point in demo mode (no Supabase configured). Uses example.com-style data only.
  */
 export const DEMO_SLUG = "demo";
+
+const DEMO_MEETING_SETTINGS: MeetingSettings = {
+  ...DEFAULT_MEETING_SETTINGS,
+  weekdays: [1, 2, 3, 4, 5, 6, 7],
+  start: "08:00",
+  end: "21:00",
+  noticeMinutes: 0,
+};
 
 export const DEMO_CARD: OwnerCard = {
   id: "00000000-0000-4000-8000-000000000000",
@@ -26,6 +35,9 @@ export const DEMO_CARD: OwnerCard = {
   isPublished: true,
   acceptsContactRequests: true,
   acceptsMeetingRequests: true,
+  // Every day, every time the picker shows, no notice: the sample behaves as before P8.4.
+  meetingSettings: DEMO_MEETING_SETTINGS,
+  meetingRules: rulesOf(DEMO_MEETING_SETTINGS),
   updatedAt: "2026-09-27T00:00:00.000Z",
   links: [
     { id: "demo-email", kind: "email", value: "alex@example.com", visible: true },

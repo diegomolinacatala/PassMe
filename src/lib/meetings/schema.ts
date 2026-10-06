@@ -5,7 +5,7 @@
  */
 import { z } from "zod";
 import { normalizeLinkValue, parseHttpUrl } from "@/lib/card/links";
-import { line, paragraph, toFieldErrors, type FieldErrors } from "@/lib/card/schema";
+import { line, paragraph, toFieldErrors, type FieldErrors } from "@/lib/card/text";
 import { canonicalTimeZone, DEFAULT_TIME_ZONE } from "./time";
 
 export const MEETING_LIMITS = {
@@ -322,6 +322,9 @@ const videoLink = z
     url.protocol = "https:";
     return url.href;
   });
+
+/** The same allowlisted video link, for the owner's default (meeting settings). */
+export const videoLinkSchema = videoLink;
 
 export function confirmSchema(format: MeetingFormat) {
   return z.object({

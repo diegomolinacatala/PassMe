@@ -26,6 +26,8 @@ export interface ApplePassInput {
   /** Present when the web service is enabled, so Wallet can fetch updates. */
   authenticationToken?: string;
   avatar?: Buffer | null;
+  /** The card is unpublished: the pass says "Tarjeta en pausa" until it's published again. */
+  paused?: boolean;
 }
 
 interface PassField {
@@ -85,6 +87,8 @@ export function buildApplePassJson(input: ApplePassInput, config: Pick<AppleWall
   const auxiliaryFields: PassField[] = card.pronouns
     ? [{ key: "pronouns", label: "PRONOMBRES", value: card.pronouns }]
     : [];
+  // Paused first, so it's never the field pushed out of the row.
+  if (input.paused) auxiliaryFields.unshift({ key: "status", label: "ESTADO", value: "Tarjeta en pausa" });
 
   const webService =
     config.webServiceEnabled && input.authenticationToken
@@ -103,6 +107,8 @@ export function buildApplePassJson(input: ApplePassInput, config: Pick<AppleWall
     foregroundColor: toRgbString(palette.foreground),
     labelColor: toRgbString(palette.label),
     sharingProhibited: false,
+    // Not `voided`: Wallet may never bring a voided pass back, and unpublishing is
+    // reversible. The "Tarjeta en pausa" field says it instead (see PROGRESO-UX.md, P8.5).
     storeCard: {
       // The name is set in the strip artwork; VoiceOver reads it from `description`.
       primaryFields: [],

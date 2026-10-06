@@ -1,4 +1,6 @@
-import { ArrowUpRight, Check, EyeOff, RefreshCw, ShieldCheck, Trash2 } from "lucide-react";
+import { ArrowUpRight, Check, ChevronDown, EyeOff, RefreshCw, ShieldCheck, Trash2 } from "lucide-react";
+import Link from "next/link";
+import type { ReactNode } from "react";
 import { BrandMotif } from "@/components/brand/brand-motif";
 import { LinkIcon } from "@/components/card/link-icon";
 import { WalletPass } from "@/components/card/wallet-pass";
@@ -57,7 +59,10 @@ function steps(googleWallet: boolean) {
     {
       n: "03",
       title: "Enséñala en un segundo",
-      body: "Doble clic al botón lateral, muestras el QR y la otra persona guarda tu contacto con lo que tú has decidido compartir.",
+      // Not "double-press the side button": on iPhone that opens the payment cards, and a store pass may not be there.
+      body: googleWallet
+        ? "Abres la Cartera, enseñas el QR y la otra persona guarda tu contacto con lo que tú has decidido compartir."
+        : "Abres la Cartera (en Android, «Mi QR»), enseñas el QR y la otra persona guarda tu contacto con lo que tú has decidido compartir.",
     },
   ];
 }
@@ -220,6 +225,72 @@ export function AlwaysUpdated({ card, googleWallet }: { card: PublicCard; google
           <div className="w-[46%] max-w-[270px] rotate-2">
             <WalletPass card={after} />
           </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+const QUESTIONS: Array<{ question: string; answer: ReactNode }> = [
+  {
+    question: "¿La otra persona necesita una app?",
+    answer:
+      "No. Escanea tu QR con la cámara de su móvil, ve tu tarjeta en el navegador y guarda tu contacto con un toque. Funciona igual en iPhone que en Android.",
+  },
+  {
+    question: "¿En qué se diferencia de NameDrop o de un Linktree?",
+    answer:
+      "NameDrop solo funciona entre dos iPhone que se tocan. Un Linktree es una lista de enlaces. PassMe es una tarjeta de visita: vive en la cartera de tu móvil, la abre cualquier móvil con cámara, la otra persona la guarda en sus contactos y tú decides qué datos se ven.",
+  },
+  {
+    question: "¿Cuánto cuesta?",
+    answer:
+      "Nada. Tu tarjeta, tu QR y tu pase son gratis para siempre. Si algún día añadimos funciones de pago, serán opcionales y nunca te cobraremos sin que lo aceptes.",
+  },
+  {
+    question: "¿Qué datos guardáis?",
+    answer: (
+      <>
+        Tu email, para que entres sin contraseña, y lo que escribas en tu tarjeta. Lo que ocultas nunca llega a quien la
+        visita, y las estadísticas no guardan IPs ni usan cookies de seguimiento. Todo el detalle está en{" "}
+        <Link href="/privacidad" className="underline underline-offset-2 hover:text-ink">
+          la política de privacidad
+        </Link>
+        .
+      </>
+    ),
+  },
+  {
+    question: "¿Y si me arrepiento?",
+    answer:
+      "Despublica tu tarjeta cuando quieras: quien escanee tu QR verá que no está disponible y tu pase quedará en pausa. O borra tu cuenta desde el editor y se borra todo, también tu foto.",
+  },
+];
+
+/** «Preguntas rápidas»: native <details>, closed, so it works without JavaScript and with any screen reader. */
+export function QuickQuestions() {
+  return (
+    <section id="preguntas" aria-labelledby="preguntas-title" className="scroll-mt-10">
+      <div className="mx-auto grid max-w-[1240px] grid-cols-1 gap-10 px-5 pb-24 sm:px-8 sm:pb-32 lg:grid-cols-12">
+        <div className="lg:col-span-4">
+          <p className="eyebrow">Antes de empezar</p>
+          <h2 id="preguntas-title" className="mt-4 font-display text-[length:var(--text-display)] leading-[0.95] tracking-tight">
+            Preguntas <em className="text-signal">rápidas.</em>
+          </h2>
+        </div>
+        <div className="divide-y divide-ink/10 border-y hairline lg:col-span-8">
+          {QUESTIONS.map(({ question, answer }) => (
+            <details key={question} className="group">
+              <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 rounded-lg py-4 text-lg font-medium tracking-tight [&::-webkit-details-marker]:hidden">
+                {question}
+                <ChevronDown
+                  className="size-5 shrink-0 text-muted transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none"
+                  aria-hidden
+                />
+              </summary>
+              <p className="max-w-2xl pb-6 leading-relaxed text-ink-soft">{answer}</p>
+            </details>
+          ))}
         </div>
       </div>
     </section>

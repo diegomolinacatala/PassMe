@@ -1,3 +1,4 @@
+import type { MeetingRules, MeetingSettings } from "@/lib/meetings/settings";
 import type { Typeface } from "./design";
 import type { LinkKind } from "./links";
 import type { PatternKind } from "./pattern";
@@ -39,6 +40,10 @@ export interface CardData {
   acceptsContactRequests: boolean;
   /** Shows "Agendar reunión" on the public card. */
   acceptsMeetingRequests: boolean;
+  /** Owner's IANA time zone (migration 20261006120000); undefined before it, so the picker uses the visitor's. */
+  timeZone?: string;
+  /** What visitors may propose (public part of the meeting settings); null or undefined = no limits. */
+  meetingRules?: MeetingRules | null;
 }
 
 /** What anonymous visitors receive: only visible links, no internal ids. */
@@ -50,4 +55,6 @@ export interface OwnerCard extends CardData {
   avatarPath: string | null;
   isPublished: boolean;
   updatedAt: string;
+  /** «Ajustes de reuniones», including the private defaults; null while the migration is pending. */
+  meetingSettings?: MeetingSettings | null;
 }

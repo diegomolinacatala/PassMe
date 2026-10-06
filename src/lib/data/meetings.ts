@@ -9,6 +9,8 @@ import type { MeetingRequestRow } from "@/lib/supabase/database.types";
 import type { TypedSupabaseClient } from "@/lib/supabase/server";
 import { getPublicCard } from "./cards";
 import { getOwnerEmail } from "./contact-requests";
+import { parseMeetingSettings } from "@/lib/meetings/settings";
+import { canonicalTimeZone } from "@/lib/meetings/time";
 import { isUuid } from "./wallet";
 
 /** Postgres / PostgREST codes for "that table or function doesn't exist" (migration pending). */
@@ -95,19 +97,38 @@ export async function getMeetingRecord(id: string): Promise<MeetingRecord | null
     return null;
   }
   if (!data) return null;
-  const { data: profile, error: profileError } = await admin
-    .from("profiles")
-    .select("id, slug, full_name")
-    .eq("id", data.profile_id)
-    .maybeSingle();
+  const { profile, error: profileError } = await findMeetingOwner(admin, data.profile_id);
   if (profileError || !profile) {
     if (profileError) log.warn("meeting owner lookup failed", { id }, profileError);
     return null;
   }
   return {
     meeting: rowToMeeting(data as MeetingRequestRow),
-    owner: { id: profile.id, slug: profile.slug, name: profile.full_name, email: null },
+    owner: {
+      id: profile.id,
+      slug: profile.slug,
+      name: profile.full_name,
+      email: null,
+      ...(canonicalTimeZone(profile.time_zone) ? { timeZone: canonicalTimeZone(profile.time_zone)! } : {}),
+      ...(profile.meeting_settings === undefined ? {} : { defaults: ownerDefaults(profile.meeting_settings) }),
+    },
   };
+}
+
+/** Postgres / PostgREST codes for a missing column (migration 20261006120000 pending). */
+const MISSING_COLUMN_CODES = new Set(["42703", "PGRST204"]);
+
+/** The card's owner, with their zone when the column exists. */
+async function findMeetingOwner(admin: NonNullable<ReturnType<typeof createAdminSupabase>>, profileId: string) {
+  const withZone = await admin.from("profiles").select("id, slug, full_name, time_zone, meeting_settings").eq("id", profileId).maybeSingle();
+  if (!withZone.error || !MISSING_COLUMN_CODES.has(withZone.error.code ?? "")) return { profile: withZone.data, error: withZone.error };
+  const plain = await admin.from("profiles").select("id, slug, full_name").eq("id", profileId).maybeSingle();
+  return { profile: plain.data ? { ...plain.data, time_zone: undefined, meeting_settings: undefined } : null, error: plain.error };
+}
+
+function ownerDefaults(raw: unknown): { videoLink: string; place: string } {
+  const { videoLink, place } = parseMeetingSettings(raw);
+  return { videoLink, place };
 }
 
 /** Same guard the guest's own address goes through: nothing that could smuggle headers. */
@@ -152,6 +173,58 @@ export async function updateMeeting(id: string, expectedSequence: number, patch:
     return null;
   }
   return data ? rowToMeeting(data as MeetingRequestRow) : null;
+}
+
+export interface UnansweredProposal {
+  meeting: Meeting;
+  owner: MeetingOwner;
+  /** Whether the card is published and still takes proposals (so «Proponer otras horas» works). */
+  takesProposals: boolean;
+}
+
+/**
+ * Visitors' proposals still waiting for the owner and touched in the last
+ * `sinceDays` (cron only, admin client). The caller picks the expired ones.
+ */
+export async function listUnansweredGuestProposals(now: Date, sinceDays: number): Promise<UnansweredProposal[]> {
+  const admin = createAdminSupabase();
+  if (!admin) return [];
+  const since = new Date(now.getTime() - sinceDays * 86_400_000).toISOString();
+  const { data, error } = await admin
+    .from("meeting_requests")
+    .select(COLUMNS)
+    .eq("status", "pending")
+    .eq("proposed_by", "guest")
+    .gte("updated_at", since)
+    .order("updated_at", { ascending: false })
+    .limit(MAX_LISTED * 5);
+  if (error) {
+    if (!MISSING_RELATION_CODES.has(error.code ?? "")) log.warn("unanswered proposals lookup failed", {}, error);
+    return [];
+  }
+  const rows = (data ?? []) as MeetingRequestRow[];
+  const ownerIds = [...new Set(rows.map((row) => row.profile_id))];
+  if (ownerIds.length === 0) return [];
+  const { data: profiles, error: profileError } = await admin
+    .from("profiles")
+    .select("id, slug, full_name, is_published, accepts_meeting_requests")
+    .in("id", ownerIds);
+  if (profileError) {
+    log.warn("proposal owners lookup failed", {}, profileError);
+    return [];
+  }
+  const owners = new Map((profiles ?? []).map((profile) => [profile.id, profile]));
+  return rows.flatMap((row) => {
+    const profile = owners.get(row.profile_id);
+    if (!profile) return [];
+    return [
+      {
+        meeting: rowToMeeting(row),
+        owner: { id: profile.id, slug: profile.slug, name: profile.full_name, email: null },
+        takesProposals: Boolean(profile.is_published && profile.accepts_meeting_requests),
+      },
+    ];
+  });
 }
 
 export interface OwnMeetings {

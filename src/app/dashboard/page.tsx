@@ -86,7 +86,14 @@ async function welcomeFor(query: Record<string, string | string[] | undefined>, 
 
 function meetingItems(meetings: Meeting[], card: OwnerCard, demo: boolean): MeetingItem[] {
   const now = new Date();
-  const owner = { id: card.id, name: card.fullName, slug: card.slug, email: null };
+  const owner = {
+    id: card.id,
+    name: card.fullName,
+    slug: card.slug,
+    email: null,
+    ...(card.timeZone ? { timeZone: card.timeZone } : {}),
+    ...(card.meetingSettings ? { defaults: { videoLink: card.meetingSettings.videoLink, place: card.meetingSettings.place } } : {}),
+  };
   return meetings.map((meeting) => ({
     view: toMeetingView(meeting, owner, "owner", now),
     // Every demo sample has its own page (/reunion/demo…/anfitrion).

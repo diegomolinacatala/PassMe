@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { LegalPage, type LegalSection } from "@/components/legal/legal-page";
-import { getLegalIdentity } from "@/lib/legal";
+import { getLegalIdentity, PRIVACY_SUMMARY } from "@/lib/legal";
 
 export const metadata: Metadata = { title: "Privacidad" };
 
@@ -53,7 +53,7 @@ export default function PrivacyPage() {
       title: "Si usas «Agendar reunión»",
       body: [
         "Cuando usas «Agendar reunión» en la tarjeta de alguien, guardamos lo que escribes (nombre, email, teléfono si lo das, empresa y tema), las horas que propones y cómo queréis veros. Su dueño lo ve en su editor y en la página de la reunión.",
-        "Para organizarla, PassMe hace de intermediario por email. Al dueño le enviamos las horas que propones, cómo queréis veros, tu nombre y tu empresa; el lugar, el tema y tus notas los ve en la página de la reunión. A ti te escribimos solo cuando responde (confirmación, otras horas o un no) o cuando alguno cancela, con un texto fijo de PassMe y, si se confirma, la invitación de calendario (.ics); sus notas las ves en tu página de la reunión. No te enviamos nada más ni te apuntamos a ninguna lista, y limitamos cuántos correos puede recibir una misma dirección.",
+        "Para organizarla, PassMe hace de intermediario por email. Al dueño le enviamos las horas que propones, cómo queréis veros, tu nombre y tu empresa; el lugar, el tema y tus notas los ve en la página de la reunión. A ti te escribimos solo cuando responde (confirmación, otras horas o un no), cuando alguno cancela o si tu propuesta caduca sin respuesta, con un texto fijo de PassMe y, si se confirma, la invitación de calendario (.ics); sus notas las ves en tu página de la reunión. No te enviamos nada más ni te apuntamos a ninguna lista, y limitamos cuántos correos puede recibir una misma dirección.",
         "El email del dueño solo te llega cuando confirma la reunión, dentro de la invitación, para que podáis hablar. Los correos de confirmación permiten responder directamente a la otra persona.",
         "Cada parte gestiona la reunión desde un enlace personal que le enviamos por email. Quien tenga ese enlace puede verla y responder, así que no lo compartas.",
         "La base legal es tu consentimiento (la casilla del formulario) y la gestión de lo que tú mismo pides. Puedes cancelar la propuesta o la reunión desde tu enlace, o escribirnos.",
@@ -108,6 +108,7 @@ export default function PrivacyPage() {
     <LegalPage
       title="Privacidad"
       intro="PassMe existe para que compartas solo lo que quieras. Esta página explica, sin letra pequeña, qué datos tratamos y por qué."
+      summary={PRIVACY_SUMMARY}
       sections={sections}
     />
   );
