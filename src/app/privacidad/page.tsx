@@ -99,7 +99,7 @@ export default function PrivacyPage() {
     {
       title: "Cookies",
       body: [
-        "Solo usamos cookies técnicas: para mantener tu sesión iniciada y para recordar qué avisos del editor ya has visto. El almacenamiento del navegador sirve para no contar dos veces la misma visita, guardar tu tarjeta a medio crear mientras entras y no repetirte consejos que ya has cerrado. No hay cookies de analítica ni de publicidad, por eso no verás un banner de cookies.",
+        "Solo usamos cookies técnicas: para mantener tu sesión iniciada y para recordar qué avisos del editor ya has visto. El almacenamiento del navegador sirve para no contar dos veces la misma visita, guardar tu tarjeta a medio crear durante 20 minutos (por si recargas la página o entras desde el email) y no repetirte consejos que ya has cerrado. No hay cookies de analítica ni de publicidad, por eso no verás un banner de cookies.",
       ],
     },
   ];

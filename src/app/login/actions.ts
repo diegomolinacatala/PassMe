@@ -26,6 +26,8 @@ export type AuthState =
       error?: string;
       /** The code was wrong or expired: the input clears for another try. */
       rejected?: boolean;
+      /** Client only: reopened after a reload (/crear), the code went out earlier. */
+      resumed?: boolean;
     };
 
 const emailSchema = z.email({ error: "Introduce un email válido." }).max(254);

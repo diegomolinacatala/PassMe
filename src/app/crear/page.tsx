@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Logo } from "@/components/brand/logo";
 import { CreateFlow, type CreateMode, type Referrer } from "@/components/create/create-flow";
-import { randomPatternSeed } from "@/lib/card/design";
+import { pickInitialTheme, randomPatternSeed } from "@/lib/card/design";
 import { parseFromSlug, parseVia } from "@/lib/card/quick";
 import { isGoogleWalletLive } from "@/lib/config.server";
 import { findOwnerCard, getPublicCard } from "@/lib/data/cards";
@@ -39,6 +39,8 @@ export default async function CreateCardPage({ searchParams }: PageProps<"/crear
   const card = from ? await getPublicCard(from) : null;
   const referrer: Referrer | null = card ? { slug: card.slug, fullName: card.fullName, avatarUrl: card.avatarUrl } : null;
   const platform = detectPlatform((await headers()).get("user-agent"));
+  // Android only sees a Google pass once Google Wallet works (D4); until then, "Mi QR".
+  const googlePass = platform === "android" && isGoogleWalletLive();
 
   return (
     <main className="min-h-dvh">
@@ -67,8 +69,11 @@ export default async function CreateCardPage({ searchParams }: PageProps<"/crear
           via={via}
           referrer={referrer}
           initialSeed={randomPatternSeed()}
+          initialTheme={pickInitialTheme(card).id}
           accountEmail={user?.email ?? null}
-          previewStyle={platform === "android" ? "google" : "apple"}
+          previewStyle={googlePass ? "google" : "apple"}
+          previewWallet={platform === "android" && !googlePass ? null : googlePass ? "Google Wallet" : "Apple Wallet"}
+          platform={platform}
           googleEnabled={mode !== "demo" && isGoogleAuthEnabled()}
           captchaSiteKey={getTurnstileSiteKey()}
         />

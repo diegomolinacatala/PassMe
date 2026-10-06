@@ -96,14 +96,14 @@ test.describe("deleting and removing", () => {
 });
 
 test.describe("option groups", () => {
-  test("/crear: «Crear mi tarjeta» in ≤ 11 Tabs, and the arrow keys change the color", async ({ page, isMobile }) => {
+  test("/crear: the submit («Continuar» while there's no email) in ≤ 11 Tabs, and the arrow keys change the color", async ({ page, isMobile }) => {
     test.skip(isMobile, "Keyboard navigation");
     await page.goto("/crear");
     await page.locator("body").click({ position: { x: 1, y: 1 } });
     let presses = 0;
     for (; presses < 30; presses++) {
       await page.keyboard.press("Tab");
-      const isSubmit = await page.evaluate(() => document.activeElement?.textContent?.trim() === "Crear mi tarjeta");
+      const isSubmit = await page.evaluate(() => ["Crear mi tarjeta", "Continuar"].includes(document.activeElement?.textContent?.trim() ?? ""));
       if (isSubmit) break;
     }
     expect(presses + 1).toBeLessThanOrEqual(11);

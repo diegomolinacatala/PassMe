@@ -84,6 +84,22 @@ export function themeFor(background: string, detail: string | null): CardTheme |
   return CARD_THEMES.find((t) => t.background === bg && (detail === null || t.detail === detail.toUpperCase()));
 }
 
+/**
+ * The color a new card starts with: any of the themes, but never the one of
+ * the card that led here (/crear?de=…) — otherwise every PassMe card ends up
+ * looking like the first. `random` returns [0, 1) (injectable for tests).
+ */
+export function pickInitialTheme(
+  referrer: { accentColor: string; detailColor: string | null } | null,
+  random: () => number = Math.random,
+): CardTheme {
+  const avoid = referrer ? themeFor(referrer.accentColor, referrer.detailColor) : undefined;
+  const choices = CARD_THEMES.filter((theme) => theme.id !== avoid?.id);
+  const value = random();
+  const index = Number.isFinite(value) ? Math.min(choices.length - 1, Math.max(0, Math.floor(value * choices.length))) : 0;
+  return choices[index]!;
+}
+
 /** The design-related fields of a card. */
 export interface DesignFields {
   accentColor: string;

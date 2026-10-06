@@ -24,7 +24,7 @@ Diego puede cambiar cualquiera: están aisladas en sus PRs.
 | P1 | `feat/ux-p1-arreglos` | ✅ hecho y subido |
 | P2 | `feat/ux-p2-mi-qr` | ✅ hecho (pendiente de subir) |
 | P3 | `feat/ux-p3-sistema` | ✅ hecho (pendiente de subir) |
-| P4 | `feat/ux-p4-crear` | pendiente |
+| P4 | `feat/ux-p4-crear` | ✅ hecho (pendiente de subir) |
 | P5 | `feat/ux-p5-tarjeta` | pendiente |
 | P6 | `feat/ux-p6-reuniones` | pendiente |
 | P7 | `feat/ux-p7-editor` | pendiente |
@@ -51,6 +51,13 @@ Diego puede cambiar cualquiera: están aisladas en sus PRs.
 - **P3.6**: los 3 `rounded-[…]` que quedan son el móvil dibujado de la landing. `text-[0.9…rem]` también pasa a `text-body`. Para que nada se salga con la letra al 200 %: las cabeceras (landing y editor) y la fila de etiqueta de los campos pueden partirse en dos líneas, la columna derecha del editor tiene `min-w-0` y las filas de reuniones bajan sus botones.
 - **P3.7**: el radio es una capa invisible (`absolute inset-0 opacity-0`) sobre toda la opción en vez de `sr-only`: el teclado funciona igual y los toques (y Playwright) caen siempre en el radio. Las horas a confirmar de `meeting-response.tsx` siguen con `sr-only`.
 - **P3.8**: con `?nueva=1`, el título de la bienvenida es el H1 y el del editor un H2; al cerrar la bienvenida (`WelcomeContext`) el del editor vuelve a ser H1 y recibe el foco. El H2 del formulario de reunión tiene estilo de *eyebrow* para no cambiar el diseño. `ExternalLink` ya no se usaba.
+- **P4.1**: el formulario llama a la misma acción que «Enviarme un código» (`authAction`, `intent=send`: límites, bloqueo y CAPTCHA). Con CAPTCHA activo, el widget va bajo «Crear mi tarjeta». Si el envío falla (CAPTCHA, límites), el error sale junto al botón y se sigue en el formulario. Sin email válido en la tarjeta el botón dice «Continuar», también con el formulario vacío. «Continuar con Google» sigue en el paso del email, que ahora solo se ve si la tarjeta no tiene email o tras «Cambiar email». «Usar otro email» abre «Email para guardarla» bajo el botón (con «Usar el de mi tarjeta» para volver).
+- **P4.2**: el borrador se guarda desde el primer cambio (300 ms y también en `pagehide`) y caduca a los 20 min sin cambios (`DRAFT_TTL_MS`). Se sigue borrando al llegar al editor (`SignedInBeacon`). Se restaura justo después de hidratar (`useHydrated`, como antes), así que en un móvil lento puede verse un instante el formulario vacío. Actualizada la frase de almacenamiento de `/privacidad` y `docs/ARCHITECTURE.md` (decía 1 h).
+- **P4.3**: `codeSentAt` usa el reloj del navegador y nunca uno posterior al del servidor, para no alargar la vida del código. Al recargar, el aviso dice «Ya te enviamos un código» y la cuenta atrás de reenvío sigue donde iba. El paso del código se oculta con `hidden` y no se desmonta. Con sesión iniciada (`member`) el borrador se guarda sin `pending` ni `authEmail`: las reglas de creación desatendida no cambian.
+- **P4.4**: `pickInitialTheme()` en `src/lib/card/design.ts`. Los datos dejados con «Déjale tu contacto» se guardan sin color (tema vacío) para que lo elija `/crear` y no salga el naranja de siempre.
+- **P4.5**: en iPhone, «Abrir Gmail» (`googlegmail://`) y «Abrir Mail» (`message://`, para todo lo que no es Gmail, también dominios de empresa) se abren en la misma pestaña. Si la app Gmail no está instalada, Safari dará un error: hay que probarlo en un iPhone real (3.3.4).
+- **P4.6**: `suggestEmailFix()` en `src/lib/auth/email-typos.ts`; la lista incluye `gmail.es` (habitual en España y no es de Gmail). La sugerencia no bloquea el envío. En `/crear` sale bajo «Te mandaremos un código a …» y «Sí, corregir» cambia también el email de la tarjeta. D3 (b): «Cerrar sesión y entrar con ese» lleva a `/login`; `/auth/signout` acepta un `next` validado con `safeNextPath` (si no, a la portada).
+- **P2.4 (rezagado)**: en `/crear`, un Android ve la vista previa de Apple con «Así se verá tu tarjeta» mientras Google Wallet esté apagado.
 
 ## Notas para retomar
 

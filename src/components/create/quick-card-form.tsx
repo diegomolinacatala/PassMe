@@ -40,11 +40,14 @@ interface QuickCardFormProps {
   errors: FieldErrors;
   onChange: (patch: Partial<QuickCardDraft>) => void;
   onBlurField: (field: QuickTextField) => void;
-  onSubmit: () => void;
+  /** Gets the form's own fields too (e.g. the CAPTCHA token rendered in `afterSubmit`). */
+  onSubmit: (form: FormData) => void;
   busy: boolean;
   submitLabel: string;
   busyLabel: string;
   formError?: string | null;
+  /** Under the button, inside the form (where the code will go, the CAPTCHA…). */
+  afterSubmit?: ReactNode;
   footnote?: ReactNode;
 }
 
@@ -59,6 +62,7 @@ export function QuickCardForm({
   submitLabel,
   busyLabel,
   formError,
+  afterSubmit,
   footnote,
 }: QuickCardFormProps) {
   const formRef = useRef<HTMLFormElement>(null);
@@ -66,7 +70,7 @@ export function QuickCardForm({
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    onSubmit();
+    onSubmit(new FormData(event.currentTarget as HTMLFormElement));
     // After React paints the errors, take the person to the first one.
     requestAnimationFrame(() => formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
   }
@@ -116,6 +120,7 @@ export function QuickCardForm({
         <SubmitButton pending={busy} pendingLabel={busyLabel}>
           {submitLabel}
         </SubmitButton>
+        {afterSubmit}
         {footnote ? <div className="text-center text-xs leading-relaxed text-muted">{footnote}</div> : null}
       </div>
     </form>

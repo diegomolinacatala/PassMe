@@ -380,7 +380,7 @@ Base para P4–P7: si se hace antes, los PRs siguientes usan los componentes nue
 
 Origen: ONB-01, ONB-05, ONB-06, ONB-14, ONB-16, LIFE-05.
 
-**P4.1 · «Crear mi tarjeta» envía ya el código** [A] · ONB-05
+**✅ P4.1 · «Crear mi tarjeta» envía ya el código** [A] · ONB-05
 - `src/components/create/create-flow.tsx` + `src/components/auth/email-code-auth.tsx`.
 - Si el campo Email del formulario es válido, bajo el botón se ve: «Te mandaremos un código a **lucia@…** para guardarla. · Usar otro email». Al pulsar «Crear mi tarjeta» se envía el código directamente (la misma acción que hoy hace «Enviarme un código», con todos sus límites y el CAPTCHA si está activo) y se pasa al paso del código, con la cabecera «Último paso · Escribe el código».
 - «Usar otro email» despliega en línea un campo de email (para separar el email de la cuenta del email visible).
@@ -389,24 +389,24 @@ Origen: ONB-01, ONB-05, ONB-06, ONB-14, ONB-16, LIFE-05.
 - «Continuar con Google» sigue apareciendo donde está si `isGoogleAuthEnabled()`.
 - ✔ Con email en el formulario: de «Crear mi tarjeta» a las 8 casillas en 1 toque, sin la pantalla «Guárdala con tu email»; ningún botón «Crear mi tarjeta» lleva a otra pantalla que pida más datos. Actualizar `e2e/onboarding.spec.ts`.
 
-**P4.2 · El borrador de `/crear` se guarda mientras escribes** [A] · ONB-01
+**✅ P4.2 · El borrador de `/crear` se guarda mientras escribes** [A] · ONB-01
 - `create-flow.tsx` + `src/lib/card/draft-storage.ts`: escribir el borrador en cada cambio (retardo 300 ms) y restaurarlo al hidratar; no llamar a `clearStoredDraft()` al restaurar en el paso del formulario, solo al crear la tarjeta con éxito. Mantener el TTL actual (`DRAFT_TTL_MS`). Todo en `try/catch` (Safari privado).
 - ✔ Rellenar 3 campos y el color, recargar: todo sigue igual; lo mismo tras cerrar y reabrir la pestaña antes del TTL.
 
-**P4.3 · No perder el paso del código** [M] · ONB-06
+**✅ P4.3 · No perder el paso del código** [M] · ONB-06
 - Guardar en el borrador `{ authEmail, codeSentAt }`. Al restaurar con `pending && authEmail && now - codeSentAt < 10 min`, abrir directamente el paso del código para ese email, con «Ya te enviamos un código a …».
 - «Editar mis datos» no desmonta `EmailCodeAuth` (ocultarlo con `hidden` y conservar el estado); si el email no cambió, al volver se muestra el paso del código sin pedir otro.
 - ✔ Pedir el código y recargar: aparecen las 8 casillas y `00000000` entra (demo). Pedir el código, «Editar mis datos», «Crear mi tarjeta»: las 8 casillas sin pedir otro.
 
-**P4.4 · Tema inicial distinto** ⚖️ D8 [B] · ONB-16
+**✅ P4.4 · Tema inicial distinto** ⚖️ D8 [B] · ONB-16
 - `src/lib/card/quick.ts` (`theme: DEFAULT_THEME.id`): elegir el tema inicial en el servidor junto con `initialSeed`, aleatorio entre los 10 y, si hay `de=<slug>`, distinto del de esa tarjeta.
 - ✔ `/crear?de=demo` nunca empieza con el tema de la tarjeta `demo` (test unitario con la semilla).
 
-**P4.5 · «Abrir Gmail» abre la app** [B] · ONB-14
+**✅ P4.5 · «Abrir Gmail» abre la app** [B] · ONB-14
 - `email-code-auth.tsx` + `src/lib/auth/code.ts`: en iOS (`detectPlatform`), `googlegmail://` para Gmail y `message://` para el resto («Abrir Mail»); en Android y escritorio, la URL web actual.
 - ✔ Con un User-Agent de iOS y un email `@gmail.com`, el enlace es `googlegmail://` (test unitario).
 
-**P4.6 · Erratas en el email y cuentas duplicadas** ⚖️ D3 [A] · LIFE-05
+**✅ P4.6 · Erratas en el email y cuentas duplicadas** ⚖️ D3 [A] · LIFE-05
 - Sugerencia de dominio en el cliente, en `/login` y en `/crear`, antes de enviar: «¿Querías decir carlos@**gmail.com**?» con «Sí, corregir» (lista corta: gmial/gmai/gamil/gmail.co, hotmial/hotmal, outlok/outllok, yaho, icloud.con…). Función pura en `src/lib/auth/` con tests.
 - Con D3 = (b): en `/crear` con sesión y sin tarjeta, cambiar «Con tu cuenta X.» por «Has entrado como **X**. ¿Ya tenías tarjeta con otro email? Cerrar sesión y entrar con ese». En `/login`, quitar «Si es tu primera vez, se crea tu cuenta al entrar».
 - Con D3 = (a): `shouldCreateUser: false` en `src/app/login/actions.ts` y, si la cuenta no existe, quedarse en el paso del email con «No hay ninguna tarjeta con … ¿Lo has escrito bien? · Crear una tarjeta nueva con este email». Las cuentas solo se crean en `/crear`.

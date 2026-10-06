@@ -10,7 +10,9 @@ import { Notice } from "@/components/ui/notice";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { Turnstile } from "@/components/ui/turnstile";
 import { formatCountdown, inboxFor, LOGIN_CODE_LENGTH } from "@/lib/auth/code";
+import type { Platform } from "@/lib/platform";
 import { CodeInput } from "./code-input";
+import { EmailTypoHint } from "./email-typo-hint";
 import { useSignedInElsewhere } from "./session-sync";
 
 export interface EmailCodeAuthProps {
@@ -26,6 +28,10 @@ export interface EmailCodeAuthProps {
   via?: string;
   initialEmail?: string;
   initialError?: string;
+  /** Where to start instead of the email step: a code /crear already sent (or is resuming). */
+  initialState?: AuthState;
+  /** The visitor's phone, from the server: on an iPhone "Abrir Gmail" opens the app. */
+  platform?: Platform;
   googleEnabled: boolean;
   /** Cloudflare Turnstile site key; null = no CAPTCHA. */
   captchaSiteKey: string | null;
@@ -33,8 +39,10 @@ export interface EmailCodeAuthProps {
   submitLabel: string;
   /** Focus the email field on arrival (only when it's empty: a prefilled one keeps the keyboard closed). */
   autoFocus?: boolean;
-  /** Told the address each time a code goes out. Should be stable (useCallback). */
-  onCodeSent?: (email: string) => void;
+  /** Told the address (and the send's server timestamp) each time a code goes out. Should be stable (useCallback). */
+  onCodeSent?: (email: string, sentAt: number) => void;
+  /** Told which step is showing. Should be stable (useCallback). */
+  onStepChange?: (step: "email" | "code") => void;
   /** Called when "Continuar con Google" is pressed. */
   onGoogle?: () => void;
 }
@@ -48,12 +56,11 @@ type CodeState = Extract<AuthState, { step: "code" }>;
  * notices and carries on.
  */
 export function EmailCodeAuth(props: EmailCodeAuthProps) {
-  const { initialEmail, initialError, continueTo, onCodeSent, autoFocus } = props;
-  const [state, dispatch, pending] = useActionState<AuthState, FormData>(authAction, {
-    step: "email",
-    email: initialEmail,
-    error: initialError,
-  });
+  const { initialEmail, initialError, initialState, continueTo, onCodeSent, onStepChange, autoFocus } = props;
+  const [state, dispatch, pending] = useActionState<AuthState, FormData>(
+    authAction,
+    initialState ?? { step: "email", email: initialEmail, error: initialError },
+  );
 
   // "Cambiar email" goes back locally; any new answer from the server ends it.
   const [editing, setEditing] = useState(false);
@@ -64,11 +71,15 @@ export function EmailCodeAuth(props: EmailCodeAuthProps) {
   }
 
   const sentTo = state.step === "code" ? state.email : null;
+  const sentAt = state.step === "code" ? state.sentAt : 0;
   useEffect(() => {
-    if (sentTo) onCodeSent?.(sentTo);
-  }, [sentTo, onCodeSent]);
+    if (sentTo) onCodeSent?.(sentTo, sentAt);
+  }, [sentTo, sentAt, onCodeSent]);
 
   const onCodeStep = state.step === "code" && !editing;
+  useEffect(() => {
+    onStepChange?.(onCodeStep ? "code" : "email");
+  }, [onCodeStep, onStepChange]);
   const goOn = useCallback(() => window.location.assign(continueTo), [continueTo]);
   // Paused while an answer is on its way: a successful code redirects by itself.
   useSignedInElsewhere(onCodeStep && !pending, goOn);
@@ -101,6 +112,8 @@ interface EmailStepProps extends EmailCodeAuthProps {
 
 function EmailStep({ next, continueTo, email, error, state, dispatch, pending, googleEnabled, captchaSiteKey, focusInput, onGoogle }: EmailStepProps) {
   const errorId = useId();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [value, setValue] = useState(email);
   return (
     <div>
       <form action={dispatch} className="space-y-4">
@@ -116,13 +129,22 @@ function EmailStep({ next, continueTo, email, error, state, dispatch, pending, g
             required
             autoFocus={focusInput}
             readOnly={pending}
-            defaultValue={email}
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
             placeholder="tu@email.com"
             aria-invalid={Boolean(error)}
             aria-describedby={error ? errorId : undefined}
             className={inputClasses({ className: "mt-1.5" })}
+            ref={inputRef}
           />
         </label>
+        <EmailTypoHint
+          email={value}
+          onFix={(fixed) => {
+            setValue(fixed);
+            inputRef.current?.focus();
+          }}
+        />
         {error ? (
           <InlineError id={errorId} live>
             {error}
@@ -195,7 +217,7 @@ interface CodeStepProps extends EmailCodeAuthProps {
   onEditEmail: () => void;
 }
 
-function CodeStep({ state, dispatch, pending, onEditEmail, next, draft, from, via, submitLabel, captchaSiteKey }: CodeStepProps) {
+function CodeStep({ state, dispatch, pending, onEditEmail, next, draft, from, via, submitLabel, captchaSiteKey, platform }: CodeStepProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [code, setCode] = useState("");
@@ -218,14 +240,14 @@ function CodeStep({ state, dispatch, pending, onEditEmail, next, draft, from, vi
   const statusId = useId();
   const errorId = useId();
   const secondsLeft = useSecondsLeft(state.sentAt, state.resendIn);
-  const inbox = inboxFor(state.email);
+  const inbox = inboxFor(state.email, platform);
 
   return (
     <div className="animate-rise">
       <Notice
         id={statusId}
         tone="ok"
-        title="¡Código enviado!"
+        title={state.resumed ? "Ya te enviamos un código" : "¡Código enviado!"}
         action={
           <button
             type="button"
@@ -236,8 +258,11 @@ function CodeStep({ state, dispatch, pending, onEditEmail, next, draft, from, vi
           </button>
         }
       >
-        Lo hemos mandado a <strong className="font-semibold text-ink [overflow-wrap:anywhere]">{state.email}</strong>. Tarda unos
-        segundos; mira también en spam o promociones.
+        {state.resumed ? "Lo mandamos a " : "Lo hemos mandado a "}
+        <strong className="font-semibold text-ink [overflow-wrap:anywhere]">{state.email}</strong>
+        {state.resumed
+          ? " y sigue valiendo unos minutos. Mira también en spam o promociones."
+          : ". Tarda unos segundos; mira también en spam o promociones."}
       </Notice>
 
       {state.notice ? (
@@ -294,12 +319,20 @@ function CodeStep({ state, dispatch, pending, onEditEmail, next, draft, from, vi
           </div>
         ) : null}
         <ResendButton secondsLeft={secondsLeft} />
-        {inbox ? (
+        {inbox?.app ? (
+          // An app on this phone: a new tab would stay behind empty.
+          <a
+            href={inbox.url}
+            className="inline-flex min-h-11 items-center gap-1 text-muted underline-offset-4 hover:text-ink hover:underline"
+          >
+            Abrir {inbox.name} <ArrowUpRight className="size-3.5" aria-hidden />
+          </a>
+        ) : inbox ? (
           <a
             href={inbox.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-muted underline-offset-4 hover:text-ink hover:underline"
+            className="inline-flex min-h-11 items-center gap-1 text-muted underline-offset-4 hover:text-ink hover:underline"
           >
             Abrir {inbox.name} <ArrowUpRight className="size-3.5" aria-hidden />
             <NewTabHint />

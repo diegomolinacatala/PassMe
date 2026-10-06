@@ -181,7 +181,7 @@ describe("stored draft", () => {
 
   it("round-trips and expires", () => {
     const draft = { ...EMPTY_QUICK_DRAFT, fullName: "Ana" };
-    writeStoredDraft({ draft, pending: true, from: "alex", via: "share", authEmail: "ana@example.com", viaGoogle: false }, 1_000);
+    writeStoredDraft({ draft, pending: true, from: "alex", via: "share", authEmail: "ana@example.com", codeSentAt: null, viaGoogle: false }, 1_000);
     expect(readStoredDraft(1_000 + 60_000)).toMatchObject({ draft, pending: true, from: "alex", via: "share", authEmail: "ana@example.com" });
     expect(readStoredDraft(1_000 + DRAFT_TTL_MS + 1)).toBeNull();
     // Expired drafts are removed, not just ignored.
@@ -190,7 +190,7 @@ describe("stored draft", () => {
 
   it("merges details typed elsewhere without wiping the rest", () => {
     writeStoredDraft(
-      { draft: { ...EMPTY_QUICK_DRAFT, headline: "CEO", theme: "cafe" }, pending: false, from: null, via: "direct", authEmail: null, viaGoogle: false },
+      { draft: { ...EMPTY_QUICK_DRAFT, headline: "CEO", theme: "cafe" }, pending: false, from: null, via: "direct", authEmail: null, codeSentAt: null, viaGoogle: false },
       1_000,
     );
     rememberDetails({ fullName: "Ana", email: "ana@example.com", phone: "", company: "Norte" }, "alex", "qr", 2_000);
@@ -220,7 +220,7 @@ describe("stored draft", () => {
     });
     expect(readStoredDraft()).toBeNull();
     expect(() =>
-      writeStoredDraft({ draft: EMPTY_QUICK_DRAFT, pending: false, from: null, via: "direct", authEmail: null, viaGoogle: false }),
+      writeStoredDraft({ draft: EMPTY_QUICK_DRAFT, pending: false, from: null, via: "direct", authEmail: null, codeSentAt: null, viaGoogle: false }),
     ).not.toThrow();
     expect(() => clearStoredDraft()).not.toThrow();
   });

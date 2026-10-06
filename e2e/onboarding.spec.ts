@@ -22,13 +22,13 @@ test("a scanned card invites the visitor to create their own", async ({ page }) 
   await expect(cta.getByRole("link", { name: "Crear mi tarjeta" })).toHaveAttribute("href", "/crear?de=demo&via=qr");
 });
 
-test("create a card: form, email, code, welcome with the QR to show", async ({ page }) => {
+test("create a card: form, code, welcome with the QR to show", async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto("/crear?de=demo");
   await expect(page.getByText("Vienes de la tarjeta de")).toContainText("Alex Rivera");
 
-  // Nothing filled in: both requirements are explained.
-  await page.getByRole("button", { name: "Crear mi tarjeta" }).click();
+  // Nothing filled in (no email yet, so it only continues): both requirements are explained.
+  await page.getByRole("button", { name: "Continuar" }).click();
   await expect(page.getByText("Tu nombre es obligatorio.")).toBeVisible();
   await expect(page.getByText(/Añade al menos un teléfono, un email o tu LinkedIn/)).toBeVisible();
   await expect(page.getByLabel("Nombre y apellidos")).toBeFocused();
@@ -38,14 +38,14 @@ test("create a card: form, email, code, welcome with the QR to show", async ({ p
   await page.getByLabel("Email").fill("lucia@example.com");
   await page.getByRole("radio", { name: "Café" }).click();
   await expect(page.getByLabel(/Vista previa del pase de .* Wallet de Lucía Ferrer/)).toBeVisible();
+  await expect(page.getByText("Te mandaremos un código a lucia@example.com para guardarla.")).toBeVisible();
 
+  // One tap from the form to the 8 boxes: no screen asking for the email again.
   await page.getByRole("button", { name: "Crear mi tarjeta" }).click();
-  await expect(page.getByRole("heading", { name: /Guárdala con tu email/ })).toBeVisible();
-  await expect(page.getByLabel("Tu email")).toHaveValue("lucia@example.com");
-
-  await page.getByRole("button", { name: "Enviarme un código" }).click();
+  await expect(page.getByRole("heading", { name: /Escribe el código/ })).toBeVisible();
+  await expect(page.getByText("Último paso")).toBeVisible();
   await expect(page.getByText("¡Código enviado!")).toBeVisible();
-  await expect(page.getByText("lucia@example.com", { exact: true })).toBeVisible();
+  await expect(page.getByText("lucia@example.com", { exact: true }).locator("visible=true")).toBeVisible();
   // Resending waits for the cooldown instead of letting people hammer the button.
   await expect(page.getByRole("button", { name: /Reenviar en \d:\d\d/ })).toBeDisabled();
 
@@ -103,6 +103,8 @@ test("login: the code screen shows up, can change the email and signs in", async
   await page.goto("/login");
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Entra en tu tarjeta");
   await expect(page.getByRole("link", { name: "Crear mi tarjeta" })).toHaveAttribute("href", "/crear");
+  // D3 (b): signing in may still create an account, but the page doesn't push that path.
+  await expect(page.getByText(/Si es tu primera vez/)).toHaveCount(0);
 
   await page.getByLabel("Tu email").fill("alex@example.com");
   const send = page.getByRole("button", { name: "Enviarme un código" });

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { headers } from "next/headers";
 import { EmailCodeAuth } from "@/components/auth/email-code-auth";
 import { BrandMotif } from "@/components/brand/brand-motif";
 import { Logo } from "@/components/brand/logo";
@@ -10,6 +11,7 @@ import { DEMO_CARD } from "@/lib/card/demo";
 import { themeDesign } from "@/lib/card/design";
 import { toPublicCard } from "@/lib/data/cards";
 import { getTurnstileSiteKey, isGoogleAuthEnabled, isSupabaseConfigured } from "@/lib/env";
+import { detectPlatform } from "@/lib/platform";
 import { safeNextPath } from "@/lib/request";
 
 export const metadata: Metadata = { title: "Entrar", robots: { index: false } };
@@ -26,6 +28,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const errorKey = typeof query.error === "string" ? query.error : "";
   const configured = isSupabaseConfigured();
   const demo = toPublicCard(DEMO_CARD);
+  const platform = detectPlatform((await headers()).get("user-agent"));
 
   return (
     <main className="grid min-h-dvh lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
@@ -51,6 +54,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
               continueTo={next}
               googleEnabled={configured && isGoogleAuthEnabled()}
               captchaSiteKey={getTurnstileSiteKey()}
+              platform={platform}
               initialError={Object.hasOwn(ERRORS, errorKey) ? ERRORS[errorKey] : undefined}
               submitLabel="Entrar"
               autoFocus
@@ -64,7 +68,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
             </Link>
           </p>
           <p className="mt-3 text-xs leading-relaxed text-muted">
-            Si es tu primera vez, se crea tu cuenta al entrar. Al continuar aceptas los{" "}
+            Al continuar aceptas los{" "}
             <a href="/terminos" className="underline underline-offset-2 hover:text-ink">
               términos de uso
             </a>{" "}

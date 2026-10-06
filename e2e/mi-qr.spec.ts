@@ -16,8 +16,8 @@ async function createCardFrom(page: Page, cardUrl: string, expectedCreate: strin
   await page.waitForURL((url) => `${url.pathname}${url.search}` === expectedCreate);
   await page.getByLabel("Nombre y apellidos").fill("Lucía Ferrer");
   await page.getByLabel("Email").fill("lucia@example.com");
+  // With an email in the card, «Crear mi tarjeta» sends the code (P4.1).
   await page.getByRole("button", { name: "Crear mi tarjeta" }).click();
-  await page.getByRole("button", { name: "Enviarme un código" }).click();
   await page.getByLabel("Código de 8 cifras").fill("00000000");
   await page.waitForURL(/\/dashboard\?nueva=1/);
   return page.getByRole("region", { name: /Ya tienes tu tarjeta/ });
