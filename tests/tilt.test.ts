@@ -1,21 +1,9 @@
 import { describe, expect, it } from "vitest";
-import {
-  easeTilt,
-  HELD_BETA,
-  isSettled,
-  MAX_TILT_DEG,
-  REST_TILT,
-  shadowOffset,
-  sheenBackground,
-  tiltFromOrientation,
-  tiltFromPointer,
-  tiltFromScroll,
-  tiltTransform,
-} from "@/lib/tilt";
+import { easeTilt, isSettled, MAX_TILT_DEG, REST_TILT, shadowOffset, sheenBackground, tiltFromPointer, tiltTransform } from "@/lib/tilt";
 
 const RECT = { left: 100, top: 50, width: 400, height: 200 };
 
-describe("tilt: the pass as an object", () => {
+describe("tilt: the pass as an object under the pointer", () => {
   it("rests flat with the light up and to the left", () => {
     expect(tiltTransform(REST_TILT)).toBe("rotateX(0deg) rotateY(0deg)");
     expect(sheenBackground(REST_TILT)).toContain("at 30% 25%");
@@ -37,32 +25,6 @@ describe("tilt: the pass as an object", () => {
     expect(outside.ry).toBeCloseTo(-MAX_TILT_DEG);
     expect(outside.rx).toBeCloseTo(-MAX_TILT_DEG);
     expect(tiltFromPointer(10, 10, { ...RECT, width: 0 })).toBe(REST_TILT);
-  });
-
-  it("reads the phone's orientation from how it was held at first", () => {
-    expect(tiltFromOrientation(HELD_BETA, 0)).toEqual({ rx: 0, ry: 0, lx: 0.5, ly: 0.5 });
-    expect(tiltFromOrientation(10, 0, MAX_TILT_DEG, 10).rx).toBe(0);
-    const tipped = tiltFromOrientation(HELD_BETA + 14, 14);
-    expect(tipped.ry).toBeCloseTo(MAX_TILT_DEG / 2);
-    expect(tipped.rx).toBeCloseTo(-MAX_TILT_DEG / 2);
-    expect(tiltFromOrientation(HELD_BETA + 500, -500).ry).toBeCloseTo(-MAX_TILT_DEG);
-    expect(tiltFromOrientation(null, 3)).toBe(REST_TILT);
-    expect(tiltFromOrientation(Number.NaN, 3)).toBe(REST_TILT);
-  });
-
-  it("without pointer or sensors, scrolling slides the light like a lamp fixed at the top", () => {
-    const box = { left: 0, width: 300, height: 200 };
-    // Centered on the screen: at rest, lit from the middle.
-    expect(tiltFromScroll({ ...box, top: 400 }, 1000)).toEqual({ rx: 0, ry: 0, lx: 0.4, ly: 0.5 });
-    // At the bottom of the screen: the light hits its top edge and it tips a little.
-    const low = tiltFromScroll({ ...box, top: 900 }, 1000);
-    expect(low.ly).toBeCloseTo(0.05);
-    expect(low.rx).toBeCloseTo(MAX_TILT_DEG / 2);
-    // Near the top of the screen: the light has slid down.
-    const high = tiltFromScroll({ ...box, top: -100 }, 1000);
-    expect(high.ly).toBeCloseTo(0.95);
-    expect(high.rx).toBeCloseTo(-MAX_TILT_DEG / 2);
-    expect(tiltFromScroll({ ...box, top: 0 }, 0)).toBe(REST_TILT);
   });
 
   it("eases toward the target and knows when it has arrived", () => {

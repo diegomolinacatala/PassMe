@@ -5,7 +5,7 @@ import { Logo } from "@/components/brand/logo";
 export function SiteFooter({ googleWallet }: { googleWallet: boolean }) {
   return (
     <footer className="border-t hairline">
-      <div className="mx-auto flex max-w-[1240px] flex-col gap-8 px-5 py-12 sm:flex-row sm:items-end sm:justify-between sm:px-8">
+      <div className="mx-auto flex max-w-[1240px] flex-col gap-8 px-5 pt-12 pb-28 sm:flex-row sm:items-end sm:justify-between sm:px-8 lg:pb-12">
         <div>
           <Logo />
           <p className="mt-3 max-w-xs text-sm text-muted">

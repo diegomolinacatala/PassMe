@@ -20,9 +20,6 @@ export function SiteHeader({ ctaHref, signedIn }: SiteHeaderProps) {
           <Link href="#como-funciona" className={`hidden md:inline-flex ${NAV_LINK}`}>
             Cómo funciona
           </Link>
-          <Link href="#diseno" className={`hidden md:inline-flex ${NAV_LINK}`}>
-            Hazla tuya
-          </Link>
           {/* "Privacidad" in the footer is the policy (/privacidad); this is the section about your data. */}
           <Link href="#privacidad" className={`hidden md:inline-flex ${NAV_LINK}`}>
             Tus datos
