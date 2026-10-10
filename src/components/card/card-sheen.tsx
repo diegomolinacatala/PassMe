@@ -4,7 +4,9 @@ import { useCallback, useRef } from "react";
 import { sheenBackground, type Tilt } from "@/lib/tilt";
 import { useTilt } from "./use-tilt";
 
-const REST_LIGHT = sheenBackground({ rx: 0, ry: 0, lx: 0.3, ly: 0.25 }, 0.16);
+/** A little stronger than the hero's: the stub is seen on a phone, often outdoors. */
+const STUB_LIGHT = 0.2;
+const REST_LIGHT = sheenBackground({ rx: 0, ry: 0, lx: 0.3, ly: 0.25 }, STUB_LIGHT);
 
 /**
  * The light on the public card's stub: it follows the pointer over the card
@@ -14,7 +16,7 @@ const REST_LIGHT = sheenBackground({ rx: 0, ry: 0, lx: 0.3, ly: 0.25 }, 0.16);
 export function CardSheen() {
   const sheen = useRef<HTMLDivElement>(null);
   const onFrame = useCallback((tilt: Tilt) => {
-    if (sheen.current) sheen.current.style.backgroundImage = sheenBackground(tilt, 0.16);
+    if (sheen.current) sheen.current.style.backgroundImage = sheenBackground(tilt, STUB_LIGHT);
   }, []);
   const { ref, enabled } = useTilt({ max: 0, onFrame });
 

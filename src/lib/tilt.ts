@@ -67,6 +67,24 @@ export function tiltFromOrientation(beta: number | null, gamma: number | null, m
   };
 }
 
+/**
+ * No pointer and no sensors (a phone before any permission): the light is a
+ * lamp fixed at the top of the screen, so scrolling slides it across the
+ * surface and tips it a little. `rect` is the element's box in the viewport.
+ */
+export function tiltFromScroll(rect: Rect, viewportHeight: number, max: number = MAX_TILT_DEG): Tilt {
+  if (viewportHeight <= 0 || rect.height <= 0) return REST_TILT;
+  const center = rect.top + rect.height / 2;
+  // -1 at the top edge of the screen, +1 at the bottom.
+  const y = clamp((center - viewportHeight / 2) / (viewportHeight / 2), -1, 1);
+  return {
+    rx: y * max * 0.5,
+    ry: 0,
+    lx: 0.4,
+    ly: 0.5 - y * 0.45,
+  };
+}
+
 /** Moves `from` a share `t` (0–1) of the way to `to`: smooth motion between frames. */
 export function easeTilt(from: Tilt, to: Tilt, t: number): Tilt {
   const k = clamp(t, 0, 1);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { easeTilt, isSettled, MAX_TILT_DEG, REST_TILT, tiltFromOrientation, tiltFromPointer, type Tilt } from "@/lib/tilt";
+import { easeTilt, isSettled, MAX_TILT_DEG, REST_TILT, tiltFromOrientation, tiltFromPointer, tiltFromScroll, type Tilt } from "@/lib/tilt";
 
 /** Share of the remaining distance covered each frame: fast to follow, soft to settle. */
 const FOLLOW = 0.14;
@@ -100,28 +100,39 @@ export function useTilt({ max = MAX_TILT_DEG, askMotion = false, onFrame }: UseT
         element.removeEventListener("pointermove", onMove);
         element.removeEventListener("pointerleave", onLeave);
       });
-    } else if ("DeviceOrientationEvent" in window) {
+    } else {
+      // Until the sensors speak (iOS needs a permission; some phones have none), scrolling moves the light.
       let neutral: number | null = null;
-      const onOrientation = (event: DeviceOrientationEvent) => {
-        if (event.beta === null || event.gamma === null) return;
-        // The first reading is how the phone is being held: that's "flat".
-        if (neutral === null) {
-          neutral = event.beta;
-          setActive(true);
-        }
-        aim(tiltFromOrientation(event.beta, event.gamma, max, neutral));
+      const onScroll = () => {
+        if (neutral !== null) return;
+        aim(tiltFromScroll(element.getBoundingClientRect(), window.innerHeight, max));
       };
-      window.addEventListener("deviceorientation", onOrientation);
-      cleanups.push(() => window.removeEventListener("deviceorientation", onOrientation));
+      onScroll();
+      window.addEventListener("scroll", onScroll, { passive: true });
+      cleanups.push(() => window.removeEventListener("scroll", onScroll));
 
-      // iOS only sends the events after a permission granted from a tap.
-      const Orientation = window.DeviceOrientationEvent as unknown as DeviceOrientationEventWithPermission;
-      if (askMotion && typeof Orientation.requestPermission === "function") {
-        const ask = () => {
-          Orientation.requestPermission?.().catch(() => undefined);
+      if ("DeviceOrientationEvent" in window) {
+        const onOrientation = (event: DeviceOrientationEvent) => {
+          if (event.beta === null || event.gamma === null) return;
+          // The first reading is how the phone is being held: that's "flat".
+          if (neutral === null) {
+            neutral = event.beta;
+            setActive(true);
+          }
+          aim(tiltFromOrientation(event.beta, event.gamma, max, neutral));
         };
-        element.addEventListener("click", ask, { once: true });
-        cleanups.push(() => element.removeEventListener("click", ask));
+        window.addEventListener("deviceorientation", onOrientation);
+        cleanups.push(() => window.removeEventListener("deviceorientation", onOrientation));
+
+        // iOS only sends the events after a permission granted from a tap.
+        const Orientation = window.DeviceOrientationEvent as unknown as DeviceOrientationEventWithPermission;
+        if (askMotion && typeof Orientation.requestPermission === "function") {
+          const ask = () => {
+            Orientation.requestPermission?.().catch(() => undefined);
+          };
+          element.addEventListener("click", ask, { once: true });
+          cleanups.push(() => element.removeEventListener("click", ask));
+        }
       }
     }
 
