@@ -1,8 +1,9 @@
 /**
- * The pass as an object: a small 3D tilt that follows the pointer (or the
- * phone's orientation) and a light that slides across the surface. Pure
- * math, shared by <TiltCard> and <CardSheen>; the components only wire the
- * events.
+ * The pass as an object on a computer: a small 3D tilt that follows the
+ * pointer and a light that slides across the surface. Pure math, shared by
+ * <TiltCard> and <CardSheen>; the components only wire the events. Phones
+ * get none of this: nothing asks for permissions or depends on holding the
+ * phone a certain way.
  */
 
 export interface Tilt {
@@ -20,11 +21,6 @@ export const REST_TILT: Tilt = { rx: 0, ry: 0, lx: 0.3, ly: 0.25 };
 
 /** Default maximum rotation, in degrees: enough to feel the object, not a carnival. */
 export const MAX_TILT_DEG = 9;
-
-/** The angle a phone is held at while reading (beta, in degrees): the tilt's neutral position until one is measured. */
-export const HELD_BETA = 40;
-/** Degrees of phone rotation that reach the full tilt. */
-const ORIENTATION_RANGE = 28;
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
@@ -46,42 +42,6 @@ export function tiltFromPointer(x: number, y: number, rect: Rect, max: number = 
     ry: (px - 0.5) * 2 * max,
     lx: px,
     ly: py,
-  };
-}
-
-/**
- * The phone's orientation (DeviceOrientationEvent): `beta` is the front-back
- * angle (0 flat, 90 upright) and `gamma` the left-right one, measured from
- * `neutralBeta` (how the phone was held when the card appeared). Null values
- * (the browser has no sensor) leave the surface at rest.
- */
-export function tiltFromOrientation(beta: number | null, gamma: number | null, max: number = MAX_TILT_DEG, neutralBeta: number = HELD_BETA): Tilt {
-  if (beta === null || gamma === null || !Number.isFinite(beta) || !Number.isFinite(gamma)) return REST_TILT;
-  const x = clamp(gamma / ORIENTATION_RANGE, -1, 1);
-  const y = clamp((beta - neutralBeta) / ORIENTATION_RANGE, -1, 1);
-  return {
-    rx: (0 - y) * max,
-    ry: x * max,
-    lx: 0.5 + x * 0.4,
-    ly: 0.5 - y * 0.4,
-  };
-}
-
-/**
- * No pointer and no sensors (a phone before any permission): the light is a
- * lamp fixed at the top of the screen, so scrolling slides it across the
- * surface and tips it a little. `rect` is the element's box in the viewport.
- */
-export function tiltFromScroll(rect: Rect, viewportHeight: number, max: number = MAX_TILT_DEG): Tilt {
-  if (viewportHeight <= 0 || rect.height <= 0) return REST_TILT;
-  const center = rect.top + rect.height / 2;
-  // -1 at the top edge of the screen, +1 at the bottom.
-  const y = clamp((center - viewportHeight / 2) / (viewportHeight / 2), -1, 1);
-  return {
-    rx: y * max * 0.5,
-    ry: 0,
-    lx: 0.4,
-    ly: 0.5 - y * 0.45,
   };
 }
 

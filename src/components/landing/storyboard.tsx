@@ -15,53 +15,57 @@ interface StoryboardProps {
 
 /**
  * "Cómo funciona" as three frames of the real thing: the pass in the wallet,
- * the camera reading the QR, the contact saved. Shown, not told.
+ * the camera reading the QR, the contact saved. Shown, not told. On a phone
+ * the frames are a strip to swipe through; on a computer, three side by side.
  */
 export function Storyboard({ card, googleWallet }: StoryboardProps) {
   const scenes: Array<{ n: string; title: string; body: string; visual: ReactNode }> = [
     {
       n: "01",
       title: "Vive en tu cartera",
-      body: googleWallet
-        ? "Junto a tus tarjetas y billetes, en Apple Wallet o Google Wallet. Sin app que instalar."
-        : "Junto a tus tarjetas y billetes, en Apple Wallet. En Android, tu QR desde la pantalla de inicio. Sin app que instalar.",
+      body: googleWallet ? "En Apple Wallet o Google Wallet, sin app que instalar." : "En Apple Wallet; en Android, tu QR desde la pantalla de inicio.",
       visual: <WalletScene card={card} />,
     },
     {
       n: "02",
       title: "Enseñas el QR",
-      body: "La otra persona lo apunta con la cámara de su móvil. Ni app, ni escribir tu nombre, ni buscar después.",
+      body: "La otra persona lo apunta con su cámara. Sin app, sin teclear.",
       visual: <ScanScene card={card} />,
     },
     {
       n: "03",
       title: "Te guarda en un toque",
-      body: "Ve tu tarjeta con lo que tú has decidido enseñar y te guarda en sus contactos. Con foto.",
+      body: "Con foto y con lo que tú has decidido enseñar.",
       visual: <SavedScene card={card} />,
     },
   ];
 
   return (
-    <section id="como-funciona" aria-labelledby="como-funciona-title" className="scroll-mt-10">
-      <div className="mx-auto max-w-[1240px] px-5 py-20 sm:px-8 sm:py-28">
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+    <section id="como-funciona" aria-labelledby="como-funciona-title" className="scroll-mt-10 overflow-x-clip border-t hairline">
+      <div className="mx-auto max-w-[1240px] px-5 py-14 sm:px-8 lg:py-24">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:gap-6">
           <p className="eyebrow lg:col-span-3">Cómo funciona</p>
-          <h2 id="como-funciona-title" className="font-display text-[length:var(--text-display)] leading-[0.95] tracking-tight lg:col-span-9">
+          <h2 id="como-funciona-title" className="font-display text-[length:var(--text-title)] leading-[0.95] tracking-tight lg:col-span-9 lg:text-[length:var(--text-display)]">
             Del bolsillo a su agenda <em className="text-signal">sin teclear nada.</em>
           </h2>
         </div>
 
-        <ol className="mt-14 grid gap-10 lg:grid-cols-3 lg:gap-5">
+        {/* Scrolls sideways on phones, so it is reachable (and scrollable) from the keyboard too. */}
+        <ol
+          tabIndex={0}
+          aria-label="Los tres pasos"
+          className="-mx-5 mt-8 flex snap-x snap-mandatory gap-4 overflow-x-auto px-5 pb-2 [scrollbar-width:none] sm:-mx-8 sm:px-8 lg:mx-0 lg:mt-12 lg:grid lg:grid-cols-3 lg:gap-5 lg:overflow-visible lg:px-0 [&::-webkit-scrollbar]:hidden"
+        >
           {scenes.map((scene) => (
-            <li key={scene.n} className="group mx-auto flex w-full max-w-[440px] flex-col lg:max-w-none">
+            <li key={scene.n} className="group flex w-[78vw] max-w-[360px] shrink-0 snap-center flex-col lg:w-auto lg:max-w-none">
               <div className="relative aspect-[4/5] overflow-hidden rounded-object bg-paper-deep shadow-inset" aria-hidden="true">
                 {scene.visual}
               </div>
-              <div className="flex gap-4 px-2 pt-6">
+              <div className="flex gap-3 px-1 pt-4 lg:gap-4 lg:px-2 lg:pt-6">
                 <span className="font-mono text-mark leading-[1.9] text-signal-deep">{scene.n}</span>
                 <div>
-                  <h3 className="text-xl font-medium tracking-tight">{scene.title}</h3>
-                  <p className="mt-2 leading-relaxed text-ink-soft">{scene.body}</p>
+                  <h3 className="text-lg font-medium tracking-tight lg:text-xl">{scene.title}</h3>
+                  <p className="mt-1 text-sm leading-relaxed text-ink-soft lg:mt-2 lg:text-body">{scene.body}</p>
                 </div>
               </div>
             </li>

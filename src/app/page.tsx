@@ -1,7 +1,6 @@
 import { CircleCheck } from "lucide-react";
-import { Configurator } from "@/components/landing/configurator";
-import { Hero } from "@/components/landing/hero";
-import { AlwaysUpdated, FinalCta, PrivacySection, QuickQuestions } from "@/components/landing/sections";
+import { HeroConfigurator } from "@/components/landing/hero-configurator";
+import { FinalCta, PrivacySection, QuickQuestions } from "@/components/landing/sections";
 import { SiteFooter } from "@/components/landing/site-footer";
 import { SiteHeader } from "@/components/landing/site-header";
 import { Storyboard } from "@/components/landing/storyboard";
@@ -22,8 +21,8 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
   const googleWallet = isGoogleWalletLive();
   // A cookie check, no network call: enough to choose "Mi tarjeta" over "Entrar".
   const signedIn = !accountDeleted && (await hasSessionCookie());
-  // "Hazla tuya" starts on the sample's color with a fresh variation (picked here so it hydrates as rendered).
-  const playground = { theme: "naranja", pattern: DEFAULT_PATTERN, typeface: DEFAULT_TYPEFACE, patternSeed: randomPatternSeed() };
+  // The hero's pass starts on the sample's color with a fresh variation (picked here so it hydrates as rendered).
+  const initialDesign = { theme: "naranja", pattern: DEFAULT_PATTERN, typeface: DEFAULT_TYPEFACE, patternSeed: randomPatternSeed() };
 
   return (
     <>
@@ -37,11 +36,9 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
             </p>
           </div>
         ) : null}
-        <Hero card={demo} ctaHref={ctaHref} />
+        <HeroConfigurator base={demo} initialDesign={initialDesign} />
         <Storyboard card={demo} googleWallet={googleWallet} />
-        <Configurator base={demo} initialDesign={playground} />
         <PrivacySection />
-        <AlwaysUpdated card={demo} googleWallet={googleWallet} />
         <QuickQuestions />
         <FinalCta ctaHref={ctaHref} googleWallet={googleWallet} />
       </main>

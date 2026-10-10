@@ -13,24 +13,22 @@ interface TiltCardProps {
   radiusClassName?: string;
   /** Maximum rotation in degrees. */
   max?: number;
-  /** Ask iOS for motion access on the first tap (only where the card is the point of the page). */
-  askMotion?: boolean;
   /** A soft contact shadow that slides as the object tips. */
   shadow?: boolean;
-  /** The resting sway when nothing drives the tilt. */
+  /** The resting sway when nothing drives the tilt (computers only). */
   idle?: boolean;
 }
 
 /**
- * Turns a pass preview into an object: it tips toward the pointer (or with
- * the phone), a light slides across it and its shadow moves the other way.
- * Renders the child untouched on the server; motion only arrives in the
- * browser, and not at all with prefers-reduced-motion.
+ * On a computer, turns a pass preview into an object: it tips toward the
+ * pointer, a light slides across it and its shadow moves the other way. On a
+ * phone it is simply the pass, still: nothing to tap, nothing to allow.
+ * Renders the child untouched on the server.
  *
- * The resting sway lives on its own element and only pauses while something
- * drives the tilt, so the two never fight over one transform and nothing snaps.
+ * The resting sway lives on its own element and only pauses while the
+ * pointer drives the tilt, so the two never fight over one transform.
  */
-export function TiltCard({ children, className, radiusClassName = "rounded-2xl", max, askMotion, shadow = true, idle = true }: TiltCardProps) {
+export function TiltCard({ children, className, radiusClassName = "rounded-2xl", max, shadow = true, idle = true }: TiltCardProps) {
   const surface = useRef<HTMLDivElement>(null);
   const sheen = useRef<HTMLDivElement>(null);
   const contact = useRef<HTMLDivElement>(null);
@@ -46,7 +44,7 @@ export function TiltCard({ children, className, radiusClassName = "rounded-2xl",
     },
     [max],
   );
-  const { ref, active, enabled } = useTilt({ max, askMotion, onFrame });
+  const { ref, active, enabled } = useTilt({ max, onFrame });
 
   return (
     <div ref={ref} className={cn("relative [perspective:1200px]", className)}>
@@ -62,11 +60,7 @@ export function TiltCard({ children, className, radiusClassName = "rounded-2xl",
         className={cn("[transform-style:preserve-3d]", idle && enabled && "animate-sway")}
         style={{ animationPlayState: active ? "paused" : undefined }}
       >
-        <div
-          ref={surface}
-          className="relative [transform-style:preserve-3d]"
-          style={{ willChange: enabled ? "transform" : undefined }}
-        >
+        <div ref={surface} className="relative [transform-style:preserve-3d]" style={{ willChange: enabled ? "transform" : undefined }}>
           {children}
           <div
             ref={sheen}

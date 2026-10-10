@@ -1,14 +1,11 @@
-import { ArrowUpRight, Check, ChevronDown, EyeOff, RefreshCw, ShieldCheck, Trash2 } from "lucide-react";
+import { Check, ChevronDown, EyeOff, RefreshCw, Trash2 } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { BrandMotif } from "@/components/brand/brand-motif";
 import { LinkIcon } from "@/components/card/link-icon";
-import { WalletPass } from "@/components/card/wallet-pass";
 import { LinkButton } from "@/components/ui/button";
 import { BRAND } from "@/lib/brand";
-import { themeDesign } from "@/lib/card/design";
 import type { LinkKind } from "@/lib/card/links";
-import type { PublicCard } from "@/lib/card/types";
 
 const PRIVACY_ROWS: Array<{ kind: LinkKind; label: string; value: string; visible: boolean }> = [
   { kind: "email", label: "Email", value: "alex@estudionorte.com", visible: true },
@@ -22,35 +19,34 @@ const PRIVACY_POINTS = [
   {
     icon: EyeOff,
     title: "Lo que ocultas no lo ve nadie",
-    body: "Los datos que ocultas no se envían ni al navegador. No es un truco visual: simplemente no están.",
+    body: "No se envía ni al navegador: simplemente no está.",
   },
   {
-    icon: ShieldCheck,
-    title: "Métricas sin rastrear a nadie",
-    body: "Contamos visitas y clics para que sepas si funciona. Sin IPs, sin cookies de terceros, sin perfiles.",
+    icon: RefreshCw,
+    title: "Cambias de trabajo, no de tarjeta",
+    body: "Editas el cargo, la foto o el diseño y el pase se actualiza solo en todas las carteras.",
   },
   {
     icon: Trash2,
     title: "Tu tarjeta, tus reglas",
-    body: "Despublícala cuando quieras o borra la cuenta con un botón. Se elimina todo, también la foto.",
+    body: "Despublícala o borra la cuenta con un botón. Se elimina todo, también la foto.",
   },
 ];
 
 export function PrivacySection() {
   return (
     <section id="privacidad" aria-labelledby="privacidad-title" className="scroll-mt-10 bg-ink text-paper">
-      <div className="mx-auto grid max-w-[1240px] grid-cols-1 gap-16 px-5 py-24 sm:px-8 sm:py-32 lg:grid-cols-12 lg:gap-10">
+      <div className="mx-auto grid max-w-[1240px] grid-cols-1 gap-10 px-5 py-14 sm:px-8 lg:grid-cols-12 lg:gap-10 lg:py-28">
         <div className="lg:col-span-6">
-          <p className="eyebrow text-paper/60">Privacidad</p>
-          <h2 id="privacidad-title" className="mt-4 font-display text-[length:var(--text-display)] leading-[0.95] tracking-tight">
+          <p className="eyebrow text-paper/60">Tus datos</p>
+          <h2 id="privacidad-title" className="mt-3 font-display text-[length:var(--text-title)] leading-[0.95] tracking-tight lg:text-[length:var(--text-display)]">
             Tú decides <em className="text-glow">qué</em> se ve.
           </h2>
-          <p className="mt-6 max-w-md text-lg leading-relaxed text-paper/70">
-            No todo el mundo quiere repartir su móvil. Enseña el LinkedIn en un evento, el WhatsApp a un cliente — y cambia
-            de idea cuando quieras.
+          <p className="mt-4 max-w-md text-body leading-relaxed text-paper/70 lg:text-lg">
+            El LinkedIn en un evento, el WhatsApp a un cliente. Cambia de idea cuando quieras.
           </p>
 
-          <ul className="mt-12 space-y-8">
+          <ul className="mt-8 space-y-6 lg:mt-12 lg:space-y-8">
             {PRIVACY_POINTS.map(({ icon: Icon, title, body }) => (
               <li key={title} className="flex gap-4">
                 <span className="mt-0.5 grid size-10 shrink-0 place-items-center rounded-full border border-paper/20 text-glow">
@@ -58,14 +54,15 @@ export function PrivacySection() {
                 </span>
                 <div>
                   <h3 className="font-medium">{title}</h3>
-                  <p className="mt-1 leading-relaxed text-paper/65">{body}</p>
+                  <p className="mt-1 text-sm leading-relaxed text-paper/65 lg:text-body">{body}</p>
                 </div>
               </li>
             ))}
           </ul>
         </div>
 
-        <div className="lg:col-span-5 lg:col-start-8">
+        {/* The switches demo says the same as the first point: computers only. */}
+        <div className="hidden lg:col-span-5 lg:col-start-8 lg:block">
           <div className="rounded-object border border-paper/12 bg-paper/[0.04] p-3 sm:p-4" aria-label="Ejemplo de contactos visibles y ocultos">
             <p className="eyebrow px-3 pt-2 pb-4 text-paper/60">Tus datos de contacto</p>
             <ul className="space-y-2">
@@ -97,49 +94,6 @@ export function PrivacySection() {
                 </li>
               ))}
             </ul>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-export function AlwaysUpdated({ card, googleWallet }: { card: PublicCard; googleWallet: boolean }) {
-  const before: PublicCard = { ...card, ...themeDesign("arena", "arco", 48_213), headline: "Product Designer", company: "Estudio Norte" };
-  const after: PublicCard = {
-    ...card,
-    ...themeDesign("cafe", "corriente", 48_213, "editorial"),
-    headline: "Head of Design",
-    company: "Norte & Co.",
-  };
-
-  return (
-    <section aria-labelledby="actualizada-title" className="overflow-x-clip">
-      <div className="mx-auto grid max-w-[1240px] grid-cols-1 items-center gap-14 px-5 py-24 sm:px-8 sm:py-32 lg:grid-cols-12">
-        <div className="lg:col-span-5">
-          <p className="eyebrow">Siempre al día</p>
-          <h2 id="actualizada-title" className="mt-4 font-display text-[length:var(--text-display)] leading-[0.95] tracking-tight">
-            Cambias de trabajo, <em className="text-signal">no de tarjeta.</em>
-          </h2>
-          <p className="mt-6 max-w-md text-lg leading-relaxed text-ink-soft">
-            Edita tu cargo, tu foto, tus enlaces o el diseño entero y el pase se actualiza solo en todas las carteras
-            donde esté. Nada de reimprimir, nada de volver a enviar.
-          </p>
-          <p className="eyebrow mt-8 inline-flex items-center gap-2">
-            <RefreshCw className="size-4 text-signal" aria-hidden />
-            {googleWallet ? "Actualización automática en Apple y Google Wallet" : "Actualización automática en Apple Wallet"}
-          </p>
-        </div>
-
-        <div className="relative flex items-center justify-center gap-4 sm:gap-8 lg:col-span-7" aria-hidden="true">
-          <div className="w-[46%] max-w-[270px] -rotate-3 scale-95">
-            <WalletPass card={before} />
-          </div>
-          <span className="grid size-11 shrink-0 place-items-center rounded-full bg-ink text-paper shadow-soft">
-            <ArrowUpRight className="size-5 rotate-45" />
-          </span>
-          <div className="w-[46%] max-w-[270px] rotate-2">
-            <WalletPass card={after} />
           </div>
         </div>
       </div>
@@ -187,17 +141,17 @@ const QUESTIONS: Array<{ question: string; answer: ReactNode }> = [
 export function QuickQuestions() {
   return (
     <section id="preguntas" aria-labelledby="preguntas-title" className="scroll-mt-10">
-      <div className="mx-auto grid max-w-[1240px] grid-cols-1 gap-10 px-5 pb-24 sm:px-8 sm:pb-32 lg:grid-cols-12">
+      <div className="mx-auto grid max-w-[1240px] grid-cols-1 gap-6 px-5 py-14 sm:px-8 lg:grid-cols-12 lg:gap-10 lg:py-28">
         <div className="lg:col-span-4">
           <p className="eyebrow">Antes de empezar</p>
-          <h2 id="preguntas-title" className="mt-4 font-display text-[length:var(--text-display)] leading-[0.95] tracking-tight">
+          <h2 id="preguntas-title" className="mt-3 font-display text-[length:var(--text-title)] leading-[0.95] tracking-tight lg:text-[length:var(--text-display)]">
             Preguntas <em className="text-signal">rápidas.</em>
           </h2>
         </div>
         <div className="divide-y divide-ink/10 border-y hairline lg:col-span-8">
           {QUESTIONS.map(({ question, answer }) => (
             <details key={question} className="group">
-              <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 rounded-lg py-4 text-lg font-medium tracking-tight [&::-webkit-details-marker]:hidden">
+              <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 rounded-lg py-4 text-body font-medium tracking-tight [&::-webkit-details-marker]:hidden lg:text-lg">
                 {question}
                 <ChevronDown
                   className="size-5 shrink-0 text-muted transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none"
@@ -215,8 +169,8 @@ export function QuickQuestions() {
 
 export function FinalCta({ ctaHref, googleWallet }: { ctaHref: string; googleWallet: boolean }) {
   return (
-    <section aria-labelledby="cta-title" className="px-5 pb-24 sm:px-8">
-      <div className="relative isolate mx-auto max-w-[1240px] overflow-hidden rounded-object bg-glow px-6 py-20 text-center text-ink sm:px-12 sm:py-28">
+    <section aria-labelledby="cta-title" className="px-5 pb-14 sm:px-8 lg:pb-24">
+      <div className="relative isolate mx-auto max-w-[1240px] overflow-hidden rounded-object bg-glow px-6 py-14 text-center text-ink sm:px-12 lg:py-28">
         <BrandMotif
           color={BRAND.signal}
           pattern="persiana"
@@ -226,17 +180,17 @@ export function FinalCta({ ctaHref, googleWallet }: { ctaHref: string; googleWal
           className="pointer-events-none absolute top-1/2 left-1/2 -z-10 -translate-x-1/2 -translate-y-1/2 opacity-35"
         />
         <p className="eyebrow relative text-ink-soft">Empieza hoy</p>
-        <h2 id="cta-title" className="relative mx-auto mt-4 max-w-3xl font-display text-[length:var(--text-display)] leading-[0.95] tracking-tight">
+        <h2 id="cta-title" className="relative mx-auto mt-3 max-w-3xl font-display text-[length:var(--text-title)] leading-[0.95] tracking-tight lg:text-[length:var(--text-display)]">
           Deja de repartir papel. <em className="text-signal-deep">Pásate.</em>
         </h2>
-        <ul className="relative mx-auto mt-8 flex max-w-xl flex-wrap justify-center gap-x-6 gap-y-2 text-ink">
+        <ul className="relative mx-auto mt-6 flex max-w-xl flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-ink lg:text-body">
           {["Gratis para siempre", "Listo en 2 minutos", googleWallet ? "iPhone y Android" : "Funciona en cualquier móvil con cámara"].map((item) => (
             <li key={item} className="inline-flex items-center gap-1.5">
               <Check className="size-4 text-signal-deep" aria-hidden /> {item}
             </li>
           ))}
         </ul>
-        <LinkButton href={ctaHref} variant="ink" size="lg" className="relative mt-10">
+        <LinkButton href={ctaHref} variant="ink" size="lg" className="relative mt-8 max-sm:w-full">
           Crear mi tarjeta
         </LinkButton>
       </div>

@@ -10,7 +10,8 @@ cartera, junto a tus tarjetas y billetes.
 
 <p align="center">
   <img src="docs/images/landing.png" alt="Landing de PassMe" width="720" /><br/>
-  <img src="docs/images/card-mobile.png" alt="Tarjeta pública al escanear el QR" width="260" />
+  <img src="docs/images/landing-mobile.png" alt="La portada en el móvil: tu nombre, tu pase y «Crear mi tarjeta»" width="200" />
+  <img src="docs/images/card-mobile.png" alt="Tarjeta pública al escanear el QR" width="200" />
   <img src="docs/images/editor.png" alt="Editor de la tarjeta" width="440" />
 </p>
 

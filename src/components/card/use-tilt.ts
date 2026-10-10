@@ -1,14 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { easeTilt, isSettled, MAX_TILT_DEG, REST_TILT, tiltFromOrientation, tiltFromPointer, tiltFromScroll, type Tilt } from "@/lib/tilt";
+import { easeTilt, isSettled, MAX_TILT_DEG, REST_TILT, tiltFromPointer, type Tilt } from "@/lib/tilt";
 
 /** Share of the remaining distance covered each frame: fast to follow, soft to settle. */
 const FOLLOW = 0.14;
-
-interface DeviceOrientationEventWithPermission {
-  requestPermission?: () => Promise<"granted" | "denied">;
-}
 
 const noop = () => () => {};
 
@@ -29,8 +25,6 @@ function useMediaQuery(query: string): boolean {
 export interface UseTiltOptions {
   /** Maximum rotation in degrees. */
   max?: number;
-  /** Ask iOS for motion access on the first tap (a system dialog). Off by default. */
-  askMotion?: boolean;
   /** Called on every animation frame with the current tilt: write it to the DOM here. */
   onFrame: (tilt: Tilt) => void;
 }
@@ -38,18 +32,21 @@ export interface UseTiltOptions {
 export interface UseTiltResult {
   /** Put it on the element the pointer is measured against. */
   ref: (element: HTMLElement | null) => void;
-  /** True while something (pointer, phone) drives the tilt: the resting animation should stop. */
+  /** True while the pointer drives the tilt: the resting animation should pause. */
   active: boolean;
-  /** True when motion is allowed at all (in the browser, without a reduced-motion preference). */
+  /**
+   * True when the tilt can happen at all: in the browser, with a fine pointer
+   * (a mouse or trackpad) and no reduced-motion preference. Phones get a still object.
+   */
   enabled: boolean;
 }
 
 /**
- * Drives a tilt from the pointer (devices with a fine pointer) or from the
- * phone's orientation (touch devices), easing between frames outside React's
- * render cycle. Honors prefers-reduced-motion by doing nothing.
+ * Drives a tilt from the pointer on devices that have one, easing between
+ * frames outside React's render cycle. Does nothing on touch devices and
+ * under prefers-reduced-motion: no sensors, no permissions, nothing to tap.
  */
-export function useTilt({ max = MAX_TILT_DEG, askMotion = false, onFrame }: UseTiltOptions): UseTiltResult {
+export function useTilt({ max = MAX_TILT_DEG, onFrame }: UseTiltOptions): UseTiltResult {
   const [element, setElement] = useState<HTMLElement | null>(null);
   const [active, setActive] = useState(false);
   const hydrated = useSyncExternalStore(
@@ -59,7 +56,7 @@ export function useTilt({ max = MAX_TILT_DEG, askMotion = false, onFrame }: UseT
   );
   const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const finePointer = useMediaQuery("(hover: hover) and (pointer: fine)");
-  const enabled = hydrated && !reduceMotion;
+  const enabled = hydrated && !reduceMotion && finePointer;
   // The latest callback, read from the animation loop without restarting it.
   const frameCallback = useRef(onFrame);
   useEffect(() => {
@@ -83,64 +80,22 @@ export function useTilt({ max = MAX_TILT_DEG, askMotion = false, onFrame }: UseT
       target = tilt;
       if (frame === null) frame = requestAnimationFrame(tick);
     };
-    const cleanups: Array<() => void> = [];
-
-    if (finePointer) {
-      const onMove = (event: PointerEvent) => {
-        setActive(true);
-        aim(tiltFromPointer(event.clientX, event.clientY, element.getBoundingClientRect(), max));
-      };
-      const onLeave = () => {
-        aim(REST_TILT);
-        setActive(false);
-      };
-      element.addEventListener("pointermove", onMove);
-      element.addEventListener("pointerleave", onLeave);
-      cleanups.push(() => {
-        element.removeEventListener("pointermove", onMove);
-        element.removeEventListener("pointerleave", onLeave);
-      });
-    } else {
-      // Until the sensors speak (iOS needs a permission; some phones have none), scrolling moves the light.
-      let neutral: number | null = null;
-      const onScroll = () => {
-        if (neutral !== null) return;
-        aim(tiltFromScroll(element.getBoundingClientRect(), window.innerHeight, max));
-      };
-      onScroll();
-      window.addEventListener("scroll", onScroll, { passive: true });
-      cleanups.push(() => window.removeEventListener("scroll", onScroll));
-
-      if ("DeviceOrientationEvent" in window) {
-        const onOrientation = (event: DeviceOrientationEvent) => {
-          if (event.beta === null || event.gamma === null) return;
-          // The first reading is how the phone is being held: that's "flat".
-          if (neutral === null) {
-            neutral = event.beta;
-            setActive(true);
-          }
-          aim(tiltFromOrientation(event.beta, event.gamma, max, neutral));
-        };
-        window.addEventListener("deviceorientation", onOrientation);
-        cleanups.push(() => window.removeEventListener("deviceorientation", onOrientation));
-
-        // iOS only sends the events after a permission granted from a tap.
-        const Orientation = window.DeviceOrientationEvent as unknown as DeviceOrientationEventWithPermission;
-        if (askMotion && typeof Orientation.requestPermission === "function") {
-          const ask = () => {
-            Orientation.requestPermission?.().catch(() => undefined);
-          };
-          element.addEventListener("click", ask, { once: true });
-          cleanups.push(() => element.removeEventListener("click", ask));
-        }
-      }
-    }
-
+    const onMove = (event: PointerEvent) => {
+      setActive(true);
+      aim(tiltFromPointer(event.clientX, event.clientY, element.getBoundingClientRect(), max));
+    };
+    const onLeave = () => {
+      aim(REST_TILT);
+      setActive(false);
+    };
+    element.addEventListener("pointermove", onMove);
+    element.addEventListener("pointerleave", onLeave);
     return () => {
-      for (const cleanup of cleanups) cleanup();
+      element.removeEventListener("pointermove", onMove);
+      element.removeEventListener("pointerleave", onLeave);
       if (frame !== null) cancelAnimationFrame(frame);
     };
-  }, [element, enabled, finePointer, max, askMotion]);
+  }, [element, enabled, max]);
 
   return { ref: setElement, active, enabled };
 }
