@@ -11,7 +11,7 @@ import { CHOICE_FOCUS, CHOICE_INPUT } from "@/components/ui/choice";
 import { inputClasses } from "@/components/ui/field";
 import { createWithDesignPath, type ChosenDesign } from "@/lib/card/design-query";
 import { CARD_THEMES, randomPatternSeed, resolveDesign, themeDesign, TYPEFACE_LABELS, TYPEFACES, type Typeface } from "@/lib/card/design";
-import { rememberDetails } from "@/lib/card/draft-storage";
+import { rememberName } from "@/lib/card/draft-storage";
 import { hasVariations, PATTERN_KINDS, PATTERN_LABELS, type PatternKind } from "@/lib/card/pattern";
 import { LIMITS } from "@/lib/card/schema";
 import type { PublicCard } from "@/lib/card/types";
@@ -145,7 +145,7 @@ export function Configurator({ base, initialDesign }: ConfiguratorProps) {
                 className="group"
                 onClick={() => {
                   // The name goes with the draft (this browser only), never in the link.
-                  if (typed) rememberDetails({ fullName: typed }, null);
+                  rememberName(typed);
                 }}
               >
                 Crear mi tarjeta con este diseño

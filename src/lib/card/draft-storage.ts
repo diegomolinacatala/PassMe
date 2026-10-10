@@ -117,6 +117,30 @@ export function rememberDetails(
   );
 }
 
+/**
+ * Keeps a name typed before the form (the landing's "Hazla tuya") without
+ * touching anything else: a code already on its way to this browser stays valid.
+ */
+export function rememberName(fullName: string, now: number = Date.now()): void {
+  const name = fullName.trim();
+  if (!name) return;
+  const current = readStoredDraft(now);
+  writeStoredDraft(
+    current
+      ? { ...current, draft: { ...current.draft, fullName: name } }
+      : {
+          draft: coerceQuickDraft({ theme: "", fullName: name }),
+          pending: false,
+          from: null,
+          via: "direct",
+          authEmail: null,
+          codeSentAt: null,
+          viaGoogle: false,
+        },
+    now,
+  );
+}
+
 export function clearStoredDraft(): void {
   try {
     storage()?.removeItem(KEY);

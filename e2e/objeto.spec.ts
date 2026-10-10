@@ -103,10 +103,15 @@ test.describe("hazla tuya", () => {
     await expect(page.getByRole("radio", { name: "Salvia" })).toBeChecked();
   });
 
-  test("a link with nonsense falls back to the defaults instead of breaking", async ({ page }) => {
+  test("a link with nonsense is treated as no design at all", async ({ page }) => {
     await page.goto("/crear?tema=neon&motivo=sello&letra=comic&variacion=x");
+    await expect(page.getByRole("radiogroup", { name: "Color de tu tarjeta" }).getByRole("radio", { checked: true })).toHaveCount(1);
+    // Any theme name (accents included: «Melocotón», «Café»), and the default hint.
+    await expect(page.getByText(/^\p{L}+\. Motivo, letra y foto, luego en el editor\.$/u)).toBeVisible();
+    // One good value is kept; the rest are the defaults.
+    await page.goto("/crear?tema=neon&motivo=cinta");
     await expect(page.getByRole("radio", { name: "Naranja" })).toBeChecked();
-    await expect(page.getByText("Naranja. Motivo, letra y foto, luego en el editor.")).toBeVisible();
+    await expect(page.getByText("Naranja, motivo Cinta y letra Clásica. La foto, luego en el editor.")).toBeVisible();
   });
 });
 

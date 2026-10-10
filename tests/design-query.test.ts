@@ -13,12 +13,15 @@ describe("design chosen before the card exists", () => {
     expect(parseDesignQuery(query)).toEqual(design);
   });
 
-  it("is null when the link carries no design, and safe when it carries nonsense", () => {
+  it("is null when the link carries nothing valid, and keeps the good values of a half-broken one", () => {
     expect(parseDesignQuery({})).toBeNull();
     expect(parseDesignQuery({ de: "demo", via: "qr" })).toBeNull();
-    expect(parseDesignQuery({ tema: "neon", motivo: "sello", letra: "comic", variacion: "-3" })).toEqual({
+    // Nothing usable: /crear behaves as if no design had been chosen (random color, nothing overridden).
+    expect(parseDesignQuery({ tema: "neon", motivo: "sello", letra: "comic", variacion: "-3" })).toBeNull();
+    expect(parseDesignQuery({ variacion: "" })).toBeNull();
+    expect(parseDesignQuery({ tema: "neon", motivo: "corriente" })).toEqual({
       theme: "naranja",
-      pattern: "arco",
+      pattern: "corriente",
       typeface: "clasica",
       patternSeed: 0,
     });

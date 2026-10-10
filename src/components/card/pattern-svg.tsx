@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactElement } from "react";
+import type { CSSProperties, ReactElement, Ref } from "react";
 import type { ResolvedDesign } from "@/lib/card/design";
 import { patternLayers, type PatternBox, type PatternFocus, type PatternLayer } from "@/lib/card/pattern";
 
@@ -24,21 +24,27 @@ export interface PatternSvgProps {
    * motif appears (`pathLength` + the motif-draw keyframes). Never for Satori.
    */
   draw?: boolean;
+  /** Browser only: the <svg> element (to watch it scroll into view). */
+  ref?: Ref<SVGSVGElement>;
 }
 
 /** How long the lines take to draw, and the stagger between layers. */
 const DRAW_MS = 1500;
 const DRAW_STAGGER_MS = 90;
 
+/**
+ * The hidden start lives in the keyframes (fill-mode `both`), never inline:
+ * with animations switched off, the motif simply shows finished.
+ */
 function drawStyle(layer: PatternLayer, index: number): CSSProperties {
   const delay = `${index * DRAW_STAGGER_MS}ms`;
   return layer.mode === "stroke"
-    ? { strokeDasharray: 1, strokeDashoffset: 1, animation: `motif-draw ${DRAW_MS}ms cubic-bezier(0.16, 1, 0.3, 1) ${delay} forwards` }
+    ? { strokeDasharray: 1, animation: `motif-draw ${DRAW_MS}ms cubic-bezier(0.16, 1, 0.3, 1) ${delay} both` }
     : { animation: `pattern-in 900ms cubic-bezier(0.16, 1, 0.3, 1) ${delay} both` };
 }
 
 /** The generative pattern alone, in the card's detail color. */
-export function PatternSvg({ design, box, focus, fade, width, height, style, layers: given, draw }: PatternSvgProps): ReactElement | null {
+export function PatternSvg({ design, box, focus, fade, width, height, style, layers: given, draw, ref }: PatternSvgProps): ReactElement | null {
   const layers = given ?? patternLayers(design.pattern, design.seed, box, focus);
   if (layers.length === 0) return null;
 
@@ -50,6 +56,7 @@ export function PatternSvg({ design, box, focus, fade, width, height, style, lay
 
   return (
     <svg
+      ref={ref}
       width={width}
       height={height}
       viewBox={`0 0 ${box.width} ${box.height}`}

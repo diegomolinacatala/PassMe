@@ -64,7 +64,7 @@ export function Hero({ card, ctaHref }: HeroProps) {
 
 function HeroPass({ card }: { card: PublicCard }) {
   return (
-    <div className="relative mx-auto w-[320px] sm:w-[380px] xl:w-[420px]" aria-label="Ejemplo de tarjeta PassMe en Apple Wallet">
+    <div className="relative mx-auto w-[320px] sm:w-[380px] xl:w-[420px]">
       <BrandMotif
         size={960}
         seed={48213}

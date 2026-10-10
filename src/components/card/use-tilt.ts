@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { easeTilt, isSettled, MAX_TILT_DEG, REST_TILT, tiltFromOrientation, tiltFromPointer, type Tilt } from "@/lib/tilt";
 
 /** Share of the remaining distance covered each frame: fast to follow, soft to settle. */
@@ -10,17 +10,20 @@ interface DeviceOrientationEventWithPermission {
   requestPermission?: () => Promise<"granted" | "denied">;
 }
 
+const noop = () => () => {};
+
 /** A media query as a store: false on the server, the browser's answer after hydration. */
 function useMediaQuery(query: string): boolean {
-  return useSyncExternalStore(
-    (onChange) => {
+  const subscribe = useCallback(
+    (onChange: () => void) => {
       const list = window.matchMedia(query);
       list.addEventListener("change", onChange);
       return () => list.removeEventListener("change", onChange);
     },
-    () => window.matchMedia(query).matches,
-    () => false,
+    [query],
   );
+  const getSnapshot = useCallback(() => window.matchMedia(query).matches, [query]);
+  return useSyncExternalStore(subscribe, getSnapshot, () => false);
 }
 
 export interface UseTiltOptions {
@@ -50,7 +53,7 @@ export function useTilt({ max = MAX_TILT_DEG, askMotion = false, onFrame }: UseT
   const [element, setElement] = useState<HTMLElement | null>(null);
   const [active, setActive] = useState(false);
   const hydrated = useSyncExternalStore(
-    () => () => {},
+    noop,
     () => true,
     () => false,
   );

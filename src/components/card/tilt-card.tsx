@@ -26,6 +26,9 @@ interface TiltCardProps {
  * the phone), a light slides across it and its shadow moves the other way.
  * Renders the child untouched on the server; motion only arrives in the
  * browser, and not at all with prefers-reduced-motion.
+ *
+ * The resting sway lives on its own element and only pauses while something
+ * drives the tilt, so the two never fight over one transform and nothing snaps.
  */
 export function TiltCard({ children, className, radiusClassName = "rounded-2xl", max, askMotion, shadow = true, idle = true }: TiltCardProps) {
   const surface = useRef<HTMLDivElement>(null);
@@ -56,17 +59,22 @@ export function TiltCard({ children, className, radiusClassName = "rounded-2xl",
         />
       ) : null}
       <div
-        ref={surface}
-        className={cn("relative [transform-style:preserve-3d]", idle && enabled && !active && "animate-sway")}
-        style={{ willChange: enabled ? "transform" : undefined }}
+        className={cn("[transform-style:preserve-3d]", idle && enabled && "animate-sway")}
+        style={{ animationPlayState: active ? "paused" : undefined }}
       >
-        {children}
         <div
-          ref={sheen}
-          aria-hidden="true"
-          className={cn("pointer-events-none absolute inset-0 overflow-hidden", radiusClassName)}
-          style={{ backgroundImage: enabled ? sheenBackground({ rx: 0, ry: 0, lx: 0.3, ly: 0.25 }) : undefined }}
-        />
+          ref={surface}
+          className="relative [transform-style:preserve-3d]"
+          style={{ willChange: enabled ? "transform" : undefined }}
+        >
+          {children}
+          <div
+            ref={sheen}
+            aria-hidden="true"
+            className={cn("pointer-events-none absolute inset-0 overflow-hidden", radiusClassName)}
+            style={{ backgroundImage: enabled ? sheenBackground({ rx: 0, ry: 0, lx: 0.3, ly: 0.25 }) : undefined }}
+          />
+        </div>
       </div>
     </div>
   );

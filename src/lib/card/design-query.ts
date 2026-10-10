@@ -21,21 +21,26 @@ type Query = Record<string, string | string[] | undefined>;
 const first = (value: string | string[] | undefined): string | null => (Array.isArray(value) ? (value[0] ?? null) : (value ?? null));
 
 /**
- * The design in a /crear query, or null when it carries none. Unknown values
- * fall back to the defaults, so a tampered link still makes a sensible card.
+ * The design in a /crear query, or null when it carries nothing valid (then
+ * /crear picks its usual random color). A link with one good value and three
+ * bad ones keeps the good one and fills the rest with the defaults.
  */
 export function parseDesignQuery(query: Query): ChosenDesign | null {
   const theme = first(query[DESIGN_PARAMS.theme]);
   const pattern = first(query[DESIGN_PARAMS.pattern]);
   const typeface = first(query[DESIGN_PARAMS.typeface]);
   const seed = first(query[DESIGN_PARAMS.seed]);
-  if (theme === null && pattern === null && typeface === null && seed === null) return null;
-  const seedNumber = seed === null ? Number.NaN : Number(seed);
+  const seedNumber = seed === null || seed.trim() === "" ? Number.NaN : Number(seed);
+  const validTheme = theme !== null && CARD_THEMES.some((t) => t.id === theme) ? theme : null;
+  const validPattern = isPatternKind(pattern) ? pattern : null;
+  const validTypeface = isTypeface(typeface) ? typeface : null;
+  const validSeed = isPatternSeed(seedNumber) ? seedNumber : null;
+  if (validTheme === null && validPattern === null && validTypeface === null && validSeed === null) return null;
   return {
-    theme: CARD_THEMES.some((t) => t.id === theme) ? (theme as string) : DEFAULT_THEME.id,
-    pattern: isPatternKind(pattern) ? pattern : DEFAULT_PATTERN,
-    typeface: isTypeface(typeface) ? typeface : DEFAULT_TYPEFACE,
-    patternSeed: isPatternSeed(seedNumber) ? seedNumber : 0,
+    theme: validTheme ?? DEFAULT_THEME.id,
+    pattern: validPattern ?? DEFAULT_PATTERN,
+    typeface: validTypeface ?? DEFAULT_TYPEFACE,
+    patternSeed: validSeed ?? 0,
   };
 }
 
