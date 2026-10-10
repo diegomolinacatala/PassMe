@@ -12,6 +12,9 @@ const subscribe = () => () => {};
  * the RSC payload (only the seed travels). The layers are memoized: editor
  * previews re-render on every keystroke, and the style gallery draws all
  * eight motifs at once.
+ *
+ * Every motif draws itself in (its lines first, then its tints), and a new
+ * variation or motif is a new drawing: the element is keyed by both.
  */
 export function DeferredPatternSvg({ style, ...props }: PatternSvgProps) {
   const isClient = useSyncExternalStore(
@@ -27,5 +30,5 @@ export function DeferredPatternSvg({ style, ...props }: PatternSvgProps) {
     [isClient, pattern, seed, boxWidth, boxHeight, x, y, r],
   );
   if (!layers) return null;
-  return <PatternSvg {...props} layers={layers} style={{ ...style, animation: "pattern-in 0.8s cubic-bezier(0.16, 1, 0.3, 1) both" }} />;
+  return <PatternSvg key={`${pattern}-${seed}`} {...props} layers={layers} style={style} draw />;
 }

@@ -6,7 +6,8 @@ import { CHOICE_FOCUS, CHOICE_INPUT } from "@/components/ui/choice";
 import { Field as FieldShell, InlineError, inputClasses } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
 import { SubmitButton } from "@/components/ui/submit-button";
-import { CARD_THEMES } from "@/lib/card/design";
+import { CARD_THEMES, DEFAULT_TYPEFACE, TYPEFACE_LABELS, type Typeface } from "@/lib/card/design";
+import { DEFAULT_PATTERN, PATTERN_LABELS, type PatternKind } from "@/lib/card/pattern";
 import { CONTACT_ERROR_KEY, type QuickCardDraft, type QuickTextField } from "@/lib/card/quick";
 import { LIMITS, type FieldErrors } from "@/lib/card/schema";
 import { cn } from "@/lib/cn";
@@ -112,7 +113,7 @@ export function QuickCardForm({
 
       <fieldset>
         <legend className="eyebrow mb-3">Color</legend>
-        <ThemePicker value={draft.theme} onChange={(theme) => onChange({ theme })} />
+        <ThemePicker value={draft.theme} pattern={draft.pattern} typeface={draft.typeface} onChange={(theme) => onChange({ theme })} />
       </fieldset>
 
       <div className="space-y-3">
@@ -176,9 +177,18 @@ function Field({ def, value, error, describedBy, onChange, onBlur, isLast }: Fie
   );
 }
 
+interface ThemePickerProps {
+  value: string;
+  /** Motif and typeface the draft already carries (chosen on the landing), named under the colors. */
+  pattern: PatternKind;
+  typeface: Typeface;
+  onChange: (theme: string) => void;
+}
+
 /** Native radios: one Tab stop, and the arrow keys go through the colors. */
-function ThemePicker({ value, onChange }: { value: string; onChange: (theme: string) => void }) {
+function ThemePicker({ value, pattern, typeface, onChange }: ThemePickerProps) {
   const selected = CARD_THEMES.find((t) => t.id === value) ?? CARD_THEMES[0]!;
+  const designChosen = pattern !== DEFAULT_PATTERN || typeface !== DEFAULT_TYPEFACE;
   return (
     <div>
       <div role="radiogroup" aria-label="Color de tu tarjeta" className="flex flex-wrap gap-2.5">
@@ -212,7 +222,9 @@ function ThemePicker({ value, onChange }: { value: string; onChange: (theme: str
         })}
       </div>
       <p className="mt-2.5 text-xs text-muted">
-        {selected.name}. Motivo, letra y foto, luego en el editor.
+        {designChosen
+          ? `${selected.name}, motivo ${PATTERN_LABELS[pattern].name} y letra ${TYPEFACE_LABELS[typeface].name}. La foto, luego en el editor.`
+          : `${selected.name}. Motivo, letra y foto, luego en el editor.`}
       </p>
     </div>
   );

@@ -19,10 +19,26 @@ export interface PatternSvgProps {
   style?: CSSProperties;
   /** Precomputed layers (the browser memoizes them); drawn from the design when omitted. */
   layers?: ReadonlyArray<PatternLayer>;
+  /**
+   * Browser only: the lines draw themselves and the tints fade in when the
+   * motif appears (`pathLength` + the motif-draw keyframes). Never for Satori.
+   */
+  draw?: boolean;
+}
+
+/** How long the lines take to draw, and the stagger between layers. */
+const DRAW_MS = 1500;
+const DRAW_STAGGER_MS = 90;
+
+function drawStyle(layer: PatternLayer, index: number): CSSProperties {
+  const delay = `${index * DRAW_STAGGER_MS}ms`;
+  return layer.mode === "stroke"
+    ? { strokeDasharray: 1, strokeDashoffset: 1, animation: `motif-draw ${DRAW_MS}ms cubic-bezier(0.16, 1, 0.3, 1) ${delay} forwards` }
+    : { animation: `pattern-in 900ms cubic-bezier(0.16, 1, 0.3, 1) ${delay} both` };
 }
 
 /** The generative pattern alone, in the card's detail color. */
-export function PatternSvg({ design, box, focus, fade, width, height, style, layers: given }: PatternSvgProps): ReactElement | null {
+export function PatternSvg({ design, box, focus, fade, width, height, style, layers: given, draw }: PatternSvgProps): ReactElement | null {
   const layers = given ?? patternLayers(design.pattern, design.seed, box, focus);
   if (layers.length === 0) return null;
 
@@ -50,6 +66,8 @@ export function PatternSvg({ design, box, focus, fade, width, height, style, lay
           strokeWidth={layer.width}
           strokeLinejoin="round"
           opacity={layer.opacity}
+          pathLength={draw && layer.mode === "stroke" ? 1 : undefined}
+          style={draw ? drawStyle(layer, index) : undefined}
         />
       ))}
     </svg>

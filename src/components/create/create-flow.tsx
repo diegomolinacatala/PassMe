@@ -12,6 +12,7 @@ import { Field, inputClasses } from "@/components/ui/field";
 import { Turnstile } from "@/components/ui/turnstile";
 import { useHydrated } from "@/components/use-hydrated";
 import { DEMO_LOGIN_CODE, LOGIN_CODE_TTL_MS } from "@/lib/auth/code";
+import type { ChosenDesign } from "@/lib/card/design-query";
 import { readStoredDraft, resumableCode, writeStoredDraft, type StoredDraft } from "@/lib/card/draft-storage";
 import {
   createPath,
@@ -42,10 +43,14 @@ interface CreateFlowProps {
   /** How they reached the referrer's card (/crear?via=…): the welcome adapts to it. */
   via: VisitSource;
   referrer: Referrer | null;
-  /** Motif variation for a fresh draft (picked on the server so the preview hydrates as rendered). */
-  initialSeed: number;
-  /** Color of a fresh draft: random, never the referrer's (picked on the server, like the seed). */
-  initialTheme: string;
+  /**
+   * Design of a fresh draft, picked on the server so the preview hydrates as
+   * rendered: a random color (never the referrer's) and variation, or the one
+   * chosen on the landing ("Hazla tuya", /crear?tema=…).
+   */
+  initialDesign: ChosenDesign;
+  /** The link carries a design: it wins over whatever an older draft in this browser had. */
+  designChosen: boolean;
   accountEmail: string | null;
   previewStyle: PassStyle;
   /** The wallet the preview stands for, or null when this phone has none to offer (Android before Google Wallet). */
@@ -84,8 +89,8 @@ export function CreateFlow({
   from,
   via,
   referrer,
-  initialSeed,
-  initialTheme,
+  initialDesign,
+  designChosen,
   accountEmail,
   previewStyle,
   previewWallet,
@@ -95,8 +100,7 @@ export function CreateFlow({
 }: CreateFlowProps) {
   const [draft, setDraft] = useState<QuickCardDraft>({
     ...EMPTY_QUICK_DRAFT,
-    theme: initialTheme,
-    patternSeed: initialSeed,
+    ...initialDesign,
     email: accountEmail ?? "",
   });
   const [origin, setOrigin] = useState(from);
@@ -144,8 +148,10 @@ export function CreateFlow({
         ...stored.draft,
         email: stored.draft.email || accountEmail || "",
         // 0 / "" is what an incomplete stored draft gets: keep this visit's variation and color instead.
-        patternSeed: stored.draft.patternSeed || initialSeed,
-        theme: stored.draft.theme || initialTheme,
+        patternSeed: stored.draft.patternSeed || initialDesign.patternSeed,
+        theme: stored.draft.theme || initialDesign.theme,
+        // A design chosen just now (the landing's link) beats the one an older draft had.
+        ...(designChosen ? initialDesign : {}),
       });
       setOrigin(from ?? stored.from);
       if (!from) setOriginVia(stored.via);

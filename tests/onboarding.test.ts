@@ -71,6 +71,8 @@ describe("quick card draft", () => {
         linkedin: "https://www.linkedin.com/in/jose-nunez",
         theme: "salvia",
         patternSeed: 1234,
+        pattern: "arco",
+        typeface: "clasica",
       },
     });
   });

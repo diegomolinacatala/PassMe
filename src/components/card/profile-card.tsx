@@ -9,6 +9,7 @@ import { fadesUnderText } from "@/lib/card/pattern";
 import type { PublicCard } from "@/lib/card/types";
 import { cn } from "@/lib/cn";
 import { Avatar } from "./avatar";
+import { CardSheen } from "./card-sheen";
 import { LinkIcon } from "./link-icon";
 import { DeferredPatternSvg } from "./deferred-pattern-svg";
 import { editorialLines, monogram, MONOGRAM_OPACITY } from "./pass-art";
@@ -120,6 +121,8 @@ export function ProfileCard({ card, preview = false, saveAction, shareAction, cl
           height={ART_BOX.height}
           style={{ position: "absolute", right: 0, bottom: 0, zIndex: -1, maxWidth: "none" }}
         />
+        {/* The light across the stub (pointer or phone tilt): printed stock, not a colored box. */}
+        {preview ? null : <CardSheen />}
         {/* No "Tarjeta de contacto" label: the PassMe logo is right above the card. */}
         {card.pronouns ? (
           <div className="flex justify-end">

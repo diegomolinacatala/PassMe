@@ -119,6 +119,19 @@ En Google Wallet el arte va en la imagen *hero* (1032×336 px) **sin el nombre**
 - **Marcas de corte** (`.crop-marks`) alrededor de los objetos de escaparate.
 - **Números de sección** en mono (`01`, `02`…) y *eyebrows* en mayúsculas espaciadas.
 
+### Materia y movimiento
+
+El pase se trata como un **objeto**, no como un rectángulo de color: es lo que hace que alguien lo vea y lo quiera.
+
+| Recurso | Qué hace | Dónde |
+| --- | --- | --- |
+| **Cartulina** (`shadow-pass`) | Borde superior iluminado, borde inferior más oscuro, una sombra de contacto y otra ambiental. | Toda vista previa del pase (`WalletPass`). |
+| **Inclinación** (`TiltCard`, `src/lib/tilt.ts`) | El pase se inclina hacia el puntero (ordenador) o con el móvil (sensores; en iPhone, tras un toque). Máximo 9°, y 7° en «Hazla tuya». Mientras nadie lo toca, un vaivén lento (`animate-sway`). | Escaparates: portada («hero» y «Hazla tuya»). Nunca en un formulario ni en algo con botones dentro. |
+| **Luz** (`sheenBackground`) | Un brillo blanco suave que recorre la superficie según la inclinación. Sobre el talón de la tarjeta pública (`CardSheen`) solo se mueve la luz, no la tarjeta: tiene botones. | Con la inclinación; y en el talón de `/u/<slug>`. |
+| **Trazo** (`motif-draw`) | Las líneas del motivo se dibujan solas (1,5 s) y las tintas aparecen en fundido; una variación nueva es un dibujo nuevo. | Todo motivo que se pinta en el navegador (`DeferredPatternSvg`). Las imágenes del servidor (Satori) no se animan. |
+
+Reglas: nada de esto cambia la información del pase; con `prefers-reduced-motion` no hay inclinación, luz móvil ni trazo (se ve el resultado final); el pase real en la cartera es plano, así que la vista previa de `/crear` y del editor solo lleva la cartulina.
+
 ## 8. Reglas de la interfaz
 
 Los componentes comunes viven en `src/components/ui/`. Úsalos en vez de copiar estilos.
