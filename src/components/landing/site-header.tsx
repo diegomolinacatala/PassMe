@@ -10,14 +10,18 @@ interface SiteHeaderProps {
 
 const NAV_LINK = "rounded-full px-3 py-2 text-sm text-ink-soft transition-colors hover:text-ink";
 
+/** Sticks to the top as a frosted strip of paper, so "Crear mi tarjeta" is always a tap away. */
 export function SiteHeader({ ctaHref, signedIn }: SiteHeaderProps) {
   return (
-    <header className="relative z-20">
-      <div className="mx-auto flex min-h-20 max-w-[1240px] flex-wrap items-center justify-between gap-2 px-5 py-3 sm:px-8">
+    <header className="sticky top-0 z-30 bg-paper/85 shadow-[0_1px_0_rgb(34_27_23/0.06)] backdrop-blur-md">
+      <div className="mx-auto flex min-h-16 max-w-[1240px] flex-wrap items-center justify-between gap-2 px-5 py-2.5 sm:px-8">
         <Logo />
         <nav aria-label="Principal" className="flex flex-wrap items-center justify-end gap-1 sm:gap-2">
           <Link href="#como-funciona" className={`hidden md:inline-flex ${NAV_LINK}`}>
             Cómo funciona
+          </Link>
+          <Link href="#diseno" className={`hidden md:inline-flex ${NAV_LINK}`}>
+            Hazla tuya
           </Link>
           {/* "Privacidad" in the footer is the policy (/privacidad); this is the section about your data. */}
           <Link href="#privacidad" className={`hidden md:inline-flex ${NAV_LINK}`}>

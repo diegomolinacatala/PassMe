@@ -4,7 +4,9 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Logo } from "@/components/brand/logo";
 import { CreateFlow, type CreateMode, type Referrer } from "@/components/create/create-flow";
-import { pickInitialTheme, randomPatternSeed } from "@/lib/card/design";
+import { DEFAULT_TYPEFACE, pickInitialTheme, randomPatternSeed } from "@/lib/card/design";
+import { parseDesignQuery } from "@/lib/card/design-query";
+import { DEFAULT_PATTERN } from "@/lib/card/pattern";
 import { parseFromSlug, parseVia } from "@/lib/card/quick";
 import { isGoogleWalletLive } from "@/lib/config.server";
 import { findOwnerCard, getPublicCard } from "@/lib/data/cards";
@@ -39,6 +41,14 @@ export default async function CreateCardPage({ searchParams }: PageProps<"/crear
   const card = from ? await getPublicCard(from) : null;
   const referrer: Referrer | null = card ? { slug: card.slug, fullName: card.fullName, avatarUrl: card.avatarUrl } : null;
   const platform = detectPlatform((await headers()).get("user-agent"));
+  // A design picked on the landing ("Hazla tuya") or, without one, a random color and variation.
+  const chosen = parseDesignQuery(query);
+  const initialDesign = {
+    theme: chosen?.theme ?? pickInitialTheme(card).id,
+    pattern: chosen?.pattern ?? DEFAULT_PATTERN,
+    typeface: chosen?.typeface ?? DEFAULT_TYPEFACE,
+    patternSeed: chosen?.patternSeed || randomPatternSeed(),
+  };
   // Android only sees a Google pass once Google Wallet works (D4); until then, "Mi QR".
   const googlePass = platform === "android" && isGoogleWalletLive();
 
@@ -68,8 +78,8 @@ export default async function CreateCardPage({ searchParams }: PageProps<"/crear
           from={card ? card.slug : from}
           via={via}
           referrer={referrer}
-          initialSeed={randomPatternSeed()}
-          initialTheme={pickInitialTheme(card).id}
+          initialDesign={initialDesign}
+          designChosen={chosen !== null}
           accountEmail={user?.email ?? null}
           previewStyle={googlePass ? "google" : "apple"}
           previewWallet={platform === "android" && !googlePass ? null : googlePass ? "Google Wallet" : "Apple Wallet"}

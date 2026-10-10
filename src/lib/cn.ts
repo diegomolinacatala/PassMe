@@ -8,7 +8,7 @@ const twMerge = extendTailwindMerge({
     theme: {
       text: ["mark", "small", "body", "lead", "title", "display", "hero"],
       radius: ["control", "panel", "object", "pass"],
-      shadow: ["object", "soft", "press", "press-ink", "press-signal", "focus-ring", "hairline", "inset"],
+      shadow: ["object", "pass", "soft", "press", "press-ink", "press-signal", "focus-ring", "hairline", "inset"],
     },
   },
 });

@@ -88,7 +88,7 @@ export function WalletPass({ card, style = "apple", className }: WalletPassProps
   if (style === "google") {
     return (
       <div
-        className={cn("w-full max-w-[340px] overflow-hidden rounded-panel shadow-object", className)}
+        className={cn("w-full max-w-[340px] overflow-hidden rounded-panel shadow-pass", className)}
         style={{ backgroundColor: design.background, color: design.foreground }}
         aria-label={`Vista previa del pase de Google Wallet de ${name}`}
       >
@@ -115,7 +115,7 @@ export function WalletPass({ card, style = "apple", className }: WalletPassProps
 
   return (
     <div
-      className={cn("w-full max-w-[340px] overflow-hidden rounded-2xl shadow-object", className)}
+      className={cn("w-full max-w-[340px] overflow-hidden rounded-2xl shadow-pass", className)}
       style={{ backgroundColor: design.background, color: design.foreground }}
       aria-label={`Vista previa del pase de Apple Wallet de ${name}`}
     >

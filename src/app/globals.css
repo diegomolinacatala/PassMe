@@ -53,6 +53,9 @@
   --radius-pass: 22px;
   --shadow-object: 0 1px 0 rgb(255 255 255 / 0.35) inset, 0 30px 60px -28px rgb(34 27 23 / 0.55),
     0 12px 24px -12px rgb(34 27 23 / 0.25);
+  /* The pass as card stock: a lit top edge, a darker bottom edge and two shadows (contact and ambient). */
+  --shadow-pass: 0 1px 0 rgb(255 255 255 / 0.28) inset, 0 -1px 0 rgb(34 27 23 / 0.1) inset,
+    0 2px 4px -1px rgb(34 27 23 / 0.18), 0 18px 36px -16px rgb(34 27 23 / 0.42), 0 44px 80px -40px rgb(34 27 23 / 0.5);
   --shadow-soft: 0 1px 2px rgb(34 27 23 / 0.06), 0 8px 24px -12px rgb(34 27 23 / 0.18);
   --shadow-press: 0 1px 0 rgb(34 27 23 / 0.9);
   --shadow-press-ink: 0 1px 0 rgb(255 255 255 / 0.12) inset, 0 6px 16px -8px rgb(34 27 23 / 0.6);
@@ -69,6 +72,8 @@
   --animate-float: float 7s ease-in-out infinite;
   --animate-scan: scan 2.6s ease-in-out infinite;
   --animate-marquee: marquee 38s linear infinite;
+  /* A resting object: a slow sway, so the light moves across it even before anyone touches it. */
+  --animate-sway: sway 9s ease-in-out infinite;
 
   @keyframes rise {
     from {
@@ -108,6 +113,18 @@
       transform: translateX(-50%);
     }
   }
+  @keyframes sway {
+    0%,
+    100% {
+      transform: rotateX(0) rotateY(0);
+    }
+    30% {
+      transform: rotateX(1.5deg) rotateY(-4deg);
+    }
+    70% {
+      transform: rotateX(-2deg) rotateY(4deg);
+    }
+  }
 }
 
 /* Deferred motif fading in after hydration (see DeferredPatternSvg).
@@ -115,6 +132,16 @@
 @keyframes pattern-in {
   from {
     opacity: 0;
+  }
+}
+
+/* The motif's lines drawing themselves (stroke layers of DeferredPatternSvg, pathLength = 1). */
+@keyframes motif-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
   }
 }
 
@@ -154,6 +181,7 @@
     *::before,
     *::after {
       animation-duration: 0.001ms !important;
+      animation-delay: 0ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.001ms !important;
     }

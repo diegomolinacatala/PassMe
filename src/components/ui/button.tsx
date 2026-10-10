@@ -13,8 +13,8 @@ export type Size = "sm" | "md" | "lg";
 
 // `btn-<variant>` carries no style: it lets tests check the rule (one signal per screen).
 const VARIANTS: Record<Variant, string> = {
-  ink: "btn-ink bg-ink text-paper shadow-press-ink hover:bg-ink-soft",
-  signal: "btn-signal bg-signal-strong text-white shadow-press-signal hover:bg-signal-deep",
+  ink: "btn-ink bg-ink text-paper shadow-press-ink hover:-translate-y-px hover:bg-ink-soft",
+  signal: "btn-signal bg-signal-strong text-white shadow-press-signal hover:-translate-y-px hover:bg-signal-deep",
   outline: "btn-outline border border-ink/80 text-ink hover:bg-ink hover:text-paper",
   ghost: "btn-ghost text-ink hover:bg-ink/[0.06]",
   danger: "btn-danger border border-danger text-danger hover:bg-danger hover:text-white",
@@ -30,7 +30,7 @@ const SIZES: Record<Size, string> = {
 };
 
 const BASE =
-  "inline-flex select-none items-center justify-center text-center font-medium leading-tight whitespace-normal text-balance transition-[background-color,color,transform,box-shadow] duration-200 ease-[var(--ease-out-expo)] active:translate-y-px disabled:pointer-events-none disabled:opacity-50";
+  "inline-flex select-none items-center justify-center text-center font-medium leading-tight whitespace-normal text-balance transition-[background-color,color,transform,box-shadow] duration-200 ease-[var(--ease-out-expo)] active:translate-y-px motion-reduce:hover:translate-y-0 disabled:pointer-events-none disabled:opacity-50";
 
 export function buttonClasses({ variant = "ink", size = "md", className }: { variant?: Variant; size?: Size; className?: string } = {}) {
   return cn(BASE, VARIANTS[variant], SIZES[size], className);

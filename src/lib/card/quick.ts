@@ -6,9 +6,9 @@
  */
 import { z } from "zod";
 import type { VisitSource } from "@/lib/env";
-import { CARD_THEMES, DEFAULT_THEME, DEFAULT_TYPEFACE, isPatternSeed, PATTERN_SEED_MAX, themeDesign } from "./design";
+import { CARD_THEMES, DEFAULT_THEME, DEFAULT_TYPEFACE, isPatternSeed, isTypeface, PATTERN_SEED_MAX, themeDesign, TYPEFACES, type Typeface } from "./design";
 import { normalizeLinkValue, type LinkKind } from "./links";
-import { DEFAULT_PATTERN } from "./pattern";
+import { DEFAULT_PATTERN, isPatternKind, PATTERN_KINDS, type PatternKind } from "./pattern";
 import { LIMITS, line, toFieldErrors, type CardInput, type FieldErrors } from "./schema";
 import { DEMO_SLUG } from "./demo";
 import { checkSlug, suggestSlug } from "./slug";
@@ -25,9 +25,12 @@ export interface QuickCardDraft {
   theme: string;
   /** Motif variation, picked when the form opens so the preview is exactly the card you get. */
   patternSeed: number;
+  /** Motif and typeface: the defaults, unless they were chosen on the landing ("Hazla tuya"). */
+  pattern: PatternKind;
+  typeface: Typeface;
 }
 
-export type QuickTextField = Exclude<keyof QuickCardDraft, "theme" | "patternSeed">;
+export type QuickTextField = Exclude<keyof QuickCardDraft, "theme" | "patternSeed" | "pattern" | "typeface">;
 
 export const EMPTY_QUICK_DRAFT: QuickCardDraft = {
   fullName: "",
@@ -38,6 +41,8 @@ export const EMPTY_QUICK_DRAFT: QuickCardDraft = {
   linkedin: "",
   theme: DEFAULT_THEME.id,
   patternSeed: 0,
+  pattern: DEFAULT_PATTERN,
+  typeface: DEFAULT_TYPEFACE,
 };
 
 /** Contact fields of the quick form, in the order they become card links. */
@@ -66,6 +71,9 @@ export function coerceQuickDraft(raw: unknown): QuickCardDraft {
     linkedin: text("linkedin", LIMITS.linkValue),
     theme: text("theme", 40),
     patternSeed: isPatternSeed(source.patternSeed) ? source.patternSeed : EMPTY_QUICK_DRAFT.patternSeed,
+    // Only current motifs: retired names never come from the form, and never from a link either.
+    pattern: isPatternKind(source.pattern) ? source.pattern : EMPTY_QUICK_DRAFT.pattern,
+    typeface: isTypeface(source.typeface) ? source.typeface : EMPTY_QUICK_DRAFT.typeface,
   };
 }
 
@@ -94,6 +102,8 @@ const quickDraftSchema = z
     linkedin: optionalLink("linkedin"),
     theme: z.string().transform((id) => (CARD_THEMES.some((t) => t.id === id) ? id : DEFAULT_THEME.id)),
     patternSeed: z.number().int().min(0).max(PATTERN_SEED_MAX),
+    pattern: z.enum(PATTERN_KINDS),
+    typeface: z.enum(TYPEFACES),
   })
   .refine((draft) => Boolean(draft.phone || draft.email || draft.linkedin), {
     path: [CONTACT_ERROR_KEY],
@@ -135,7 +145,7 @@ export function quickDraftToCardInput(draft: ValidQuickDraft, { slug, linkId }: 
     location: "",
     pronouns: "",
     bio: "",
-    ...themeDesign(draft.theme, DEFAULT_PATTERN, draft.patternSeed, DEFAULT_TYPEFACE),
+    ...themeDesign(draft.theme, draft.pattern, draft.patternSeed, draft.typeface),
     avatarPath: null,
     isPublished: true,
     links,
@@ -156,7 +166,7 @@ export function quickDraftToPublicCard(draft: QuickCardDraft): PublicCard {
     location: "",
     pronouns: "",
     bio: "",
-    ...themeDesign(draft.theme, DEFAULT_PATTERN, draft.patternSeed, DEFAULT_TYPEFACE),
+    ...themeDesign(draft.theme, draft.pattern, draft.patternSeed, draft.typeface),
     avatarUrl: null,
     links,
     acceptsContactRequests: false,
