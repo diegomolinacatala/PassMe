@@ -9,6 +9,7 @@ import {
   sheenBackground,
   tiltFromOrientation,
   tiltFromPointer,
+  tiltFromScroll,
   tiltTransform,
 } from "@/lib/tilt";
 
@@ -47,6 +48,21 @@ describe("tilt: the pass as an object", () => {
     expect(tiltFromOrientation(HELD_BETA + 500, -500).ry).toBeCloseTo(-MAX_TILT_DEG);
     expect(tiltFromOrientation(null, 3)).toBe(REST_TILT);
     expect(tiltFromOrientation(Number.NaN, 3)).toBe(REST_TILT);
+  });
+
+  it("without pointer or sensors, scrolling slides the light like a lamp fixed at the top", () => {
+    const box = { left: 0, width: 300, height: 200 };
+    // Centered on the screen: at rest, lit from the middle.
+    expect(tiltFromScroll({ ...box, top: 400 }, 1000)).toEqual({ rx: 0, ry: 0, lx: 0.4, ly: 0.5 });
+    // At the bottom of the screen: the light hits its top edge and it tips a little.
+    const low = tiltFromScroll({ ...box, top: 900 }, 1000);
+    expect(low.ly).toBeCloseTo(0.05);
+    expect(low.rx).toBeCloseTo(MAX_TILT_DEG / 2);
+    // Near the top of the screen: the light has slid down.
+    const high = tiltFromScroll({ ...box, top: -100 }, 1000);
+    expect(high.ly).toBeCloseTo(0.95);
+    expect(high.rx).toBeCloseTo(-MAX_TILT_DEG / 2);
+    expect(tiltFromScroll({ ...box, top: 0 }, 0)).toBe(REST_TILT);
   });
 
   it("eases toward the target and knows when it has arrived", () => {
