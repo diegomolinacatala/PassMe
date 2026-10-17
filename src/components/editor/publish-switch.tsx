@@ -46,7 +46,7 @@ export function PublishSwitch({ checked, savedPublished, onChange, className }: 
         onClick={(e) => {
           if (e.target === e.currentTarget) dialog.current?.close();
         }}
-        className="m-auto w-[min(92vw,28rem)] rounded-object bg-card p-0 text-ink shadow-object backdrop:bg-ink/55 backdrop:backdrop-blur-[2px] max-sm:mb-0 max-sm:w-full max-sm:max-w-none max-sm:rounded-b-none"
+        className="m-auto w-[min(92vw,28rem)] rounded-object bg-card p-0 text-ink shadow-object backdrop:bg-ink/55 lg:backdrop:backdrop-blur-[2px] max-sm:mb-0 max-sm:w-full max-sm:max-w-none max-sm:rounded-b-none"
       >
         <div className="p-6">
           <h2 id={titleId} className="font-display text-3xl leading-none tracking-tight">

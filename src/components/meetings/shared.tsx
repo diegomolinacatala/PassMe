@@ -2,7 +2,10 @@
 
 import { MapPin, Phone, Video } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
-import type { MeetingFormat } from "@/lib/meetings/schema";
+import type { MeetingFormat } from "@/lib/meetings/constants";
+
+/** Id of the consent checkbox's error, shared by the form and its last step. */
+export const CONSENT_ERROR_ID = "agendar-consent-error";
 
 export const FORMAT_ICONS: Record<MeetingFormat, typeof MapPin> = { in_person: MapPin, video: Video, phone: Phone };
 

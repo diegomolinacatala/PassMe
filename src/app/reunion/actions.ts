@@ -3,7 +3,7 @@
 import { headers } from "next/headers";
 import { after } from "next/server";
 import type { FieldErrors } from "@/lib/card/schema";
-import { getMeetingRecord, withOwnerEmail } from "@/lib/data/meetings";
+import { findMeetingRecord, withOwnerEmail } from "@/lib/data/meetings";
 import { createSharedRateLimiter } from "@/lib/data/rate-limits";
 import { DEMO_CARD } from "@/lib/card/demo";
 import { isSupabaseConfigured } from "@/lib/env";
@@ -17,7 +17,14 @@ import { clientRateKey } from "@/lib/request";
 
 export type MeetingResponseState =
   | { status: "idle" }
-  | { status: "done"; action: MeetingChange["action"]; view: MeetingView; demo?: boolean }
+  | {
+      status: "done";
+      action: MeetingChange["action"];
+      view: MeetingView;
+      demo?: boolean;
+      /** Saved, but an email couldn't be sent (an allowance, or setup): the page must not promise the invitation. */
+      emailsSkipped?: true;
+    }
   | { status: "error"; message: string; errors?: FieldErrors };
 
 // Each answer can send emails: keep it human-paced, per meeting and per connection.
@@ -25,6 +32,9 @@ const meetingLimiter = createSharedRateLimiter({ name: "meeting-answer", limit: 
 const ipLimiter = createSharedRateLimiter({ name: "meeting-answer-ip", limit: 30, windowMs: 10 * 60_000 });
 
 const INVALID_LINK = "Este enlace no es válido. Ábrelo de nuevo desde el último email.";
+const NOT_FOUND = "No encontramos esta reunión. Puede que ya se haya borrado.";
+/** The database failed: nothing is known about the meeting, so don't say it's gone. */
+const COULD_NOT_LOAD = "No hemos podido cargarla. Inténtalo de nuevo en un momento.";
 
 function changeFromForm(formData: FormData, format: Parameters<typeof parseConfirm>[1]):
   | { ok: true; change: MeetingChange }
@@ -129,8 +139,10 @@ export async function respondMeetingAction(
     return { status: "error", message: "Demasiados cambios seguidos. Espera unos minutos." };
   }
 
-  const record = await getMeetingRecord(id);
-  if (!record) return { status: "error", message: "No encontramos esta reunión. Puede que ya se haya borrado." };
+  const lookup = await findMeetingRecord(id);
+  if (lookup.status === "error") return { status: "error", message: COULD_NOT_LOAD };
+  if (lookup.status === "missing") return { status: "error", message: NOT_FOUND };
+  const { record } = lookup;
 
   // The meeting's format decides how the "where" field is read.
   const parsed = changeFromForm(formData, record.meeting.format);
@@ -141,7 +153,12 @@ export async function respondMeetingAction(
 
   after(result.emails);
   const { meeting } = result.record;
-  // A confirmed meeting shows the guest how to reach the owner.
+  // A confirmed meeting shows the guest how to reach the owner (already looked up when the emails were prepared).
   const owner = party === "owner" || meeting.status === "confirmed" ? await withOwnerEmail(result.record.owner) : result.record.owner;
-  return { status: "done", action: parsed.change.action, view: toMeetingView(meeting, owner, party, new Date()) };
+  return {
+    status: "done",
+    action: parsed.change.action,
+    view: toMeetingView(meeting, owner, party, new Date()),
+    ...(result.emailsSkipped ? { emailsSkipped: true as const } : {}),
+  };
 }

@@ -4,9 +4,10 @@ import { log } from "@/lib/log";
 import {
   authorizePass,
   emptyResponse,
-  getWebServiceContext,
   isValidDeviceId,
   isValidPushToken,
+  openWebService,
+  unavailableResponse,
 } from "@/lib/pass/web-service";
 
 export const runtime = "nodejs";
@@ -15,7 +16,7 @@ type Ctx = RouteContext<"/api/wallet/v1/devices/[deviceLibraryId]/registrations/
 
 /** Apple Wallet: a device added the pass and wants push updates. */
 export async function POST(request: NextRequest, { params }: Ctx) {
-  const context = getWebServiceContext();
+  const context = await openWebService(request);
   if (!context.ok) return context.response;
   const { deviceLibraryId, passTypeId, serialNumber } = await params;
   if (!isValidDeviceId(deviceLibraryId)) return emptyResponse(400);
@@ -35,14 +36,14 @@ export async function POST(request: NextRequest, { params }: Ctx) {
     const created = await registerDevice(context.ctx.admin, { deviceLibraryId, passTypeId, serial: serialNumber }, pushToken);
     return emptyResponse(created ? 201 : 200);
   } catch (error) {
-    log.error("wallet register failed", { serialNumber }, error);
-    return emptyResponse(500);
+    log.error("wallet register failed", { profileId: serialNumber }, error);
+    return unavailableResponse();
   }
 }
 
 /** Apple Wallet: the pass was removed from a device. */
 export async function DELETE(request: NextRequest, { params }: Ctx) {
-  const context = getWebServiceContext();
+  const context = await openWebService(request);
   if (!context.ok) return context.response;
   const { deviceLibraryId, passTypeId, serialNumber } = await params;
   if (!isValidDeviceId(deviceLibraryId)) return emptyResponse(400);
@@ -54,7 +55,7 @@ export async function DELETE(request: NextRequest, { params }: Ctx) {
     await unregisterDevice(context.ctx.admin, { deviceLibraryId, passTypeId, serial: serialNumber });
     return emptyResponse(200);
   } catch (error) {
-    log.error("wallet unregister failed", { serialNumber }, error);
-    return emptyResponse(500);
+    log.error("wallet unregister failed", { profileId: serialNumber }, error);
+    return unavailableResponse();
   }
 }

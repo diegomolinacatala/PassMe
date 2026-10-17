@@ -6,7 +6,7 @@ import { DEMO_SLUG } from "@/lib/card/demo";
 import type { FieldErrors } from "@/lib/card/schema";
 import { checkSlug } from "@/lib/card/slug";
 import { verifyCaptcha } from "@/lib/captcha";
-import { getPublicCard } from "@/lib/data/cards";
+import { lookupPublicCard } from "@/lib/data/cards";
 import { proposalOutsideRules } from "@/lib/meetings/settings";
 import { submitMeetingRequest } from "@/lib/data/meetings";
 import { createSharedRateLimiter } from "@/lib/data/rate-limits";
@@ -14,7 +14,7 @@ import { isSupabaseConfigured } from "@/lib/env";
 import { log } from "@/lib/log";
 import { parseMeetingRequest } from "@/lib/meetings/schema";
 import { meetingPath } from "@/lib/meetings/links";
-import { meetingsAvailable, notifyNewProposal } from "@/lib/meetings/service";
+import { admitNewProposal, meetingsAvailable, sendNewProposal } from "@/lib/meetings/service";
 import { DEMO_MEETING_ID } from "@/lib/meetings/view";
 import { clientRateKey, getClientIp, parseVisitSource } from "@/lib/request";
 
@@ -27,6 +27,8 @@ export type MeetingRequestState =
       details: { name: string; email: string; phone: string; company: string };
       /** The visitor's own signed page, to check or cancel what they sent. */
       guestPath: string | null;
+      /** Saved, but the owner's email couldn't be sent (an allowance, or setup): say so rather than "ya la tiene". */
+      emailSkipped?: true;
     }
   | { status: "error"; message: string; errors?: FieldErrors };
 
@@ -80,7 +82,10 @@ export async function submitMeetingAction(
     return { status: "error", message: "Completa la verificación anti-spam e inténtalo de nuevo." };
   }
 
-  const card = await getPublicCard(cleanSlug);
+  const lookup = await lookupPublicCard(cleanSlug);
+  // A database hiccup is not "this card stopped taking proposals".
+  if (lookup.status === "error") return { status: "error", message: GENERIC_ERROR };
+  const card = lookup.status === "found" ? lookup.card : null;
   if (!card?.acceptsMeetingRequests) return { status: "error", message: CLOSED };
   // The owner's settings (P8.4), checked here whatever the browser sent.
   const outside = proposalOutsideRules(card, data);
@@ -96,10 +101,24 @@ export async function submitMeetingAction(
         ? CLOSED
         : result.reason === "full"
           ? `${card.fullName.split(/\s+/)[0]} tiene muchas propuestas pendientes. Prueba a dejarle tu contacto.`
-          : GENERIC_ERROR;
+          : result.reason === "guest_full"
+            ? `Ya tienes dos propuestas pendientes con ${card.fullName.split(/\s+/)[0]}. Espera a que responda o cancela una desde tu email.`
+            : GENERIC_ERROR;
     return { status: "error", message };
   }
 
-  after(() => notifyNewProposal(result.id).catch((error: unknown) => log.error("meeting proposal email failed", {}, error)));
-  return { status: "sent", email: data.email, details, guestPath: meetingPath(result.id, "guest") };
+  // The proposal is saved either way. Whether the owner's email may go is decided now, so the visitor isn't told "sent" when it won't be.
+  const emailAdmitted = await admitNewProposal(result.id, result.ownerId);
+  if (emailAdmitted) {
+    after(() =>
+      sendNewProposal(result.id).catch((error: unknown) => log.error("meeting proposal email failed", { kind: "proposal", meetingId: result.id, party: "owner" }, error)),
+    );
+  }
+  return {
+    status: "sent",
+    email: data.email,
+    details,
+    guestPath: meetingPath(result.id, "guest"),
+    ...(emailAdmitted ? {} : { emailSkipped: true as const }),
+  };
 }

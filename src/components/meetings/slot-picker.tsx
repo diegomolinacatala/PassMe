@@ -5,8 +5,8 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { InlineError } from "@/components/ui/field";
 import { undoKey, UndoNotice, type UndoItem } from "@/components/ui/undo-notice";
 import { cn } from "@/lib/cn";
-import { HORIZON_DAYS, MAX_SLOTS } from "@/lib/meetings/schema";
-import { inRange, slotAllowed, type MeetingRules } from "@/lib/meetings/settings";
+import { HORIZON_DAYS, MAX_SLOTS } from "@/lib/meetings/constants";
+import { inRange, slotAllowed, type MeetingRules } from "@/lib/meetings/rules";
 import {
   dateKey,
   formatDay,

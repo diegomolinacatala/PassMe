@@ -8,8 +8,9 @@ import { Notice } from "@/components/ui/notice";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { CARD_THEMES, DEFAULT_TYPEFACE, TYPEFACE_LABELS, type Typeface } from "@/lib/card/design";
 import { DEFAULT_PATTERN, PATTERN_LABELS, type PatternKind } from "@/lib/card/pattern";
-import { CONTACT_ERROR_KEY, type QuickCardDraft, type QuickTextField } from "@/lib/card/quick";
-import { LIMITS, type FieldErrors } from "@/lib/card/schema";
+import type { FieldErrors } from "@/lib/card/clean-text";
+import { LIMITS } from "@/lib/card/limits";
+import { CONTACT_ERROR_KEY, type QuickCardDraft, type QuickTextField } from "@/lib/card/quick-draft";
 import { cn } from "@/lib/cn";
 
 interface FieldDef {

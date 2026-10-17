@@ -2,6 +2,7 @@ import { z } from "zod";
 import { meetingSettingsSchema } from "@/lib/meetings/settings";
 import { canonicalTimeZone } from "@/lib/meetings/time";
 import { HEX_COLOR_RE } from "./colors";
+import { LIMITS, MAX_LINKS } from "./limits";
 import { PATTERN_SEED_MAX, TYPEFACES } from "./design";
 import { PATTERN_KINDS } from "./pattern";
 import { LINK_KINDS, normalizeLinkValue, toLinkKind } from "./links";
@@ -9,19 +10,9 @@ import { checkSlug, SLUG_ERRORS } from "./slug";
 import { line, paragraph, toFieldErrors, tooLong, type FieldErrors } from "./text";
 import type { CardLink } from "./types";
 
-export const MAX_LINKS = 20;
+export { LIMITS, MAX_LINKS } from "./limits";
 /** Mirrors profiles_time_zone_format (migration 20261006120000). */
 const TIME_ZONE_RE = /^[A-Za-z][A-Za-z0-9_+-]*(\/[A-Za-z0-9_+-]+){0,2}$/;
-export const LIMITS = {
-  fullName: 80,
-  headline: 80,
-  company: 80,
-  location: 80,
-  pronouns: 30,
-  bio: 280,
-  linkLabel: 40,
-  linkValue: 300,
-} as const;
 
 const LINK_ID_RE = /^[A-Za-z0-9_-]{6,40}$/;
 export { line, paragraph, toFieldErrors, type FieldErrors } from "./text";

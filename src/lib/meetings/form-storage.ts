@@ -1,4 +1,4 @@
-import { DEFAULT_DURATION, MEETING_DURATIONS, MEETING_FORMATS, MAX_SLOTS, type MeetingDuration, type MeetingFormat } from "./schema";
+import { DEFAULT_DURATION, MEETING_DURATIONS, MEETING_FORMATS, MAX_SLOTS, type MeetingDuration, type MeetingFormat } from "./constants";
 
 /**
  * "Agendar reunión" half-filled, kept for this tab only (sessionStorage): a

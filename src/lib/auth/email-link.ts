@@ -1,14 +1,12 @@
 import type { EmailOtpType } from "@supabase/supabase-js";
 
-/** Link types our email templates may send to /auth/confirm (see supabase/templates). */
-export const EMAIL_LINK_TYPES: ReadonlySet<string> = new Set([
-  "email",
-  "magiclink",
-  "signup",
-  "invite",
-  "recovery",
-  "email_change",
-]);
+/**
+ * The only link type our email template sends to /auth/confirm
+ * (supabase/templates/magic-link.html: `type=email`, used for both the Magic
+ * Link and Confirm signup emails). Recovery, invite and email-change tokens
+ * are not ours to sign anyone in with.
+ */
+export const EMAIL_LINK_TYPES: ReadonlySet<string> = new Set(["email"]);
 
 export function isEmailLinkType(value: unknown): value is EmailOtpType {
   return typeof value === "string" && EMAIL_LINK_TYPES.has(value);

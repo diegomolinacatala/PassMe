@@ -4,7 +4,7 @@ import { CircleCheck, CircleX, LoaderCircle } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { checkSlugAction, type SlugCheckResult } from "@/app/dashboard/actions";
 import { isDemoSlugTaken } from "@/lib/card/demo";
-import { checkSlug, normalizeSlugInput, slugAlternatives, SLUG_ERRORS, SLUG_MAX_LENGTH } from "@/lib/card/slug";
+import { checkNewSlug, normalizeSlugInput, slugAlternatives, SLUG_ERRORS, SLUG_MAX_LENGTH } from "@/lib/card/slug";
 import { cn } from "@/lib/cn";
 import { inputClasses } from "@/components/ui/field";
 
@@ -37,7 +37,8 @@ export function SlugField({ value, savedValue, siteHost, demo, serverError, sugg
 
   // The saved slug is valid by definition (and "demo" is reserved on purpose in demo mode).
   const unchanged = value === savedValue;
-  const local = unchanged ? ({ ok: true } as const) : checkSlug(value);
+  // A new handle also avoids the newly reserved words (its own current one is kept, whatever it is).
+  const local = unchanged ? ({ ok: true } as const) : checkNewSlug(value);
   const needsRemote = local.ok && !unchanged;
 
   useEffect(() => {

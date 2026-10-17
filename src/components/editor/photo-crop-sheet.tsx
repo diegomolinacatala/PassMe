@@ -108,7 +108,7 @@ export function PhotoCropSheet({ source, onCancel, onConfirm }: PhotoCropSheetPr
         pointers.current.clear();
         if (!confirmed.current) onCancel();
       }}
-      className="m-auto w-[min(92vw,24rem)] rounded-object bg-card p-0 text-ink shadow-object backdrop:bg-ink/55 backdrop:backdrop-blur-[2px] max-sm:mb-0 max-sm:w-full max-sm:max-w-none max-sm:rounded-b-none"
+      className="m-auto w-[min(92vw,24rem)] rounded-object bg-card p-0 text-ink shadow-object backdrop:bg-ink/55 lg:backdrop:backdrop-blur-[2px] max-sm:mb-0 max-sm:w-full max-sm:max-w-none max-sm:rounded-b-none"
     >
       <div className="p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
         <p className="eyebrow">Tu foto</p>

@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useReducer } from "react";
+import { useEffect, useMemo, useReducer, useState } from "react";
 import type { DesignFields } from "@/lib/card/design";
+import { MAX_LINKS } from "@/lib/card/limits";
 import type { LinkKind } from "@/lib/card/links";
-import { MAX_LINKS, parseCardInput, type FieldErrors } from "@/lib/card/schema";
+import type { FieldErrors, parseCardInput } from "@/lib/card/schema";
 import type { CardLink, OwnerCard, PublicCard } from "@/lib/card/types";
 import type { MeetingSettings } from "@/lib/meetings/settings";
 import { localTimeZone } from "@/lib/meetings/time";
@@ -58,7 +59,12 @@ export function draftFromCard(card: OwnerCard): CardDraft {
   };
 }
 
-/** Payload for saveCardAction (avatarUrl is derived server-side). */
+/**
+ * Payload for saveCardAction (avatarUrl is derived server-side). With meetings
+ * off, their settings aren't on screen, so they're neither sent nor validated:
+ * the server keeps the stored ones (a missing `meetingSettings` leaves them as
+ * they are) and a mistake in a hidden field can't block the save.
+ */
 export function draftToInput(draft: CardDraft) {
   return {
     slug: draft.slug,
@@ -77,7 +83,7 @@ export function draftToInput(draft: CardDraft) {
     isPublished: draft.isPublished,
     acceptsContactRequests: draft.acceptsContactRequests,
     acceptsMeetingRequests: draft.acceptsMeetingRequests,
-    ...(draft.meetingSettings ? { meetingSettings: draft.meetingSettings } : {}),
+    ...(draft.acceptsMeetingRequests && draft.meetingSettings ? { meetingSettings: draft.meetingSettings } : {}),
     // P8.1: the owner's zone travels with every save (validated on the server).
     timeZone: localTimeZone(),
     links: draft.links,
@@ -113,7 +119,7 @@ function newLinkId(): string {
   return `l-${random}`;
 }
 
-type Action =
+export type CardDraftAction =
   | { type: "field"; field: TextField; value: string }
   | { type: "design"; patch: Partial<DesignFields> }
   | { type: "meetingSettings"; patch: Partial<MeetingSettings> }
@@ -127,17 +133,18 @@ type Action =
   | { type: "updateLink"; id: string; patch: Partial<Omit<CardLink, "id">> }
   | { type: "removeLink"; id: string }
   | { type: "restoreLink"; link: CardLink; index: number }
-  | { type: "reset"; draft: CardDraft }
+  // A save came back: `submitted` is the draft that was sent, `saved` the card the server stored.
+  | { type: "saved"; submitted: CardDraft; saved: CardDraft }
   // Back to the saved state ("Descartar"), or to a draft that was just discarded ("Deshacer").
   | { type: "discard" }
   | { type: "replace"; draft: CardDraft };
 
-interface State {
+export interface CardDraftState {
   draft: CardDraft;
   saved: CardDraft;
 }
 
-function reducer(state: State, action: Action): State {
+export function cardDraftReducer(state: CardDraftState, action: CardDraftAction): CardDraftState {
   const { draft } = state;
   switch (action.type) {
     case "field":
@@ -185,8 +192,10 @@ function reducer(state: State, action: Action): State {
       links.splice(Math.min(Math.max(action.index, 0), links.length), 0, action.link);
       return { ...state, draft: { ...draft, links } };
     }
-    case "reset":
-      return { draft: action.draft, saved: action.draft };
+    case "saved":
+      // Edits typed while the save was on its way stay on screen (and unsaved);
+      // otherwise the editor shows the card exactly as the server stored it.
+      return state.draft === action.submitted ? { draft: action.saved, saved: action.saved } : { ...state, saved: action.saved };
     case "discard":
       return { ...state, draft: state.saved };
     case "replace":
@@ -194,13 +203,40 @@ function reducer(state: State, action: Action): State {
   }
 }
 
+type CardParser = typeof parseCardInput;
+
+/**
+ * The card's rules (zod) load after the editor shows up instead of travelling
+ * in its first bundle: until they arrive there are no live errors, and a save
+ * in the meantime is still checked by the server.
+ */
+function useCardParser(): CardParser | null {
+  const [parser, setParser] = useState<{ parse: CardParser } | null>(null);
+  useEffect(() => {
+    let active = true;
+    import("@/lib/card/schema")
+      .then(({ parseCardInput: parse }) => {
+        if (active) setParser({ parse });
+      })
+      .catch(() => {
+        // Offline or a stale deploy: the editor keeps working, the server still validates.
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+  return parser?.parse ?? null;
+}
+
 export function useCardDraft(initial: CardDraft) {
-  const [state, dispatch] = useReducer(reducer, { draft: initial, saved: initial });
+  const [state, dispatch] = useReducer(cardDraftReducer, { draft: initial, saved: initial });
+  const parse = useCardParser();
 
   const errors: FieldErrors = useMemo(() => {
-    const result = parseCardInput(draftToInput(state.draft));
+    if (!parse) return {};
+    const result = parse(draftToInput(state.draft));
     return result.ok ? {} : result.errors;
-  }, [state.draft]);
+  }, [parse, state.draft]);
 
   const dirty = useMemo(() => JSON.stringify(state.draft) !== JSON.stringify(state.saved), [state.draft, state.saved]);
 
@@ -227,7 +263,8 @@ export function useCardDraft(initial: CardDraft) {
       updateLink: (id: string, patch: Partial<Omit<CardLink, "id">>) => dispatch({ type: "updateLink", id, patch }),
       removeLink: (id: string) => dispatch({ type: "removeLink", id }),
       restoreLink: (link: CardLink, index: number) => dispatch({ type: "restoreLink", link, index }),
-      markSaved: (draft: CardDraft) => dispatch({ type: "reset", draft }),
+      /** `submitted` was sent; `saved` is what the server stored (the same draft in demo mode). */
+      markSaved: (submitted: CardDraft, saved: CardDraft = submitted) => dispatch({ type: "saved", submitted, saved }),
       discard: () => dispatch({ type: "discard" }),
       replaceDraft: (draft: CardDraft) => dispatch({ type: "replace", draft }),
     }),

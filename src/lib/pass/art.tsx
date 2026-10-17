@@ -4,7 +4,7 @@ import { ImageResponse } from "next/og";
 import sharp from "sharp";
 import { initials } from "@/components/card/avatar";
 import { HERO_BOX, PassArt, STRIP_BOX, type ArtVariant } from "@/components/card/pass-art";
-import { designVersion, resolveDesign } from "@/lib/card/design";
+import { resolveDesign } from "@/lib/card/design";
 import type { PublicCard } from "@/lib/card/types";
 import { loadOgFonts, OG_SANS, SERIF } from "@/lib/og";
 import { AVATAR_MAX_INPUT_PIXELS } from "./images";
@@ -44,12 +44,17 @@ function memo(key: string, build: () => Promise<Buffer>): Promise<Buffer> {
   return promise;
 }
 
+const sha256 = (value: string | Buffer): string => createHash("sha256").update(value).digest("hex");
+
+/** Length of the `?v=` cache-busting token: 64 bits of the fingerprint. */
+const VERSION_LENGTH = 16;
+
 /** Everything the artwork depends on; changes to anything else don't re-render it. */
-export function artVersion(card: PublicCard, variant: ArtVariant): string {
+function artInputs(card: PublicCard, variant: ArtVariant): ReadonlyArray<string | number | null> {
   const design = resolveDesign(card);
   // The hero has no text, except the monogram's initial.
   const hasText = variant === "strip" || design.pattern === "monograma";
-  return designVersion([
+  return [
     variant,
     design.background,
     design.detail,
@@ -58,7 +63,25 @@ export function artVersion(card: PublicCard, variant: ArtVariant): string {
     hasText ? design.typeface : "",
     hasText ? card.fullName : "",
     variant === "strip" ? card.avatarUrl : "",
-  ]);
+  ];
+}
+
+/**
+ * SHA-256 of the full artwork inputs (JSON, so no separator ambiguity). The
+ * render cache is keyed on this: a 32-bit hash let a user craft a design that
+ * collided with someone else's and be served their cached render.
+ */
+export function artFingerprint(card: PublicCard, variant: ArtVariant): string {
+  return sha256(JSON.stringify(artInputs(card, variant)));
+}
+
+/**
+ * Short form of the fingerprint for `?v=` URLs (Google caches images by URL, so
+ * the token changes only when the drawing does). Also what the hero route
+ * compares before it grants a year-long `immutable` cache.
+ */
+export function artVersion(card: PublicCard, variant: ArtVariant): string {
+  return artFingerprint(card, variant).slice(0, VERSION_LENGTH);
 }
 
 async function avatarDataUri(avatar: Buffer): Promise<string> {
@@ -94,10 +117,10 @@ async function renderPng(card: PublicCard, variant: ArtVariant, width: number, h
 
 /** Apple Wallet strip images at 1x/2x/3x (rendered once at 3x, then downscaled). */
 export async function stripImages(card: PublicCard, avatar: Buffer | null): Promise<ImageSet> {
-  const avatarKey = avatar ? createHash("sha1").update(avatar).digest("hex") : "none";
+  const avatarKey = avatar ? sha256(avatar) : "none";
   const width = STRIP_BOX.width * 3;
   const height = STRIP_BOX.height * 3;
-  const master = await memo(`strip:${artVersion(card, "strip")}:${avatarKey}`, () =>
+  const master = await memo(`strip:${artFingerprint(card, "strip")}:${avatarKey}`, () =>
     renderPng(card, "strip", width, height, avatar),
   );
 
@@ -118,5 +141,5 @@ export async function stripImages(card: PublicCard, avatar: Buffer | null): Prom
 
 /** Google Wallet hero image (no text, per Google's brand guidelines). */
 export function heroImage(card: PublicCard): Promise<Buffer> {
-  return memo(`hero:${artVersion(card, "hero")}`, () => renderPng(card, "hero", HERO_WIDTH, HERO_HEIGHT, null));
+  return memo(`hero:${artFingerprint(card, "hero")}`, () => renderPng(card, "hero", HERO_WIDTH, HERO_HEIGHT, null));
 }

@@ -1,6 +1,6 @@
 import { LOGIN_CODE_TTL_MS, RESEND_COOLDOWN_SECONDS } from "@/lib/auth/code";
 import type { VisitSource } from "@/lib/env";
-import { coerceQuickDraft, parseVia, type QuickCardDraft } from "./quick";
+import { coerceQuickDraft, parseVia, type QuickCardDraft } from "./quick-draft";
 
 /**
  * The quick-card draft, kept in this browser while it's being filled in and

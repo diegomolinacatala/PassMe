@@ -8,6 +8,7 @@ import { ShareLinkButton } from "@/components/ui/share-link-button";
 import { AddToWalletButton, GoogleWalletSoon, passHref, QrShortcutButton } from "@/components/wallet/add-to-wallet-button";
 import { phoneWalletAction, type Platform } from "@/lib/platform";
 import { InlineError } from "@/components/ui/field";
+import { callAction, CONNECTION_FAILED } from "@/lib/client/call-action";
 import { PrintQrDialog } from "./print-qr-dialog";
 
 export interface WalletAvailability {
@@ -56,9 +57,10 @@ function Handoff({ blocked }: { blocked: boolean }) {
   function request() {
     setError(null);
     startTransition(async () => {
-      const result = await createHandoffLinkAction();
-      if (result.ok) setHandoff({ url: result.url, expiresAt: result.expiresAt });
-      else setError(result.error);
+      const call = await callAction(() => createHandoffLinkAction());
+      if (call.failed) setError(CONNECTION_FAILED);
+      else if (call.result.ok) setHandoff({ url: call.result.url, expiresAt: call.result.expiresAt });
+      else setError(call.result.error);
     });
   }
 

@@ -4,8 +4,9 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { cleanCode, DEMO_LOGIN_CODE, RESEND_COOLDOWN_SECONDS, retryAfterSeconds } from "@/lib/auth/code";
+import { isTransientAuthError } from "@/lib/auth/otp-errors";
 import { welcomePath } from "@/lib/card/quick";
-import { clearOtpFailures, registerOtpAttempt } from "@/lib/data/otp-attempts";
+import { clearOtpFailures, forgetOtpAttempt, registerOtpAttempt } from "@/lib/data/otp-attempts";
 import { createSharedRateLimiter } from "@/lib/data/rate-limits";
 import { getSiteUrl } from "@/lib/env";
 import { log } from "@/lib/log";
@@ -34,17 +35,23 @@ const emailSchema = z.email({ error: "Introduce un email válido." }).max(254);
 const codeSchema = z.string().regex(/^\d{6,10}$/, "El código son las cifras que te hemos enviado por email.");
 
 /*
- * Shared across instances, per client. Sized for a room full of people on the
- * same Wi-Fi signing up after a talk, not for one person. There is deliberately
- * no per-recipient limit on sending: anyone could spend it to lock a victim out.
- * Flooding one inbox is bounded by Supabase instead (one email per address per
- * minute, the project's hourly email cap) and by the optional CAPTCHA; guessing
- * codes, by the per-email lockout (otp-attempts.ts).
+ * Shared across instances, per client. Five sends in ten minutes: a person
+ * needs one or two, and at 10 a single client could use up Supabase's whole
+ * hourly email cap (60) by itself. A room of people on the same Wi-Fi signing
+ * up after a talk shares a client, so for events turn on the CAPTCHA and raise
+ * the cap instead of this. There is deliberately no per-recipient limit on
+ * sending: anyone could spend it to lock a victim out. Flooding one inbox is
+ * bounded by Supabase instead (one email per address per minute, the project's
+ * hourly email cap) and by the optional CAPTCHA; guessing codes, by the
+ * per-email lockout (otp-attempts.ts).
  */
 const emailIpLimiter = createSharedRateLimiter({ name: "login-email-ip", limit: 10, windowMs: 10 * 60_000 });
 const verifyLimiter = createSharedRateLimiter({ name: "login-verify-ip", limit: 20, windowMs: 10 * 60_000 });
 
 const LOCKED = "Demasiados códigos incorrectos. Usa el botón del email o espera 15 minutos.";
+// Our side failed, not the person's code: neither of these may sound like a lockout or a wrong code.
+const TRY_LATER = "Ahora mismo no podemos comprobar códigos. Inténtalo más tarde.";
+const COULD_NOT_CHECK = "No hemos podido comprobarlo. Inténtalo de nuevo.";
 const CAPTCHA_FAILED = "Completa la verificación anti-spam e inténtalo de nuevo.";
 const TOO_MANY = "Demasiados intentos. Espera unos minutos.";
 
@@ -137,13 +144,38 @@ async function verifyCode(prev: AuthState, formData: FormData): Promise<AuthStat
   // Per-email lockout (shared across instances), counted before checking the
   // code so parallel guesses can't all get through.
   const client = await clientKey();
-  if (!(await registerOtpAttempt(email, client))) return fail(LOCKED);
+  const attempt = await registerOtpAttempt(email, client);
+  if (attempt === "locked") return fail(LOCKED);
+  if (attempt === "unavailable") return fail(TRY_LATER);
 
-  const { data, error } = await supabase.auth.verifyOtp({ email, token: parsedCode.data, type: "email" });
-  if (error || !data.user) return fail("Código incorrecto o caducado.", true);
+  const verdict = await checkCode(supabase, email, parsedCode.data);
+  if (verdict.kind === "wrong") return fail("Código incorrecto o caducado.", true);
+  if (verdict.kind === "unreachable") {
+    // Not a wrong guess: keep their digits and give the attempt back.
+    log.error("verifyOtp could not judge the code", { status: verdict.status, code: verdict.code }, verdict.error);
+    await forgetOtpAttempt(email, client);
+    return fail(COULD_NOT_CHECK);
+  }
 
   await clearOtpFailures(email, client);
-  return finishSignIn(supabase, data.user.id, formData);
+  return finishSignIn(supabase, verdict.userId, formData);
+}
+
+type CodeVerdict =
+  | { kind: "signed-in"; userId: string }
+  | { kind: "wrong" }
+  | { kind: "unreachable"; status?: number; code?: string; error: unknown };
+
+/** Asks Supabase about the code, telling "wrong or expired" from "couldn't be checked". */
+async function checkCode(supabase: TypedSupabaseClient, email: string, token: string): Promise<CodeVerdict> {
+  try {
+    const { data, error } = await supabase.auth.verifyOtp({ email, token, type: "email" });
+    if (!error) return data.user ? { kind: "signed-in", userId: data.user.id } : { kind: "wrong" };
+    if (isTransientAuthError(error)) return { kind: "unreachable", status: error.status, code: error.code, error };
+    return { kind: "wrong" };
+  } catch (thrown) {
+    return { kind: "unreachable", error: thrown };
+  }
 }
 
 /**

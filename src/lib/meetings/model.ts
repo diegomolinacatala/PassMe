@@ -1,7 +1,11 @@
 import type { CalendarEvent } from "./calendar";
-import { FORMAT_LABELS, type MeetingFormat } from "./schema";
+import { FORMAT_LABELS, type MeetingFormat } from "./constants";
 import type { MeetingParty, MeetingState } from "./state";
+import { isSafeName } from "./text-safety";
 import { addMinutes, formatDay, formatTime, otherZoneTime, timeZoneLabel } from "./time";
+
+export { firstName } from "@/lib/card/first-name";
+export { formatDuration } from "./rules";
 
 /** A meeting proposal as the app works with it (see meeting_requests). */
 export interface Meeting extends MeetingState {
@@ -48,10 +52,6 @@ export function ownerContactEmail(owner: Pick<MeetingOwner, "email" | "contactEm
   return owner.contactEmail || owner.email;
 }
 
-export function formatDuration(minutes: number): string {
-  return minutes >= 60 ? `${minutes / 60} h` : `${minutes} min`;
-}
-
 /** The place is a map link ("Cómo llegar"), only ever shown as a link on signed pages and in the owner's calendar. */
 export function hasMapLink(meeting: { format: MeetingFormat; location: string }): boolean {
   return meeting.format === "in_person" && /^https:\/\//.test(meeting.location);
@@ -85,6 +85,19 @@ export function displayName(person: { name: string; company?: string }): string 
   return person.company ? `${person.name} (${person.company})` : person.name;
 }
 
+/** What a guest's inbox and calendar call an owner whose card name looks like a link. */
+export const FALLBACK_OWNER_NAME = "Tu contacto de PassMe";
+
+/**
+ * The owner's name as `recipient` may read it. Card names aren't held to the meeting
+ * rules (a name can look like a link or a phone number), and the guest's address is
+ * unverified: their emails, calendar files and Google Calendar links get a neutral
+ * name instead. The owner's own copy keeps their name.
+ */
+export function ownerNameFor(recipient: MeetingParty, name: string): string {
+  return recipient === "owner" || isSafeName(name) ? name : FALLBACK_OWNER_NAME;
+}
+
 /** Who sees a calendar copy, and what it says about the other person. */
 interface DescriptionInput {
   format: MeetingFormat;
@@ -101,7 +114,7 @@ interface DescriptionInput {
 export function meetingDescription(meeting: DescriptionInput, recipient: MeetingParty, owner: { name: string; email: string | null }): string {
   const toOwner = recipient === "owner";
   return [
-    `Con: ${toOwner ? displayName(meeting.guest) : owner.name}`,
+    `Con: ${toOwner ? displayName(meeting.guest) : ownerNameFor(recipient, owner.name)}`,
     toOwner ? (meeting.guest.email ? `Email: ${meeting.guest.email}` : "") : owner.email ? `Email: ${owner.email}` : "",
     toOwner && meeting.guest.phone ? `Teléfono: ${meeting.guest.phone}` : "",
     toOwner && meeting.topic ? `Tema: ${meeting.topic}` : "",
@@ -136,7 +149,7 @@ export function meetingEvent(
   options: { uidDomain: string },
 ): CalendarEvent {
   const start = meeting.confirmedStart ?? meeting.slots[0]!;
-  const other = recipient === "owner" ? meeting.guest.name : owner.name;
+  const other = recipient === "owner" ? meeting.guest.name : ownerNameFor(recipient, owner.name);
   return {
     uid: `${meeting.id}@${options.uidDomain}`,
     sequence: meeting.sequence,
@@ -147,11 +160,7 @@ export function meetingEvent(
     alarmMinutes: alarmMinutes(meeting.format),
     location: calendarLocation(meeting, recipient),
     url: "",
-    organizer: { name: owner.name, email: owner.email },
+    organizer: { name: ownerNameFor(recipient, owner.name), email: owner.email },
     attendee: { name: meeting.guest.name, email: meeting.guest.email },
   };
-}
-
-export function firstName(name: string): string {
-  return name.split(/\s+/)[0] || name;
 }

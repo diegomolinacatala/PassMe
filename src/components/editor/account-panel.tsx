@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { deleteAccountAction } from "@/app/dashboard/actions";
 import { Button } from "@/components/ui/button";
 import { InlineError, inputClasses } from "@/components/ui/field";
+import { callAction } from "@/lib/client/call-action";
 
 interface AccountPanelProps {
   email: string | null;
@@ -22,8 +23,11 @@ export function AccountPanel({ email, demo, hasContacts }: AccountPanelProps) {
   function remove() {
     setError(null);
     startTransition(async () => {
-      const result = await deleteAccountAction(confirmation);
-      if (result && !result.ok) setError(result.error);
+      // Success leaves the page (redirect); only failures come back.
+      const call = await callAction(() => deleteAccountAction(confirmation));
+      // No answer: it may or may not have gone through, so don't claim either.
+      if (call.failed) setError("Se ha cortado la conexión. Recarga la página: si tu cuenta sigue ahí, inténtalo de nuevo.");
+      else if (call.result && !call.result.ok) setError(call.result.error);
     });
   }
 

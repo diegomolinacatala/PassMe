@@ -2,8 +2,11 @@ import "server-only";
 import { createServerClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { isAppSession, isSessionMissingError } from "@/lib/auth/session-claims";
 import { hasSupabaseAuthCookie } from "@/lib/auth/session-cookie";
 import { getSupabasePublicConfig } from "@/lib/env";
+import { log } from "@/lib/log";
+import { supabaseCookieOptions } from "./cookie-options";
 import type { Database } from "./database.types";
 
 export type TypedSupabaseClient = SupabaseClient<Database>;
@@ -18,6 +21,7 @@ export async function createServerSupabase(): Promise<TypedSupabaseClient | null
 
   const cookieStore = await cookies();
   return createServerClient<Database>(config.url, config.key, {
+    cookieOptions: supabaseCookieOptions(),
     cookies: {
       getAll() {
         return cookieStore.getAll();
@@ -49,10 +53,24 @@ export interface SessionUser {
   email: string | null;
 }
 
-/** Verified user (JWT signature checked via getClaims), or null. */
+/**
+ * Verified user (JWT signature checked via getClaims), or null. Only sessions
+ * that came through our own sign-in count: not anonymous ones, nor ones
+ * opened with a password (see lib/auth/session-claims.ts).
+ */
 export async function getSessionUser(supabase: TypedSupabaseClient): Promise<SessionUser | null> {
   const { data, error } = await supabase.auth.getClaims();
-  if (error || !data?.claims?.sub) return null;
-  const email = typeof data.claims.email === "string" ? data.claims.email : null;
-  return { id: data.claims.sub, email };
+  if (error) {
+    // "Nobody is signed in" is normal; a bad or unverifiable token is worth knowing about.
+    if (!isSessionMissingError(error)) log.warn("getClaims failed", {}, error);
+    return null;
+  }
+  const claims = data?.claims;
+  if (!claims?.sub) return null;
+  if (!isAppSession(claims)) {
+    log.warn("rejected a session that did not come from our sign-in", { anonymous: claims.is_anonymous === true });
+    return null;
+  }
+  const email = typeof claims.email === "string" ? claims.email : null;
+  return { id: claims.sub, email };
 }

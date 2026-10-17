@@ -9,19 +9,19 @@ import { parseContactRequest } from "@/lib/card/contact";
 import { DEMO_SLUG } from "@/lib/card/demo";
 import { parseFromSlug, parseVia } from "@/lib/card/quick";
 import { sendCardDetails } from "@/lib/card/send-card";
-import { checkSlug, SLUG_ERRORS } from "@/lib/card/slug";
+import { checkNewSlug, SLUG_ERRORS } from "@/lib/card/slug";
 import { parseCardInput, type FieldErrors } from "@/lib/card/schema";
 import type { OwnerCard } from "@/lib/card/types";
 import { contactIpLimiter, deliverContactRequest, DELIVERY_ERRORS, GENERIC_DELIVERY_ERROR } from "@/lib/contact-delivery";
 import { findOwnerCard, isSlugAvailable, saveOwnerCard } from "@/lib/data/cards";
 import { deleteContactRequest } from "@/lib/data/contact-requests";
-import { deleteOwnMeeting, getMeetingRecord, ownsMeeting } from "@/lib/data/meetings";
+import { deleteOwnMeeting, findMeetingRecord, lookupOwnMeeting } from "@/lib/data/meetings";
 import { createSharedRateLimiter } from "@/lib/data/rate-limits";
 import { log } from "@/lib/log";
 import { changeMeeting } from "@/lib/meetings/service";
 import { clientRateKey } from "@/lib/request";
 import { HANDOFF_TTL_SECONDS, signHandoffToken } from "@/lib/pass/handoff";
-import { notifyWalletsOfUpdate } from "@/lib/pass/service";
+import { notifyWalletsOfUpdate, withdrawWalletPasses } from "@/lib/pass/service";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { createServerSupabase, getSessionUser, type TypedSupabaseClient } from "@/lib/supabase/server";
 
@@ -32,6 +32,8 @@ import { createServerSupabase, getSessionUser, type TypedSupabaseClient } from "
 
 // Each save can fan out to APNs and the Google Wallet API: keep it human-paced.
 const saveLimiter = createSharedRateLimiter({ name: "save-user", limit: 30, windowMs: 10 * 60_000 });
+// The slug field asks while typing (debounced); every ask is a database read.
+const slugCheckLimiter = createSharedRateLimiter({ name: "slug-check-user", limit: 60, windowMs: 60_000 });
 
 async function requireUser() {
   const supabase = await createServerSupabase();
@@ -73,6 +75,36 @@ export async function saveCardAction(input: unknown): Promise<SaveCardResult> {
   return { ok: true, card: result.card, designPending: result.designPending };
 }
 
+/** Pages of avatar files removed per account deletion before giving up (a folder holds a handful at most). */
+const MAX_AVATAR_PAGES = 20;
+const AVATAR_PAGE_SIZE = 100;
+
+/**
+ * Removes every file in the user's avatar folder, page by page until it is
+ * empty (each pass lists again from the start: removed files shift the list).
+ * False when anything failed or files remain: the caller must not delete the
+ * account then, or the photo would outlive it in the public bucket.
+ */
+async function removeAllAvatars(admin: TypedSupabaseClient, userId: string): Promise<boolean> {
+  for (let page = 0; page < MAX_AVATAR_PAGES; page += 1) {
+    const { data, error } = await admin.storage.from(AVATAR_BUCKET).list(userId, { limit: AVATAR_PAGE_SIZE });
+    if (error) {
+      log.error("avatar list failed during account deletion", { userId }, error);
+      return false;
+    }
+    // Folders (id === null) can't be created under the current policy; skip them defensively.
+    const paths = data.filter((file) => file.id !== null).map((file) => `${userId}/${file.name}`);
+    if (paths.length === 0) return true;
+    const removal = await admin.storage.from(AVATAR_BUCKET).remove(paths);
+    if (removal.error) {
+      log.error("avatar removal failed during account deletion", { userId }, removal.error);
+      return false;
+    }
+  }
+  log.error("avatar folder still not empty during account deletion", { userId, pages: MAX_AVATAR_PAGES });
+  return false;
+}
+
 /** Removes replaced or abandoned uploads from the user's avatar folder (flat by policy). */
 async function cleanupAvatars(supabase: TypedSupabaseClient, userId: string, keep: string | null): Promise<void> {
   const { data, error } = await supabase.storage.from(AVATAR_BUCKET).list(userId, { limit: 1000 });
@@ -94,11 +126,15 @@ export type SlugCheckResult = { status: "available" | "taken" | "invalid"; messa
 
 export async function checkSlugAction(raw: string): Promise<SlugCheckResult> {
   const slug = String(raw ?? "").trim().toLowerCase();
-  const check = checkSlug(slug);
+  // Only called for a handle the owner is switching to (the editor skips their current one).
+  const check = checkNewSlug(slug);
   if (!check.ok) return { status: "invalid", message: SLUG_ERRORS[check.reason] };
 
   const session = await requireUser();
   if (!session) return { status: "invalid", message: "Tu sesión ha caducado." };
+  if (!(await slugCheckLimiter.check(session.user.id)).ok) {
+    return { status: "invalid", message: "Demasiadas comprobaciones seguidas. Espera un momento." };
+  }
 
   try {
     return (await isSlugAvailable(session.supabase, slug))
@@ -172,7 +208,7 @@ export async function sendMyCardAction(toSlug: string, via: string): Promise<Sen
   return { ok: true };
 }
 
-export type DeleteResult = { ok: true } | { ok: false; error: string };
+export type DeleteResult = { ok: true; emailsSkipped?: true } | { ok: false; error: string };
 
 /** Removes one contact request (RLS: only the card owner can delete it). */
 export async function deleteContactRequestAction(id: string): Promise<DeleteResult> {
@@ -210,14 +246,19 @@ export async function declineMeetingAction(id: string): Promise<DeleteResult> {
   const meetingId = String(id).toLowerCase();
   const notFound = { ok: false as const, error: "No encontramos esta propuesta. Recarga la página." };
   if (!(await declineLimiter.check(session.user.id)).ok) return { ok: false, error: "Demasiados cambios seguidos. Espera unos minutos." };
+  // A database hiccup is not "it's gone": the owner can simply try again.
+  const retry = { ok: false as const, error: "No hemos podido comprobarlo. Inténtalo de nuevo." };
   // RLS says it's theirs; the stored owner must agree.
-  if (!(await ownsMeeting(session.supabase, meetingId))) return notFound;
-  const record = await getMeetingRecord(meetingId);
-  if (!record || record.owner.id !== session.user.id) return notFound;
-  const result = await changeMeeting(record, "owner", { action: "decline", note: "" });
+  const ownership = await lookupOwnMeeting(session.supabase, meetingId);
+  if (ownership === "error") return retry;
+  if (ownership === "none") return notFound;
+  const lookup = await findMeetingRecord(meetingId);
+  if (lookup.status === "error") return retry;
+  if (lookup.status === "missing" || lookup.record.owner.id !== session.user.id) return notFound;
+  const result = await changeMeeting(lookup.record, "owner", { action: "decline", note: "" });
   if (!result.ok) return { ok: false, error: result.error };
   after(result.emails);
-  return { ok: true };
+  return result.emailsSkipped ? { ok: true, emailsSkipped: true } : { ok: true };
 }
 
 export type DeleteAccountResult = { ok: false; error: string };
@@ -238,7 +279,12 @@ export async function deleteAccountAction(confirmation: string): Promise<DeleteA
   }
 
   const userId = session.user.id;
-  await cleanupAvatars(session.supabase, userId, null);
+  // The photo lives in a public bucket: it goes first, and if it can't, the account stays (it is still theirs to retry).
+  if (!(await removeAllAvatars(admin, userId))) {
+    return { ok: false, error: "No hemos podido borrar la cuenta. Escríbenos y lo hacemos a mano." };
+  }
+  // Their Google Wallet pass would keep showing their details otherwise. Needs the card, so before deleteUser; best effort.
+  await withdrawWalletPasses(userId);
 
   const { error } = await admin.auth.admin.deleteUser(userId);
   if (error) {

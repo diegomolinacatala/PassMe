@@ -60,14 +60,74 @@ export function buildGenericClass(config: GoogleWalletConfig) {
 export interface GooglePassInput {
   card: PublicCard;
   profileId: string;
-  /** The card is unpublished: the object goes INACTIVE until it's published again. */
+  /**
+   * The card is unpublished: the object goes INACTIVE and keeps only the name
+   * and photo (no subheader, text modules or links) until it's published again.
+   */
   paused?: boolean;
+  /** The account was deleted: EXPIRED, with no name, photo, barcode or links left. */
+  withdrawn?: boolean;
 }
 
-export function buildGenericObject(config: GoogleWalletConfig, { card, profileId, paused = false }: GooglePassInput) {
+type GoogleTextModule = { id: string; header: string; body: string };
+
+export interface GoogleGenericObject {
+  id: string;
+  classId: string;
+  state: "ACTIVE" | "INACTIVE" | "EXPIRED";
+  cardTitle: LocalizedString;
+  header: LocalizedString;
+  subheader?: LocalizedString;
+  hexBackgroundColor: string;
+  logo: { sourceUri: { uri: string }; contentDescription: LocalizedString };
+  heroImage?: { sourceUri: { uri: string }; contentDescription: LocalizedString };
+  barcode?: { type: "QR_CODE"; value: string; alternateText: string };
+  textModulesData?: GoogleTextModule[];
+  linksModuleData?: { uris: Array<{ id: string; uri: string; description: string }> };
+}
+
+/** What a published card turns into: every section present. */
+export type FullGoogleObject = GoogleGenericObject &
+  Required<Pick<GoogleGenericObject, "heroImage" | "barcode" | "textModulesData" | "linksModuleData">>;
+
+export function buildGenericObject(
+  config: GoogleWalletConfig,
+  input: Omit<GooglePassInput, "paused" | "withdrawn"> & { paused?: false; withdrawn?: false },
+): FullGoogleObject;
+export function buildGenericObject(config: GoogleWalletConfig, input: GooglePassInput): GoogleGenericObject;
+export function buildGenericObject(
+  config: GoogleWalletConfig,
+  { card, profileId, paused = false, withdrawn = false }: GooglePassInput,
+): GoogleGenericObject {
   const design = resolveDesign(card);
-  const logoUri = card.avatarUrl ?? `${getSiteUrl()}/brand/wallet-logo.png`;
+  const brandLogo = `${getSiteUrl()}/brand/wallet-logo.png`;
+  const logoUri = withdrawn ? brandLogo : (card.avatarUrl ?? brandLogo);
   const heroUri = `${profileUrl(card.slug)}/hero?v=${artVersion(card, "hero")}`;
+
+  if (withdrawn || paused) {
+    // PUT replaces the whole object, so leaving fields out removes them from the wallet.
+    const name = withdrawn ? "Tarjeta eliminada" : card.fullName;
+    return {
+      id: googleObjectId(config, profileId),
+      classId: googleClassId(config),
+      state: withdrawn ? "EXPIRED" : "INACTIVE",
+      cardTitle: localized("PassMe"),
+      header: localized(name),
+      hexBackgroundColor: design.background,
+      logo: {
+        sourceUri: { uri: logoUri },
+        contentDescription: localized(withdrawn || !card.avatarUrl ? "PassMe" : `Foto de ${card.fullName}`),
+      },
+      ...(withdrawn
+        ? {}
+        : {
+            heroImage: {
+              sourceUri: { uri: heroUri },
+              contentDescription: localized(`Diseño de la tarjeta de ${card.fullName}`),
+            },
+          }),
+    };
+  }
 
   // Ids match the class template rows (company | location), which is unchanged
   // since v1 so existing issuer classes keep working without a new suffix.
@@ -76,7 +136,7 @@ export function buildGenericObject(config: GoogleWalletConfig, { card, profileId
     card.location ? { id: "location", header: "Ubicación", body: card.location } : null,
     card.pronouns ? { id: "pronouns", header: "Pronombres", body: card.pronouns } : null,
     card.bio ? { id: "bio", header: "Sobre mí", body: card.bio } : null,
-  ].filter((m): m is { id: string; header: string; body: string } => m !== null);
+  ].filter((m): m is GoogleTextModule => m !== null);
 
   const uris = [
     { id: "card", uri: profileUrl(card.slug), description: "Ver tarjeta completa" },
@@ -90,7 +150,7 @@ export function buildGenericObject(config: GoogleWalletConfig, { card, profileId
   return {
     id: googleObjectId(config, profileId),
     classId: googleClassId(config),
-    state: paused ? "INACTIVE" : "ACTIVE",
+    state: "ACTIVE",
     cardTitle: localized(card.company || "PassMe"),
     header: localized(card.fullName),
     ...(card.headline ? { subheader: localized(card.headline) } : {}),
@@ -136,7 +196,19 @@ export async function createGoogleSaveUrl(config: GoogleWalletConfig, input: Goo
   return `${SAVE_URL}${jwt}`;
 }
 
+/** Access tokens last an hour: reuse one until a minute before it expires. */
+const TOKEN_EARLY_EXPIRY_MS = 60_000;
+let cachedToken: { key: string; token: string; expiresAt: number } | null = null;
+
+/** Test hook: forget the cached OAuth token. */
+export function resetGoogleAccessTokenCache(): void {
+  cachedToken = null;
+}
+
 async function getAccessToken(config: GoogleWalletConfig): Promise<string> {
+  const key = `${config.serviceAccountEmail}|${config.issuerId}`;
+  if (cachedToken && cachedToken.key === key && cachedToken.expiresAt > Date.now()) return cachedToken.token;
+
   const assertion = await new SignJWT({ scope: SCOPE })
     .setProtectedHeader({ alg: "RS256", typ: "JWT" })
     .setIssuer(config.serviceAccountEmail)
@@ -152,8 +224,12 @@ async function getAccessToken(config: GoogleWalletConfig): Promise<string> {
     signal: AbortSignal.timeout(10_000),
   });
   if (!response.ok) throw new Error(`Google token exchange failed (${response.status})`);
-  const json = (await response.json()) as { access_token?: string };
+  const json = (await response.json()) as { access_token?: string; expires_in?: number };
   if (!json.access_token) throw new Error("Google token exchange returned no token");
+  const lifetimeMs = (typeof json.expires_in === "number" && json.expires_in > 0 ? json.expires_in : 0) * 1000;
+  cachedToken = lifetimeMs > TOKEN_EARLY_EXPIRY_MS
+    ? { key, token: json.access_token, expiresAt: Date.now() + lifetimeMs - TOKEN_EARLY_EXPIRY_MS }
+    : null;
   return json.access_token;
 }
 
@@ -172,12 +248,14 @@ export async function syncGoogleObject(config: GoogleWalletConfig, input: Google
     });
     if (response.status === 404) return "not_saved";
     if (!response.ok) {
-      log.warn("Google Wallet object update failed", { status: response.status });
+      // A rejected token (revoked early) must not be reused for the rest of its hour.
+      if (response.status === 401) cachedToken = null;
+      log.warn("Google Wallet object update failed", { status: response.status, profileId: input.profileId });
       return "failed";
     }
     return "updated";
   } catch (error) {
-    log.warn("Google Wallet sync error", {}, error);
+    log.warn("Google Wallet sync error", { profileId: input.profileId }, error);
     return "failed";
   }
 }

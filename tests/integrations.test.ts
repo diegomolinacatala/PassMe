@@ -34,11 +34,11 @@ describe("OTP lockout backed by Supabase", () => {
 
   it("records the attempt before counting, and locks past the limit", async () => {
     const fake = useAdmin(countIs(otp.OTP_MAX_ATTEMPTS));
-    expect(await otp.registerOtpAttempt("shared@example.com", "203.0.113.1")).toBe(true);
+    expect(await otp.registerOtpAttempt("shared@example.com", "203.0.113.1")).toBe("ok");
     expect(fake.queries.map(first).slice(0, 3)).toEqual(["insert", "select", "select"]);
 
     useAdmin(countIs(otp.OTP_MAX_ATTEMPTS + 1));
-    expect(await otp.registerOtpAttempt("shared2@example.com", "203.0.113.1")).toBe(false);
+    expect(await otp.registerOtpAttempt("shared2@example.com", "203.0.113.1")).toBe("locked");
   });
 
   it("also locks an email tried from too many places at once", async () => {
@@ -50,15 +50,52 @@ describe("OTP lockout backed by Supabase", () => {
       const isGlobal = q.calls.some(([method, args]) => method === "eq" && args[1] === global);
       return { count: isGlobal ? otp.OTP_MAX_ATTEMPTS_PER_EMAIL + 1 : 1 };
     });
-    expect(await otp.registerOtpAttempt(email, "198.51.100.7")).toBe(false);
+    expect(await otp.registerOtpAttempt(email, "198.51.100.7")).toBe("locked");
   });
 
-  it("fails closed if the attempt cannot be stored or counted", async () => {
-    vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    useAdmin((q) => (first(q) === "insert" ? { error: { message: "db down" } } : { count: 0 }));
-    expect(await otp.registerOtpAttempt("anyone@example.com", "203.0.113.2")).toBe(false);
-    useAdmin((q) => (first(q) === "select" ? { error: { message: "db down" } } : {}));
-    expect(await otp.registerOtpAttempt("anyone2@example.com", "203.0.113.2")).toBe(false);
+  it("says 'unavailable' (not 'locked') if the attempt cannot be stored or counted", async () => {
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    useAdmin((q) => (first(q) === "insert" ? { error: { message: "db down", code: "08006" } } : { count: 0 }));
+    expect(await otp.registerOtpAttempt("anyone@example.com", "203.0.113.2")).toBe("unavailable");
+    useAdmin((q) => (first(q) === "select" ? { error: { message: "db down", code: "08006" } } : {}));
+    expect(await otp.registerOtpAttempt("anyone2@example.com", "203.0.113.2")).toBe("unavailable");
+    // Both are our failures: logged as errors, with the database's code.
+    expect(errorLog).toHaveBeenCalledTimes(2);
+    expect(String(errorLog.mock.calls[0]![0])).toContain("08006");
+  });
+
+  it("does not hold an unavailable attempt against the person", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    useAdmin((q) => (first(q) === "insert" ? { error: { message: "db down" } } : {}));
+    for (let i = 0; i < otp.OTP_MAX_ATTEMPTS + 3; i += 1) {
+      expect(await otp.registerOtpAttempt("patient@example.com", "203.0.113.20")).toBe("unavailable");
+    }
+    useAdmin(countIs(1));
+    expect(await otp.registerOtpAttempt("patient@example.com", "203.0.113.20")).toBe("ok");
+  });
+
+  it("refunds an attempt by deleting the newest row of each layer", async () => {
+    const fake = useAdmin((q) => (first(q) === "select" ? { data: [{ id: 41 }] } : {}));
+    await otp.forgetOtpAttempt("refund@example.com", "203.0.113.21");
+    const kinds = fake.queries.map(first);
+    expect(kinds).toEqual(["select", "select", "delete"]);
+    const hashes = fake.queries
+      .slice(0, 2)
+      .map((q) => q.calls.find(([method]) => method === "eq")![1][1] as string);
+    // One layer for the email overall, one for the email from this client.
+    expect(hashes).toContain(otp.hashEmail("refund@example.com"));
+    expect(new Set(hashes).size).toBe(2);
+    expect(fake.queries[0]!.calls).toContainEqual(["order", ["id", { ascending: false }]]);
+    expect(fake.queries[0]!.calls).toContainEqual(["limit", [1]]);
+    const del = fake.queries[2]!;
+    expect(del.calls).toContainEqual(["in", ["id", [41, 41]]]);
+  });
+
+  it("a failed refund is logged, never thrown", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    useAdmin((q) => (first(q) === "select" ? { error: { message: "down" } } : {}));
+    await expect(otp.forgetOtpAttempt("refund2@example.com", "203.0.113.22")).resolves.toBeUndefined();
+    expect(warn).toHaveBeenCalled();
   });
 
   it("stores only a hash and clears on success", async () => {
@@ -95,7 +132,7 @@ describe("shared rate limiter", () => {
   });
 
   it("falls back to memory when the function is missing", async () => {
-    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
     useAdmin(() => ({ error: { message: "not found", code: "PGRST202" } }));
     const limiter = createSharedRateLimiter({ name: "test-fallback", limit: 1, windowMs: 60_000 });
     expect((await limiter.check("x")).ok).toBe(true);
@@ -151,10 +188,31 @@ describe("contact requests data", () => {
     const pending = fakeSupabase(() => ({ error: { message: "relation does not exist", code: "42P01" } }));
     expect(await contacts.listOwnContactRequests(pending.client)).toEqual({ available: false, requests: [] });
 
-    const del = fakeSupabase(() => ({}));
+    const del = fakeSupabase(() => ({ data: [{ id: row.id }] }));
     expect(await contacts.deleteContactRequest(del.client, "not-a-uuid")).toBe(false);
     expect(del.queries).toHaveLength(0);
     expect(await contacts.deleteContactRequest(del.client, row.id)).toBe(true);
+  });
+
+  it("tells a failed read from an empty list", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const down = fakeSupabase(() => ({ error: { message: "timeout", code: "57014" } }));
+    expect(await contacts.listOwnContactRequests(down.client)).toEqual({ available: true, requests: [], failed: true });
+    const empty = fakeSupabase(() => ({ data: [] }));
+    expect(await contacts.listOwnContactRequests(empty.client)).toEqual({ available: true, requests: [] });
+  });
+
+  it("only reports a delete when a row really went", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const id = "33333333-3333-4333-8333-333333333333";
+    // Row-level security makes someone else's row (or an already deleted one) match nothing, without an error.
+    const nothing = fakeSupabase(() => ({ data: [] }));
+    expect(await contacts.deleteContactRequest(nothing.client, id)).toBe(false);
+    const failed = fakeSupabase(() => ({ error: { message: "down" } }));
+    expect(await contacts.deleteContactRequest(failed.client, id)).toBe(false);
+    const ok = fakeSupabase(() => ({ data: [{ id }] }));
+    expect(await contacts.deleteContactRequest(ok.client, id)).toBe(true);
+    expect(ok.queries[0]!.calls.map(([m]) => m)).toEqual(["delete", "eq", "select"]);
   });
 });
 

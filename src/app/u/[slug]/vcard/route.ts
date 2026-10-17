@@ -1,11 +1,12 @@
 import { after, type NextRequest } from "next/server";
 import { buildVCard, savedWithPassMeNote, servesVCardInline, vcardContentDisposition } from "@/lib/card/vcard";
-import { getPublicCard, resolveSlugRedirect } from "@/lib/data/cards";
+import { lookupPublicCard, resolveSlugRedirect } from "@/lib/data/cards";
 import { createSharedRateLimiter } from "@/lib/data/rate-limits";
 import { recordEventBySlug } from "@/lib/data/events";
 import { prettyProfileUrl, profileUrl } from "@/lib/env";
 import { log } from "@/lib/log";
 import { avatarForVCard, fetchAvatar } from "@/lib/pass/images";
+import { cardUnavailableResponse, tooManyRequestsResponse } from "@/lib/pass/public-responses";
 import { clientRateKey, isBot, parseVisitSource } from "@/lib/request";
 
 export const runtime = "nodejs";
@@ -15,20 +16,20 @@ const limiter = createSharedRateLimiter({ name: "vcard-ip", limit: 30, windowMs:
 /** "Guardar contacto": a vCard with only the links the owner made visible. */
 export async function GET(request: NextRequest, ctx: RouteContext<"/u/[slug]/vcard">) {
   const rate = await limiter.check(clientRateKey(request.headers));
-  if (!rate.ok) {
-    return new Response("Demasiadas peticiones", { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } });
-  }
+  if (!rate.ok) return tooManyRequestsResponse(rate.retryAfterSeconds);
 
   const { slug } = await ctx.params;
-  const card = await getPublicCard(slug);
-  if (!card) {
+  const lookup = await lookupPublicCard(slug);
+  if (lookup.status === "error") return cardUnavailableResponse();
+  if (lookup.status === "missing") {
     const current = await resolveSlugRedirect(slug);
     if (current) return Response.redirect(new URL(`/u/${current}/vcard${request.nextUrl.search}`, request.url), 307);
-    return new Response("Tarjeta no encontrada", { status: 404 });
+    return new Response("Tarjeta no encontrada", { status: 404, headers: { "Cache-Control": "no-store" } });
   }
+  const card = lookup.card;
 
   let photo = null;
-  const avatar = await fetchAvatar(card.avatarUrl);
+  const avatar = await fetchAvatar(card.avatarUrl, { slug: card.slug });
   if (avatar) {
     try {
       photo = { base64: await avatarForVCard(avatar), type: "JPEG" as const };

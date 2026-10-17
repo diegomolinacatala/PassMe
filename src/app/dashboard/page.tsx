@@ -55,6 +55,14 @@ async function welcomeFor(query: Record<string, string | string[] | undefined>, 
       </p>
     );
   }
+  if (query.sesion === "error") {
+    // "Cerrar sesión en todos mis dispositivos" didn't reach Supabase: the other devices are still signed in.
+    return (
+      <p role="alert" className="rounded-2xl bg-danger-wash px-4 py-3 text-sm text-danger">
+        No hemos podido cerrar la sesión en todos tus dispositivos. Inténtalo de nuevo.
+      </p>
+    );
+  }
   if (query.existente === "1") {
     return (
       <p role="status" className="rounded-2xl border hairline bg-card px-4 py-3 text-sm text-ink-soft">
@@ -139,15 +147,17 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
   const user = await getSessionUser(supabase);
   if (!user) redirect("/login?next=/dashboard");
 
+  // The panels' data doesn't depend on the card (row-level security scopes it to this
+  // account), so it's fetched alongside the card instead of after it.
+  const panels = Promise.all([getOwnStats(supabase), listOwnContactRequests(supabase), listOwnMeetings(supabase)]);
+  // Nobody awaits it when there's no card: a failure there mustn't become an unhandled rejection.
+  panels.catch(() => {});
+
   // No card yet (or one that was never filled in): the quick form makes it in a minute.
   const card = await findOwnerCard(supabase, user.id);
   if (!card?.fullName) redirect("/crear");
 
-  const [stats, contacts, meetings] = await Promise.all([
-    getOwnStats(supabase),
-    listOwnContactRequests(supabase),
-    listOwnMeetings(supabase),
-  ]);
+  const [stats, contacts, meetings] = await panels;
   const status = getConfigStatus();
   const wallet = {
     apple: status.appleWallet && status.supabaseSecretKey,
@@ -163,7 +173,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
         initialCard={card}
         stats={stats}
         contacts={{ ...contacts, seenAt: contactsSeenAt }}
-        meetings={{ available: meetings.available, items: meetingItems(meetings.meetings, card, false) }}
+        meetings={{ available: meetings.available, failed: meetings.failed, items: meetingItems(meetings.meetings, card, false) }}
         wallet={wallet}
         platform={platform}
         siteUrl={getSiteUrl()}

@@ -1,6 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isAppSession, isSessionMissingError } from "@/lib/auth/session-claims";
 import { getSupabasePublicConfig, getTurnstileSiteKey, TURNSTILE_ORIGIN } from "@/lib/env";
+import { log } from "@/lib/log";
+import { supabaseCookieOptions } from "@/lib/supabase/cookie-options";
 
 /**
  * Runs before every page/API request (see matcher):
@@ -60,6 +63,7 @@ export async function proxy(request: NextRequest) {
 
   if (config) {
     const supabase = createServerClient(config.url, config.key, {
+      cookieOptions: supabaseCookieOptions(),
       cookies: {
         getAll() {
           return request.cookies.getAll();
@@ -74,8 +78,11 @@ export async function proxy(request: NextRequest) {
     });
 
     // getClaims() verifies the JWT; do not put logic between client creation and this call.
-    const { data } = await supabase.auth.getClaims();
-    isAuthenticated = Boolean(data?.claims?.sub);
+    const { data, error } = await supabase.auth.getClaims();
+    // "Nobody is signed in" is normal; a token that can't be verified is worth a line in the log.
+    if (error && !isSessionMissingError(error)) log.warn("getClaims failed", { path: request.nextUrl.pathname }, error);
+    // Only sessions from our own sign-in (code or Google): not anonymous ones, nor password ones.
+    isAuthenticated = isAppSession(data?.claims);
 
     const { pathname, search } = request.nextUrl;
     let redirectTo: URL | null = null;

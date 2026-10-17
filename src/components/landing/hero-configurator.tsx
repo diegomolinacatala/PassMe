@@ -2,7 +2,7 @@
 
 import { ArrowRight, ArrowUpRight, Check, Dices } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { memo, useCallback, useDeferredValue, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { initials } from "@/components/card/avatar";
 import { containerUnit, CSS_FONTS, editorialLines, PassArt } from "@/components/card/pass-art";
 import { TiltCard } from "@/components/card/tilt-card";
@@ -14,7 +14,7 @@ import { createWithDesignPath, type ChosenDesign } from "@/lib/card/design-query
 import { CARD_THEMES, randomPatternSeed, resolveDesign, themeDesign, TYPEFACE_LABELS, TYPEFACES, type Typeface } from "@/lib/card/design";
 import { rememberName } from "@/lib/card/draft-storage";
 import { hasVariations, PATTERN_KINDS, PATTERN_LABELS, type PatternKind } from "@/lib/card/pattern";
-import { LIMITS } from "@/lib/card/schema";
+import { LIMITS } from "@/lib/card/limits";
 import type { PublicCard } from "@/lib/card/types";
 import { cn } from "@/lib/cn";
 
@@ -22,6 +22,8 @@ interface HeroConfiguratorProps {
   /** The sample card: its job, company and details stand in until a name is typed. */
   base: PublicCard;
   initialDesign: ChosenDesign;
+  /** The pass's QR, drawn on the server (<PassQr>), so the qrcode library stays out of the browser. */
+  qr?: ReactNode;
 }
 
 /**
@@ -31,23 +33,29 @@ interface HeroConfiguratorProps {
  * On a phone the action stays within thumb's reach in a bar at the bottom
  * whenever the inline button scrolls away.
  */
-export function HeroConfigurator({ base, initialDesign }: HeroConfiguratorProps) {
+export function HeroConfigurator({ base, initialDesign, qr }: HeroConfiguratorProps) {
   const [design, setDesign] = useState<ChosenDesign>(initialDesign);
   const [name, setName] = useState("");
   const nameId = useId();
-  const typed = name.trim();
-  const card: PublicCard = {
-    ...base,
-    ...themeDesign(design.theme, design.pattern, design.patternSeed, design.typeface),
-    fullName: typed || base.fullName,
-  };
-  const resolved = resolveDesign(card);
+  // The input follows the finger; the thirteen drawings (pass, motifs, letters) catch up when the thread is free.
+  const typed = useDeferredValue(name).trim();
   const displayName = typed || base.fullName;
+  const card: PublicCard = useMemo(
+    () => ({
+      ...base,
+      ...themeDesign(design.theme, design.pattern, design.patternSeed, design.typeface),
+      fullName: displayName,
+    }),
+    [base, design, displayName],
+  );
+  const resolved = useMemo(() => resolveDesign(card), [card]);
   const theme = CARD_THEMES.find((t) => t.id === design.theme) ?? CARD_THEMES[0]!;
   const href = createWithDesignPath(design);
-  const update = (patch: Partial<ChosenDesign>) => setDesign((prev) => ({ ...prev, ...patch }));
-  // The name goes with the draft (this browser only), never in the link.
-  const keepName = () => rememberName(typed);
+  const update = useCallback((patch: Partial<ChosenDesign>) => setDesign((prev) => ({ ...prev, ...patch })), []);
+  const pickPattern = useCallback((pattern: PatternKind) => update({ pattern }), [update]);
+  const pickTypeface = useCallback((typeface: Typeface) => update({ typeface }), [update]);
+  // The name goes with the draft (this browser only), never in the link. Read from the input, not the deferred copy.
+  const keepName = () => rememberName(name.trim());
 
   // The bottom bar on phones: shown while the inline "Crear mi tarjeta" is off screen.
   const inlineCta = useRef<HTMLDivElement>(null);
@@ -101,9 +109,7 @@ export function HeroConfigurator({ base, initialDesign }: HeroConfiguratorProps)
         </div>
 
         <div className="[grid-area:pass] lg:sticky lg:top-24 lg:self-start">
-          <TiltCard className="mx-auto w-[300px] sm:w-[360px] lg:w-[420px]">
-            <WalletPass card={card} className="max-w-none" />
-          </TiltCard>
+          <HeroPass card={card} qr={qr} />
           <p className="mt-10 hidden text-center font-medium text-ink lg:block">Pruébalo: escanéalo con tu móvil →</p>
         </div>
 
@@ -163,7 +169,18 @@ export function HeroConfigurator({ base, initialDesign }: HeroConfiguratorProps)
               className="-mx-5 flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-5 pb-1 [scrollbar-width:none] sm:-mx-8 sm:px-8 lg:mx-0 lg:grid lg:grid-cols-4 lg:overflow-visible lg:px-0 [&::-webkit-scrollbar]:hidden"
             >
               {PATTERN_KINDS.map((kind) => (
-                <MotifChip key={kind} kind={kind} selected={design.pattern === kind} card={card} onSelect={() => update({ pattern: kind })} />
+                <MotifChip
+                  key={kind}
+                  kind={kind}
+                  selected={design.pattern === kind}
+                  name={card.fullName}
+                  avatarUrl={card.avatarUrl}
+                  accentColor={card.accentColor}
+                  detailColor={card.detailColor}
+                  patternSeed={card.patternSeed}
+                  typeface={card.typeface}
+                  onSelect={pickPattern}
+                />
               ))}
             </div>
           </Group>
@@ -178,7 +195,7 @@ export function HeroConfigurator({ base, initialDesign }: HeroConfiguratorProps)
                   name={displayName}
                   background={resolved.background}
                   foreground={resolved.foreground}
-                  onSelect={() => update({ typeface })}
+                  onSelect={pickTypeface}
                 />
               ))}
             </div>
@@ -204,7 +221,7 @@ export function HeroConfigurator({ base, initialDesign }: HeroConfiguratorProps)
       <div
         aria-hidden={!ctaOffScreen}
         className={cn(
-          "fixed inset-x-0 bottom-0 z-30 border-t hairline bg-paper/90 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md transition-transform duration-300 ease-[var(--ease-out-expo)] lg:hidden",
+          "fixed inset-x-0 bottom-0 z-30 border-t hairline bg-paper/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] transition-transform duration-300 ease-[var(--ease-out-expo)] lg:hidden",
           ctaOffScreen ? "translate-y-0" : "pointer-events-none translate-y-full",
         )}
       >
@@ -248,34 +265,56 @@ function Group({ label, hint, aside, children }: { label: string; hint?: string;
   );
 }
 
+/**
+ * The hero's pass. Its own memoized component: scrolling the "Crear mi tarjeta"
+ * button in and out of view re-renders the hero, and that must not redraw the pass.
+ */
+const HeroPass = memo(function HeroPass({ card, qr }: { card: PublicCard; qr: ReactNode }) {
+  return (
+    <TiltCard className="mx-auto w-[300px] sm:w-[360px] lg:w-[420px]">
+      <WalletPass card={card} className="max-w-none" qr={qr} />
+    </TiltCard>
+  );
+});
+
+// Primitive props only (and a stable onSelect), so choosing one motif doesn't redraw the other seven.
 interface MotifChipProps {
   kind: PatternKind;
   selected: boolean;
-  card: PublicCard;
-  onSelect: () => void;
+  name: string;
+  avatarUrl: string | null;
+  accentColor: string;
+  detailColor: string | null;
+  patternSeed: number;
+  typeface: Typeface;
+  onSelect: (kind: PatternKind) => void;
 }
 
 /** The pass strip, drawn with this motif, as the option itself. */
-function MotifChip({ kind, selected, card, onSelect }: MotifChipProps) {
-  const design = resolveDesign({ ...card, pattern: kind });
+const MotifChip = memo(function MotifChip({ kind, selected, name, avatarUrl, accentColor, detailColor, patternSeed, typeface, onSelect }: MotifChipProps) {
+  const design = useMemo(
+    () => resolveDesign({ accentColor, detailColor, pattern: kind, patternSeed, typeface }),
+    [accentColor, detailColor, kind, patternSeed, typeface],
+  );
   const label = PATTERN_LABELS[kind].name;
   return (
     <label className={cn("group relative flex w-[132px] shrink-0 snap-start flex-col gap-1.5 rounded-xl lg:w-auto", CHOICE_FOCUS)}>
-      <input type="radio" name="landing-motif" checked={selected} onChange={onSelect} aria-label={label} className={CHOICE_INPUT} />
+      <input type="radio" name="landing-motif" checked={selected} onChange={() => onSelect(kind)} aria-label={label} className={CHOICE_INPUT} />
       <span
         className={cn(
           "block overflow-hidden rounded-xl shadow-hairline transition-transform duration-200 ease-[var(--ease-spring)] group-hover:-translate-y-0.5",
           selected && "ring-2 ring-ink ring-offset-2 ring-offset-paper",
         )}
+        data-cq=""
         style={{ containerType: "inline-size" }}
         aria-hidden="true"
       >
         <PassArt
           design={design}
           variant="strip"
-          name={card.fullName}
-          initials={initials(card.fullName)}
-          avatarSrc={card.avatarUrl}
+          name={name}
+          initials={initials(name)}
+          avatarSrc={avatarUrl}
           unit={containerUnit}
           fonts={CSS_FONTS}
           deferPattern
@@ -286,7 +325,7 @@ function MotifChip({ kind, selected, card, onSelect }: MotifChipProps) {
       </span>
     </label>
   );
-}
+});
 
 interface TypefaceChipProps {
   typeface: Typeface;
@@ -294,7 +333,7 @@ interface TypefaceChipProps {
   name: string;
   background: string;
   foreground: string;
-  onSelect: () => void;
+  onSelect: (typeface: Typeface) => void;
 }
 
 function sampleStyle(typeface: Typeface): CSSProperties {
@@ -309,13 +348,13 @@ function sampleStyle(typeface: Typeface): CSSProperties {
   }
 }
 
-function TypefaceChip({ typeface, selected, name, background, foreground, onSelect }: TypefaceChipProps) {
+const TypefaceChip = memo(function TypefaceChip({ typeface, selected, name, background, foreground, onSelect }: TypefaceChipProps) {
   const [first, rest] = editorialLines(name);
   const surname = rest.split(" ")[0] ?? "";
   const label = TYPEFACE_LABELS[typeface].name;
   return (
     <label className={cn("group relative flex flex-col gap-1.5 rounded-xl", CHOICE_FOCUS)}>
-      <input type="radio" name="landing-typeface" checked={selected} onChange={onSelect} aria-label={label} className={CHOICE_INPUT} />
+      <input type="radio" name="landing-typeface" checked={selected} onChange={() => onSelect(typeface)} aria-label={label} className={CHOICE_INPUT} />
       <span
         className={cn(
           "flex h-12 items-center overflow-hidden rounded-xl px-2.5 shadow-hairline transition-transform duration-200 ease-[var(--ease-spring)] group-hover:-translate-y-0.5",
@@ -339,4 +378,4 @@ function TypefaceChip({ typeface, selected, name, background, foreground, onSele
       </span>
     </label>
   );
-}
+});

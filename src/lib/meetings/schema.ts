@@ -2,108 +2,32 @@
  * "Agendar reunión": what a visitor proposes and what each side answers.
  * Isomorphic — the forms and the server actions share these rules.
  * Keep the limits in sync with supabase/migrations/20261002120000_meeting_requests.sql.
+ *
+ * This module holds the zod schemas. Client components must import the plain
+ * constants from ./constants instead (they are re-exported here for the server).
  */
 import { z } from "zod";
 import { normalizeLinkValue, parseHttpUrl } from "@/lib/card/links";
 import { line, paragraph, toFieldErrors, type FieldErrors } from "@/lib/card/text";
+import {
+  HORIZON_DAYS,
+  MAX_SLOTS,
+  MEETING_DURATIONS,
+  MEETING_FORMATS,
+  MEETING_LIMITS,
+  type MeetingDuration,
+  type MeetingFormat,
+} from "./constants";
+import { NAME_RE, noLinks, unsafeTextReason, isSafeText } from "./text-safety";
 import { canonicalTimeZone, DEFAULT_TIME_ZONE } from "./time";
 
-export const MEETING_LIMITS = {
-  name: 80,
-  email: 254,
-  phone: 30,
-  company: 80,
-  topic: 140,
-  location: 120,
-  videoLink: 300,
-  note: 300,
-} as const;
+export * from "./constants";
+export * from "./text-safety";
 
-export const MEETING_FORMATS = ["in_person", "video", "phone"] as const;
-export type MeetingFormat = (typeof MEETING_FORMATS)[number];
-
-export const FORMAT_LABELS: Record<MeetingFormat, string> = {
-  in_person: "En persona",
-  video: "Videollamada",
-  phone: "Llamada",
-};
-
-export const MEETING_DURATIONS = [15, 30, 45, 60] as const;
-export type MeetingDuration = (typeof MEETING_DURATIONS)[number];
-export const DEFAULT_DURATION: MeetingDuration = 30;
-
-export const MAX_SLOTS = 3;
-/** Proposals reach this far ahead. */
-export const HORIZON_DAYS = 60;
 /** Times sit on quarter hours (the picker offers half hours). */
 const STEP_MINUTES = 15;
 
 const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/;
-/**
- * Generic TLDs that spam uses, plus every country code. "Expo.Pack", "S.L." or
- * "EE.UU." are plain text; "evil.com" or "bit.ly" are links an email client
- * would make clickable.
- */
-const GENERIC_TLDS =
-  "com|net|org|info|biz|edu|gov|int|mil|app|dev|xyz|online|site|website|store|shop|club|top|link|live|tech|pro|name|mobi|art|blog|cloud|page|email|click|icu|vip|win|bid|life|world|today|news|space|fun|cat|eus|gal|madrid|barcelona|bcn";
-const COUNTRY_TLDS =
-  "ac|ad|ae|af|ag|ai|al|am|ao|aq|ar|as|at|au|aw|ax|az|ba|bb|bd|be|bf|bg|bh|bi|bj|bm|bn|bo|br|bs|bt|bw|by|bz|ca|cc|cd|cf|cg|ch|ci|ck|cl|cm|cn|co|cr|cu|cv|cw|cx|cy|cz|de|dj|dk|dm|do|dz|ec|ee|eg|er|es|et|eu|fi|fj|fk|fm|fo|fr|ga|gd|ge|gf|gg|gh|gi|gl|gm|gn|gp|gq|gr|gs|gt|gu|gw|gy|hk|hm|hn|hr|ht|hu|id|ie|il|im|in|io|iq|ir|is|it|je|jm|jo|jp|ke|kg|kh|ki|km|kn|kp|kr|kw|ky|kz|la|lb|lc|li|lk|lr|ls|lt|lu|lv|ly|ma|mc|md|me|mg|mh|mk|ml|mm|mn|mo|mp|mq|mr|ms|mt|mu|mv|mw|mx|my|mz|na|nc|ne|nf|ng|ni|nl|no|np|nr|nu|nz|om|pa|pe|pf|pg|ph|pk|pl|pm|pn|pr|ps|pt|pw|py|qa|re|ro|rs|ru|rw|sa|sb|sc|sd|se|sg|sh|si|sk|sl|sm|sn|so|sr|ss|st|su|sv|sx|sy|sz|tc|td|tf|tg|th|tj|tk|tl|tm|tn|to|tr|tt|tv|tw|tz|ua|ug|uk|us|uy|uz|va|vc|ve|vg|vi|vn|vu|wf|ws|ye|yt|za|zm|zw";
-/**
- * Links have no business in text a form anyone can fill sends to an inbox: a
- * scheme, "www.", an email, a domain followed by a path, or a known TLD that
- * ends the word.
- */
-const LINKISH_RE = new RegExp(
-  String.raw`https?:|www\.|:\/\/|@|[\p{L}\d-]\.[\p{L}\d-]+\/|[\p{L}\d-]\.(?:${GENERIC_TLDS}|${COUNTRY_TLDS})(?![\p{L}\d])`,
-  "iu",
-);
-/** Nine or more digits, maybe split by single spaces, dots or dashes: a phone number. */
-const PHONEISH_RE = /\d(?:[\s.-]?\d){8,}/;
-/** Dates (27-10-2026, 27/10/2026) and times (10:30, 10h30) are not phone numbers. */
-const DATE_RE = /(?<!\d)(?:0?[1-9]|[12]\d|3[01])[-/.](?:0?[1-9]|1[0-2])[-/.](?:19|20)\d{2}(?!\d)/g;
-const TIME_RE = /(?<!\d)(?:[01]?\d|2[0-3])[:h][0-5]\d(?!\d)/g;
-/** Letters, marks and the punctuation real names use (O'Connor, Jean-Luc, Mª José, J. R., Marta (Aranda)). */
-const NAME_RE = /^[\p{L}\p{M}][\p{L}\p{M} .,'’()-]*$/u;
-const FRAGMENT_MAX = 40;
-
-const noLinks = (s: string) => !LINKISH_RE.test(s);
-
-/** The whole word around a match, without trailing punctuation, to quote it back. */
-function wordAt(s: string, start: number, end: number): string {
-  const from = s.slice(0, start).search(/\S*$/);
-  const tail = s.slice(end).match(/^\S*/)?.[0] ?? "";
-  const word = (s.slice(from, end) + tail).replace(/[.,;:!?)»”"']+$/u, "");
-  return word.length > FRAGMENT_MAX ? `${word.slice(0, FRAGMENT_MAX - 1)}…` : word;
-}
-
-/**
- * Why a free text can't reach someone's inbox (a link, an email or a phone
- * number), quoting the fragment so the visitor knows what to change; null when
- * it's fine.
- */
-export function unsafeTextReason(s: string): string | null {
-  const link = LINKISH_RE.exec(s);
-  if (link) {
-    const fragment = wordAt(s, link.index, link.index + link[0].length);
-    return fragment.includes("@")
-      ? `“${fragment}” parece un email. Si es el tuyo, ponlo en su campo.`
-      : `“${fragment}” parece un enlace. Escríbelo sin el punto.`;
-  }
-  // Blank dates and times out (same length, so indexes still match the text).
-  const digitsOnly = s.replace(DATE_RE, (m) => " ".repeat(m.length)).replace(TIME_RE, (m) => " ".repeat(m.length));
-  const phone = PHONEISH_RE.exec(digitsOnly);
-  if (phone) return `“${phone[0].trim()}” parece un teléfono: ponlo en su campo.`;
-  return null;
-}
-
-/** Free text that may reach someone's inbox: no links, emails, domains or phone numbers. */
-export function isSafeText(s: string): boolean {
-  return unsafeTextReason(s) === null;
-}
-
-export function isSafeName(s: string): boolean {
-  return NAME_RE.test(s) && isSafeText(s);
-}
 
 /** Refines a text field with the quoted reason it can't be sent. */
 function safeText<T extends z.ZodType<string>>(schema: T) {
@@ -154,6 +78,9 @@ const placeOrMap = z
     return z.NEVER;
   });
 
+/** Control and format characters: CR/LF, NUL, zero-width and bidirectional marks… */
+const INVISIBLE_RE = /[\p{Cc}\p{Cf}]/u;
+
 /** One contact value normalized like the card's own links (email or phone). */
 function contactValue(kind: "email" | "phone", max: number) {
   return z
@@ -162,6 +89,11 @@ function contactValue(kind: "email" | "phone", max: number) {
     .transform((raw, ctx) => {
       const value = raw.trim();
       if (!value) return null;
+      // Never part of a real address or number, and a classic way to smuggle headers or disguise a value.
+      if (INVISIBLE_RE.test(value)) {
+        ctx.addIssue({ code: "custom", message: kind === "email" ? "Email no válido." : "Solo números, espacios y el prefijo +." });
+        return z.NEVER;
+      }
       const normalized = normalizeLinkValue(kind, value);
       if (!normalized.ok || normalized.value.length > max) {
         ctx.addIssue({ code: "custom", message: normalized.ok ? "Demasiado largo." : normalized.error });

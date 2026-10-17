@@ -13,7 +13,7 @@ const NAV_LINK = "rounded-full px-3 py-2 text-sm text-ink-soft transition-colors
 /** Sticks to the top as a frosted strip of paper, so "Crear mi tarjeta" is always a tap away. */
 export function SiteHeader({ ctaHref, signedIn }: SiteHeaderProps) {
   return (
-    <header className="sticky top-0 z-30 bg-paper/85 shadow-[0_1px_0_rgb(34_27_23/0.06)] backdrop-blur-md">
+    <header className="sticky top-0 z-30 bg-paper/95 shadow-[0_1px_0_rgb(34_27_23/0.06)] lg:bg-paper/85 lg:backdrop-blur-md">
       <div className="mx-auto flex min-h-16 max-w-[1240px] flex-wrap items-center justify-between gap-2 px-5 py-2.5 sm:px-8">
         <Logo />
         <nav aria-label="Principal" className="flex flex-wrap items-center justify-end gap-1 sm:gap-2">

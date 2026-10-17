@@ -8,7 +8,14 @@ import { checkSlug } from "@/lib/card/slug";
 import { verifyCaptcha } from "@/lib/captcha";
 import { contactIpLimiter, deliverContactRequest, DELIVERY_ERRORS, GENERIC_DELIVERY_ERROR as GENERIC_ERROR } from "@/lib/contact-delivery";
 import { isSupabaseConfigured } from "@/lib/env";
+import { createSharedRateLimiter } from "@/lib/data/rate-limits";
 import { clientRateKey, getClientIp, parseVisitSource } from "@/lib/request";
+
+// One person has no reason to leave the same details on the same card more than a couple of times
+// an hour (a typo, a second try). Keyed by connection, card AND the email/phone they leave: a whole
+// room on the venue Wi-Fi can still leave their contacts on the speaker's card (the per-IP and
+// per-card limits bound the flood).
+const ipCardLimiter = createSharedRateLimiter({ name: "contact-ip-card", limit: 2, windowMs: 60 * 60_000 });
 
 export type ContactFormState =
   | { status: "idle" }
@@ -85,6 +92,10 @@ export async function submitContactAction(
   }
   if (!(await verifyCaptcha(String(formData.get("captchaToken") ?? ""), getClientIp(requestHeaders)))) {
     return fail("Completa la verificación anti-spam e inténtalo de nuevo.");
+  }
+  const sender = (parsed.data.email ?? parsed.data.phone ?? "").toLowerCase();
+  if (!(await ipCardLimiter.check(`${clientRateKey(requestHeaders)}:${cleanSlug}:${sender}`)).ok) {
+    return fail("Ya le has dejado tu contacto a esta persona. Prueba dentro de un rato.");
   }
 
   const delivery = await deliverContactRequest(cleanSlug, parsed.data, parseVisitSource(source));

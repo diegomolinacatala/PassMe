@@ -4,9 +4,9 @@ import { ChevronDown } from "lucide-react";
 import { useId } from "react";
 import { Field, inputClasses } from "@/components/ui/field";
 import { cn } from "@/lib/cn";
-import { formatDuration } from "@/lib/meetings/model";
-import { FORMAT_LABELS, MEETING_DURATIONS, MEETING_FORMATS, MEETING_LIMITS, type MeetingDuration } from "@/lib/meetings/schema";
+import { FORMAT_LABELS, MEETING_DURATIONS, MEETING_FORMATS, MEETING_LIMITS, type MeetingDuration } from "@/lib/meetings/constants";
 import {
+  formatDuration,
   NOTICE_OPTIONS,
   noticeLabel,
   PLACE_MAX,
@@ -15,7 +15,7 @@ import {
   WEEKDAY_LABELS,
   WEEKDAYS,
   type MeetingSettings,
-} from "@/lib/meetings/settings";
+} from "@/lib/meetings/rules";
 
 interface MeetingSettingsFieldProps {
   value: MeetingSettings;

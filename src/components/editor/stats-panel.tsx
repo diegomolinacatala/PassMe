@@ -40,6 +40,14 @@ function Sparkline({ data, days }: { data: CardStats["dailyViews"]; days: number
 }
 
 export function StatsPanel({ stats, links, demo }: StatsPanelProps) {
+  if (stats.unavailable) {
+    // Zeros would read as "nobody looked": say we couldn't count instead.
+    return (
+      <p role="status" className="text-sm text-muted">
+        No hemos podido cargar tus estadísticas ahora. Recarga en un momento.
+      </p>
+    );
+  }
   const tiles = [
     { label: "Visitas", value: stats.views },
     { label: "Desde el QR", value: stats.qrViews },

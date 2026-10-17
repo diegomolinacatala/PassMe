@@ -92,6 +92,8 @@ interface ActionPanelProps {
   title: string;
   subtitle: string;
   onOpen?: () => void;
+  /** The visitor's pointer, finger or focus is on the row: time to start loading what opens (idempotent). */
+  onWarm?: () => void;
   /** The open panel; it should include a <PanelCloseButton>. */
   children: ReactNode;
 }
@@ -100,7 +102,7 @@ interface ActionPanelProps {
  * A secondary action under the card: a row (icon in a soft circle, title,
  * subtitle, arrow) that opens its panel in place. Opening one closes the other.
  */
-export function ActionPanel({ panel, id, icon, title, subtitle, onOpen, children }: ActionPanelProps) {
+export function ActionPanel({ panel, id, icon, title, subtitle, onOpen, onWarm, children }: ActionPanelProps) {
   const { openPanel, open, scrollTo, clearScroll, focusReturn, clearFocusReturn } = useCardPage();
   const isOpen = openPanel === panel;
   const trigger = useRef<HTMLButtonElement>(null);
@@ -125,6 +127,9 @@ export function ActionPanel({ panel, id, icon, title, subtitle, onOpen, children
         <button
           ref={trigger}
           type="button"
+          onPointerEnter={onWarm}
+          onFocus={onWarm}
+          onTouchStart={onWarm}
           onClick={() => {
             onOpen?.();
             open(panel);

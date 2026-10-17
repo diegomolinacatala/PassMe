@@ -7,11 +7,17 @@ import { AVATAR_SIZE_PX, newAvatarPath } from "@/lib/card/avatar";
 import { cropRect, isHeic, type CropView } from "@/lib/card/crop";
 import { AVATAR_BUCKET } from "@/lib/env";
 import { InlineError } from "@/components/ui/field";
-import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { PhotoCropSheet, type CropSource } from "./photo-crop-sheet";
 
 const MAX_INPUT_BYTES = 15 * 1024 * 1024;
-const JPEG_QUALITY = 0.86;
+const JPEG_QUALITY = 0.8;
+
+/**
+ * The Supabase client (auth, realtime, storage…) is only needed to upload, so it
+ * loads then, not with the editor: it is the biggest piece of the page's JS.
+ * Warmed when the file picker opens, so it is ready by the time a photo is chosen.
+ */
+const loadSupabase = () => import("@/lib/supabase/browser");
 
 /** The framed square of the photo as a small, consistent JPEG. */
 async function toSquareJpeg(bitmap: ImageBitmap, view: CropView): Promise<Blob> {
@@ -79,6 +85,7 @@ export function AvatarField({ userId, name, url, demo, onChange }: AvatarFieldPr
         onChange(null, URL.createObjectURL(blob));
         return;
       }
+      const { getBrowserSupabase } = await loadSupabase();
       const supabase = getBrowserSupabase();
       if (!supabase) throw new Error("Supabase no configurado");
       const path = newAvatarPath(userId);
@@ -110,7 +117,10 @@ export function AvatarField({ userId, name, url, demo, onChange }: AvatarFieldPr
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => inputRef.current?.click()}
+            onClick={() => {
+              void loadSupabase();
+              inputRef.current?.click();
+            }}
             disabled={busy}
             className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-ink/80 px-4 text-sm font-medium transition-colors hover:bg-ink hover:text-paper disabled:opacity-50"
           >

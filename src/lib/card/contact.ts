@@ -4,11 +4,13 @@
  * Keep the limits in sync with supabase/migrations/20260929130000_contact_requests.sql.
  */
 import { z } from "zod";
-import { linkHref, normalizeLinkValue } from "./links";
-import { line, paragraph, toFieldErrors, type FieldErrors } from "./schema";
+import { CONTACT_LIMITS, CONTACT_ONE_OF_ERROR, contactPhoneHref, type ContactRequest } from "./contact-info";
+import { normalizeLinkValue } from "./links";
+import { line, paragraph, toFieldErrors, type FieldErrors } from "./text";
 import { escapeText, foldLine, splitName } from "./vcard";
 
-export const CONTACT_LIMITS = { name: 80, email: 254, phone: 30, company: 80, message: 500 } as const;
+// Client code imports the plain parts (limits, hrefs, the request type) from ./contact-info.
+export * from "./contact-info";
 
 /** Optional single-line field: empty → null, otherwise normalized by `normalize`. */
 function optionalContact(kind: "email" | "phone", max: number) {
@@ -31,9 +33,6 @@ function optionalContact(kind: "email" | "phone", max: number) {
       return normalized.value;
     });
 }
-
-/** Shown under the phone and email fields when both are empty. */
-export const CONTACT_ONE_OF_ERROR = "Deja tu móvil o tu email: con uno basta.";
 
 /** Also run a refinement when other fields failed, so the visitor sees every problem at once. */
 const always = ({ value }: { value: unknown }) => typeof value === "object" && value !== null;
@@ -58,26 +57,6 @@ export type ParseContactResult = { ok: true; data: ValidContactRequest } | { ok:
 export function parseContactRequest(input: unknown): ParseContactResult {
   const result = contactRequestSchema.safeParse(input);
   return result.success ? { ok: true, data: result.data } : { ok: false, errors: toFieldErrors(result.error) };
-}
-
-/** A stored request as the owner sees it. */
-export interface ContactRequest {
-  id: string;
-  name: string;
-  email: string | null;
-  phone: string | null;
-  company: string;
-  message: string;
-  source: "direct" | "qr" | "share";
-  createdAt: string;
-}
-
-export function contactEmailHref(email: string): string {
-  return linkHref("email", email);
-}
-
-export function contactPhoneHref(phone: string): string {
-  return linkHref("phone", phone);
 }
 
 function contactVCard(request: ContactRequest, note: string): string {

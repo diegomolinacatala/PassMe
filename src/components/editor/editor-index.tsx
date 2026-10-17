@@ -116,7 +116,7 @@ export function EditorIndex({ entries }: { entries: ReadonlyArray<IndexEntry> })
   }
 
   return (
-    <div ref={setBar} className="sticky top-0 z-20 -mx-4 mb-6 bg-paper/90 px-4 py-2 backdrop-blur-md sm:-mx-8 sm:px-8">
+    <div ref={setBar} className="sticky top-0 z-20 -mx-4 mb-6 bg-paper/95 px-4 py-2 sm:-mx-8 sm:px-8 lg:bg-paper/90 lg:backdrop-blur-md">
       <div className="relative">
         <button
           ref={trigger}

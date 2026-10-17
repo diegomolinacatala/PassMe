@@ -95,7 +95,7 @@ export function PreviewDock({ card, anchor }: PreviewDockProps) {
         inert={!shown}
         aria-hidden={!shown}
         className={
-          "fixed right-3 z-20 flex h-16 items-center gap-3 rounded-full border hairline bg-card/95 py-2.5 pr-4 pl-2.5 text-body font-medium text-ink shadow-object backdrop-blur-md transition-[transform,opacity] duration-200 ease-[var(--ease-out-expo)] lg:hidden " +
+          "fixed right-3 z-20 flex h-16 items-center gap-3 rounded-full border hairline bg-card/95 py-2.5 pr-4 pl-2.5 text-body font-medium text-ink shadow-object transition-[transform,opacity] duration-200 ease-[var(--ease-out-expo)] lg:hidden " +
           (shown ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-4 opacity-0")
         }
         style={{ bottom: "calc(var(--savebar-h, max(0.75rem, env(safe-area-inset-bottom))) + 0.5rem)" }}
@@ -116,7 +116,7 @@ export function PreviewDock({ card, anchor }: PreviewDockProps) {
         onClick={(event) => {
           if (event.target === event.currentTarget) dialog.current?.close();
         }}
-        className="mx-auto mt-auto mb-0 max-h-[92dvh] w-full max-w-[640px] overflow-y-auto rounded-t-object bg-paper p-0 text-ink shadow-object backdrop:bg-ink/55 backdrop:backdrop-blur-[2px] lg:hidden"
+        className="mx-auto mt-auto mb-0 max-h-[92dvh] w-full max-w-[640px] overflow-y-auto rounded-t-object bg-paper p-0 text-ink shadow-object backdrop:bg-ink/55 lg:hidden"
       >
         <div className="px-4 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
           <div className="mb-3 flex items-center justify-between gap-3">

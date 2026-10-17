@@ -55,6 +55,12 @@ export interface OwnContactRequests {
   /** False until migration 20260929130000 is applied. */
   available: boolean;
   requests: ContactRequest[];
+  /**
+   * Set when the database failed for any other reason: `requests` is empty because
+   * we couldn't read them, NOT because there are none. Callers must not show the
+   * empty state (or export an empty file) in that case.
+   */
+  failed?: true;
 }
 
 /** The signed-in owner's requests, newest first (RLS limits them to their own card). */
@@ -65,17 +71,30 @@ export async function listOwnContactRequests(supabase: TypedSupabaseClient): Pro
     .order("created_at", { ascending: false })
     .limit(MAX_LISTED);
   if (error) {
-    if (!MISSING_RELATION_CODES.has(error.code ?? "")) log.warn("contact requests list failed", {}, error);
-    return { available: !MISSING_RELATION_CODES.has(error.code ?? ""), requests: [] };
+    if (MISSING_RELATION_CODES.has(error.code ?? "")) return { available: false, requests: [] };
+    log.error("contact requests list failed", {}, error);
+    return { available: true, requests: [], failed: true };
   }
   return { available: true, requests: data.map(rowToContactRequest) };
 }
 
+/**
+ * True only when a row was really removed: with row-level security, deleting
+ * something that isn't yours (or is already gone) is not an error, it just
+ * matches nothing.
+ */
 export async function deleteContactRequest(supabase: TypedSupabaseClient, id: string): Promise<boolean> {
   if (!isUuid(id)) return false;
-  const { error } = await supabase.from("contact_requests").delete().eq("id", id);
-  if (error) log.warn("contact request delete failed", {}, error);
-  return !error;
+  const { data, error } = await supabase.from("contact_requests").delete().eq("id", id).select("id");
+  if (error) {
+    log.warn("contact request delete failed", {}, error);
+    return false;
+  }
+  if (!data || data.length === 0) {
+    log.warn("contact request delete matched no row", {});
+    return false;
+  }
+  return true;
 }
 
 /** Owner's login email, for the "someone left you their contact" notification. */

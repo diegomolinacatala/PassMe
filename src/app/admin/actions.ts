@@ -16,14 +16,19 @@ export interface AdminLoginState {
 
 /*
  * Per client, plus a global cap so guessing from many addresses stays slow too.
- * The global one is generous: anyone can spend it, and spending it locks the
- * owner out. With a 16+ character password, 150 guesses an hour get nowhere.
+ * The global one is very generous: anyone can spend it, and spending it locks
+ * the owner out. A 16+ character password isn't going to fall to 1000 guesses
+ * an hour; the per-client limit does the real work.
+ *
+ * Both fail closed: if the shared counters can't be reached, nobody gets to
+ * try passwords (per-instance memory would let a flood spread over instances).
  */
-const ipLimiter = createSharedRateLimiter({ name: "admin-login-ip", limit: 5, windowMs: 15 * 60_000 });
-const globalLimiter = createSharedRateLimiter({ name: "admin-login", limit: 150, windowMs: 60 * 60_000 });
+const ipLimiter = createSharedRateLimiter({ name: "admin-login-ip", limit: 5, windowMs: 15 * 60_000, failClosed: true });
+const globalLimiter = createSharedRateLimiter({ name: "admin-login", limit: 1000, windowMs: 60 * 60_000, failClosed: true });
 
 const WRONG = "Usuario o contraseña incorrectos.";
 const TOO_MANY = "Demasiados intentos. Espera 15 minutos.";
+const UNAVAILABLE = "No podemos comprobar tus datos ahora mismo. Inténtalo en unos minutos.";
 const OFF = "El panel no está activado.";
 
 export async function adminLoginAction(_prev: AdminLoginState, formData: FormData): Promise<AdminLoginState> {
@@ -34,9 +39,10 @@ export async function adminLoginAction(_prev: AdminLoginState, formData: FormDat
   const password = String(formData.get("password") ?? "").slice(0, 500);
 
   const key = clientRateKey(await headers());
-  if (!(await ipLimiter.check(key)).ok || !(await globalLimiter.check("all")).ok) {
-    return { username, error: TOO_MANY };
-  }
+  const perClient = await ipLimiter.check(key);
+  if (!perClient.ok) return { username, error: perClient.degraded ? UNAVAILABLE : TOO_MANY };
+  const overall = await globalLimiter.check("all");
+  if (!overall.ok) return { username, error: overall.degraded ? UNAVAILABLE : TOO_MANY };
   if (!credentialsMatch(credentials, username, password)) {
     // A short hash, not the IP: enough to tell an attack (many tries, one client) from a typo.
     log.warn("admin login failed", { client: createHash("sha256").update(key).digest("hex").slice(0, 10) });

@@ -34,6 +34,7 @@ vi.mock("@/lib/supabase/admin", () => ({ createAdminSupabase: () => state.admin 
 vi.mock("@/lib/data/cards", () => ({
   findOwnerCard: async () => state.ownCard,
   getPublicCard: async () => state.target,
+  lookupPublicCard: async () => (state.target ? { status: "found", card: state.target } : { status: "missing" }),
 }));
 
 const { sendMyCardAction } = await import("@/app/dashboard/actions");

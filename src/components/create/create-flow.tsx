@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowLeft, LoaderCircle } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { createMyCardAction } from "@/app/crear/actions";
 import { authAction, type AuthState } from "@/app/login/actions";
 import { EmailCodeAuth } from "@/components/auth/email-code-auth";
@@ -23,10 +23,12 @@ import {
   type QuickTextField,
 } from "@/lib/card/quick";
 import type { FieldErrors } from "@/lib/card/schema";
+import { callAction } from "@/lib/client/call-action";
 import type { VisitSource } from "@/lib/env";
 import { cn } from "@/lib/cn";
 import type { Platform } from "@/lib/platform";
 import { QuickCardForm } from "./quick-card-form";
+import { cardEmailAfterCodeChange, restoreDraft, withoutDesignQuery } from "./draft-rules";
 
 /** guest: signs up at the end · member: signed in, card still empty · demo: no Supabase. */
 export type CreateMode = "guest" | "member" | "demo";
@@ -53,6 +55,8 @@ interface CreateFlowProps {
   designChosen: boolean;
   accountEmail: string | null;
   previewStyle: PassStyle;
+  /** The preview pass's QR, drawn on the server (a stand-in: the card's link doesn't exist yet). */
+  previewQr: ReactNode;
   /** The wallet the preview stands for, or null when this phone has none to offer (Android before Google Wallet). */
   previewWallet: string | null;
   platform: Platform;
@@ -64,6 +68,8 @@ const EMAIL_LIKE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 /** Typing pauses this long before the draft is written to storage. */
 const DRAFT_SAVE_DELAY_MS = 300;
 const SEND_FAILED = "No hemos podido enviar el email. Inténtalo de nuevo.";
+/** createMyCardAction got no answer: nothing typed is lost. */
+const CREATE_UNREACHABLE = "No hemos podido conectar. Tus datos siguen aquí: inténtalo de nuevo.";
 
 const isEmail = (value: string) => EMAIL_LIKE.test(value.trim());
 
@@ -93,6 +99,7 @@ export function CreateFlow({
   designChosen,
   accountEmail,
   previewStyle,
+  previewQr,
   previewWallet,
   platform,
   googleEnabled,
@@ -144,15 +151,8 @@ export function CreateFlow({
     setRestored(true);
     const stored = readStoredDraft();
     if (stored) {
-      setDraft({
-        ...stored.draft,
-        email: stored.draft.email || accountEmail || "",
-        // 0 / "" is what an incomplete stored draft gets: keep this visit's variation and color instead.
-        patternSeed: stored.draft.patternSeed || initialDesign.patternSeed,
-        theme: stored.draft.theme || initialDesign.theme,
-        // A design chosen just now (the landing's link) beats the one an older draft had.
-        ...(designChosen ? initialDesign : {}),
-      });
+      // A design chosen just now (the landing's link) beats the one an older draft had.
+      setDraft(restoreDraft(stored.draft, { accountEmail, initialDesign, designChosen }));
       setOrigin(from ?? stored.from);
       if (!from) setOriginVia(stored.via);
       if (mode === "member") {
@@ -176,6 +176,22 @@ export function CreateFlow({
         }
       }
     }
+  }
+
+  // The landing's design is in the draft now (and in storage, below): drop it from the
+  // address, or a reload would bring it back over a color picked since.
+  useEffect(() => {
+    if (!restored || !designChosen) return;
+    const clean = withoutDesignQuery(window.location.href);
+    if (clean) window.history.replaceState(null, "", clean);
+  }, [restored, designChosen]);
+
+  // "Cambiar email" on the code step: a typo in the card's own email shouldn't stay on the card.
+  const [previousCode, setPreviousCode] = useState(sentCode);
+  if (previousCode !== sentCode) {
+    setPreviousCode(sentCode);
+    const email = cardEmailAfterCodeChange(previousCode?.email ?? null, sentCode?.email ?? null, draft.email);
+    if (email) setDraft((prev) => ({ ...prev, email }));
   }
 
   // Kept in this browser while it's typed and while signing in (the email's button
@@ -233,7 +249,9 @@ export function CreateFlow({
     (codeBox ?? headingRef.current)?.focus();
   }, [step]);
 
-  const validation = useMemo(() => parseQuickDraft(draft), [draft]);
+  // Checks and the pass follow the typing a beat behind: on a slow phone the keystroke comes first.
+  const deferredDraft = useDeferredValue(draft);
+  const validation = useMemo(() => parseQuickDraft(deferredDraft), [deferredDraft]);
   const localErrors: FieldErrors = validation.ok ? {} : validation.errors;
   const serverErrors = server && server.draft === draft ? server.errors : {};
   const shownErrors: FieldErrors = Object.fromEntries(
@@ -244,8 +262,9 @@ export function CreateFlow({
     (value: QuickCardDraft) => {
       startCreating(async () => {
         // Success redirects to the welcome screen; only failures come back.
-        const result = await createMyCardAction(JSON.stringify(value), origin, originVia);
-        if (result && !result.ok) setServer({ error: result.error, errors: result.errors ?? {}, draft: value });
+        const call = await callAction(() => createMyCardAction(JSON.stringify(value), origin, originVia));
+        if (call.failed) setServer({ error: CREATE_UNREACHABLE, errors: {}, draft: value });
+        else if (call.result && !call.result.ok) setServer({ error: call.result.error, errors: call.result.errors ?? {}, draft: value });
       });
     },
     [origin, originVia],
@@ -292,7 +311,8 @@ export function CreateFlow({
 
   function submit(form: FormData) {
     setSubmitted(true);
-    if (!validation.ok) return;
+    // The shown checks may trail the last keystroke: decide on the draft as it is now.
+    if (!parseQuickDraft(draft).ok) return;
     if (mode === "member") {
       create(draft);
       return;
@@ -317,7 +337,12 @@ export function CreateFlow({
     sendCode(email, String(form.get("captchaToken") ?? ""));
   }
 
-  const preview = quickDraftToPublicCard(draft);
+  const preview = useMemo(() => quickDraftToPublicCard(deferredDraft), [deferredDraft]);
+  // A memoized element: React skips the pass entirely while only the form changes.
+  const previewPass = useMemo(
+    () => <WalletPass card={preview} style={previewStyle} qr={previewQr} className="animate-rise" />,
+    [preview, previewStyle, previewQr],
+  );
   const firstName = referrer?.fullName.split(/\s+/)[0] ?? "";
   const onCodeStep = authStep === "code";
 
@@ -491,7 +516,7 @@ export function CreateFlow({
         aria-label="Vista previa de tu pase"
       >
         <div className="relative mx-auto w-full max-w-[340px] max-lg:max-h-[250px] max-lg:overflow-hidden max-lg:[mask-image:linear-gradient(to_bottom,black_72%,transparent)]">
-          <WalletPass card={preview} style={previewStyle} className="animate-rise" />
+          {previewPass}
         </div>
         <p className="mt-3 text-center text-xs text-muted max-lg:hidden">
           {previewWallet ? `Así se verá en ${previewWallet}. El QR lleva a tu tarjeta.` : "Así se verá tu tarjeta. El QR lleva a ella."}
@@ -550,7 +575,7 @@ export function CreateFlow({
       </div>
 
       {autoCreate && creating ? (
-        <div role="status" className="fixed inset-0 z-40 grid place-items-center bg-paper/80 backdrop-blur-sm">
+        <div role="status" className="fixed inset-0 z-40 grid place-items-center bg-paper/90 lg:bg-paper/80 lg:backdrop-blur-sm">
           <p className="inline-flex items-center gap-3 rounded-full bg-card px-5 py-3 text-sm shadow-object">
             <LoaderCircle className="size-5 animate-spin text-signal" aria-hidden /> Creando tu tarjeta…
           </p>

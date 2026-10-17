@@ -152,6 +152,7 @@ export function ProfileCard({ card, preview = false, saveAction, shareAction, cl
             url={card.avatarUrl}
             size={AVATAR_SIZE}
             className="ring-1 ring-[var(--card-detail)] ring-offset-4 ring-offset-[var(--card-bg)]"
+            priority={!preview}
           />
         </div>
       </header>

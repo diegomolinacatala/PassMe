@@ -222,23 +222,52 @@ function createAnonSupabase(): TypedSupabaseClient | null {
   });
 }
 
-/** Published card by slug. `/u/demo` always serves the built-in sample. */
-export const getPublicCard = cache(async (rawSlug: string): Promise<PublicCard | null> => {
+/**
+ * What a public lookup found. `missing` is a real "no such published card"
+ * (404); `error` means the database could not answer, which must never look
+ * like a 404 (a blip would tell crawlers and people the card is gone).
+ */
+export type PublicCardLookup =
+  | { status: "found"; card: PublicCard }
+  | { status: "missing" }
+  | { status: "error" };
+
+/** Published card by slug, telling a miss apart from a failure. `/u/demo` always serves the built-in sample. */
+export const lookupPublicCard = cache(async (rawSlug: string): Promise<PublicCardLookup> => {
   const slug = rawSlug.toLowerCase();
-  if (slug === DEMO_SLUG) return toPublicCard(DEMO_CARD);
-  if (!checkSlug(slug).ok) return null;
+  if (slug === DEMO_SLUG) return { status: "found", card: toPublicCard(DEMO_CARD) };
+  if (!checkSlug(slug).ok) return { status: "missing" };
 
   const supabase = createAnonSupabase();
-  if (!supabase) return null;
+  if (!supabase) return { status: "missing" };
 
-  const { data, error } = await supabase.rpc("get_public_card", { p_slug: slug });
-  if (error) {
-    log.error("get_public_card failed", { slug }, error);
-    return null;
+  try {
+    const { data, error } = await supabase.rpc("get_public_card", { p_slug: slug });
+    if (error) {
+      log.error("get_public_card failed", { slug }, error);
+      return { status: "error" };
+    }
+    if (data === null || data === undefined) return { status: "missing" };
+    if (typeof data !== "object" || Array.isArray(data)) {
+      log.error("get_public_card returned an unexpected shape", { slug, type: Array.isArray(data) ? "array" : typeof data });
+      return { status: "error" };
+    }
+    const card = jsonToPublicCard(data as PublicCardJson);
+    return card ? { status: "found", card } : { status: "missing" };
+  } catch (error) {
+    log.error("get_public_card threw", { slug }, error);
+    return { status: "error" };
   }
-  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
-  return jsonToPublicCard(data as PublicCardJson);
 });
+
+/**
+ * Published card by slug, or null. Null also covers a database failure (it is
+ * logged): callers that must not turn an outage into a 404 use `lookupPublicCard`.
+ */
+export async function getPublicCard(rawSlug: string): Promise<PublicCard | null> {
+  const lookup = await lookupPublicCard(rawSlug);
+  return lookup.status === "found" ? lookup.card : null;
+}
 
 /**
  * Current handle for an old one (the owner renamed their card), so printed QRs
@@ -271,7 +300,14 @@ export async function findOwnerCard(supabase: TypedSupabaseClient, userId: strin
 }
 
 export type CreateCardResult =
-  | { ok: true; card: OwnerCard; /** False: the user already had a card, which was left untouched. */ created: boolean }
+  | {
+      ok: true;
+      card: OwnerCard;
+      /** False: the user already had a card, which was left untouched. */
+      created: boolean;
+      /** The database couldn't store some newer design fields yet (a migration is pending). */
+      designPending?: boolean;
+    }
   | { ok: false; error: string };
 
 const CREATE_FAILED = "No hemos podido crear tu tarjeta. Inténtalo de nuevo.";
@@ -310,7 +346,7 @@ export async function createCardFromDraft(
     // An empty card already exists (the editor creates one on first visit): fill it in.
     if (current) {
       const saved = await saveOwnerCard(supabase, userId, parsed.data);
-      if (saved.ok) return { ok: true, card: saved.card, created: true };
+      if (saved.ok) return { ok: true, card: saved.card, created: true, ...(saved.designPending ? { designPending: true } : {}) };
       if (!saved.errors.slug) return { ok: false, error: saved.errors._form ?? CREATE_FAILED };
       slugIndex += 1;
       continue;
@@ -318,6 +354,7 @@ export async function createCardFromDraft(
 
     const {
       result: { data, error },
+      dropped,
     } = await withDesignFallback("create", designColumns(parsed.data), (fields) =>
       supabase
         .from("profiles")
@@ -325,7 +362,14 @@ export async function createCardFromDraft(
         .select("*")
         .single(),
     );
-    if (!error && data) return { ok: true, card: rowToOwnerCard(data), created: true };
+    if (!error && data) {
+      // The card exists but without part of the person's choices: say so in the log, not just per attempt.
+      const designPending = dropped.some((field) => field !== "time_zone");
+      if (dropped.length > 0) {
+        log.warn("quick card created without some design fields (migration pending?)", { userId, fields: dropped.join(",") });
+      }
+      return { ok: true, card: rowToOwnerCard(data), created: true, ...(designPending ? { designPending: true } : {}) };
+    }
     if (error?.code !== UNIQUE_VIOLATION) {
       log.error("createCardFromDraft failed", { userId }, error);
       return { ok: false, error: CREATE_FAILED };
@@ -395,6 +439,13 @@ export async function saveOwnerCard(
   const current = await findOwnProfile(supabase, userId);
   if (!current) return { ok: false, errors: { _form: "No encontramos tu tarjeta. Recarga la página." } };
 
+  if (input.avatarPath && input.avatarPath !== current.avatar_path) {
+    // sharp stays out of every page that merely reads cards: load it only when a photo changes.
+    const { checkUploadedAvatar } = await import("@/lib/pass/images");
+    const check = await checkUploadedAvatar(avatarPublicUrl(input.avatarPath), { profileId: userId });
+    if (check.verdict === "rejected") return { ok: false, errors: { avatarPath: check.error } };
+  }
+
   const {
     result: { data, error },
     dropped,
@@ -442,6 +493,8 @@ export interface CardStats {
   walletAdds: number;
   linkClicks: Record<string, number>;
   dailyViews: Array<{ day: string; count: number }>;
+  /** Set when the stats couldn't be read: the zeros are not data, don't show them as such. */
+  unavailable?: boolean;
 }
 
 export const EMPTY_STATS: CardStats = {
@@ -457,8 +510,8 @@ export const EMPTY_STATS: CardStats = {
 export async function getOwnStats(supabase: TypedSupabaseClient, days = 30): Promise<CardStats> {
   const { data, error } = await supabase.rpc("get_card_stats", { p_days: days });
   if (error || !data || typeof data !== "object" || Array.isArray(data)) {
-    if (error) log.warn("get_card_stats failed", {}, error);
-    return EMPTY_STATS;
+    log.warn("get_card_stats failed", { shape: data === null || data === undefined ? "empty" : typeof data }, error ?? undefined);
+    return { ...EMPTY_STATS, days, unavailable: true };
   }
   const raw = data as Record<string, unknown>;
   const num = (v: unknown) => (typeof v === "number" ? v : Number(v) || 0);

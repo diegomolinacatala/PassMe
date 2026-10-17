@@ -9,6 +9,9 @@ export const runtime = "nodejs";
 
 const MAX_BODY_BYTES = 1024;
 const limiter = createSharedRateLimiter({ name: "events-ip", limit: 60, windowMs: 60_000 });
+// A ceiling per card, whoever sends: many addresses together can't flood one card's stats table.
+// 5000 an hour is far past real traffic for a business card; beyond it events are dropped silently.
+const cardLimiter = createSharedRateLimiter({ name: "events-card", limit: 5000, windowMs: 60 * 60_000 });
 
 const eventSchema = z.object({
   slug: z.string().min(1).max(SLUG_MAX_LENGTH).regex(/^[a-z0-9-]+$/),
@@ -38,6 +41,8 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) return new Response(null, { status: 400 });
 
   const { slug, kind, source, linkId } = parsed.data;
+  // Beacons never see errors: past the ceiling the event is simply not recorded.
+  if (!(await cardLimiter.check(slug)).ok) return noContent;
   after(() =>
     recordEventBySlug(slug, {
       kind,

@@ -18,7 +18,7 @@ vi.mock("next/server", async (original) => ({
   ...(await original<typeof import("next/server")>()),
   after: (task: () => unknown) => state.after.push(task),
 }));
-vi.mock("@/lib/data/cards", () => ({ getPublicCard: async () => state.card }));
+vi.mock("@/lib/data/cards", () => ({ getPublicCard: async () => state.card, lookupPublicCard: async () => (state.card ? { status: "found", card: state.card } : { status: "missing" }) }));
 
 const { submitMeetingAction } = await import("@/app/u/[slug]/meeting-actions");
 const { respondMeetingAction } = await import("@/app/reunion/actions");
@@ -114,6 +114,15 @@ describe("proposing a meeting", () => {
     });
     vi.stubEnv("RESEND_API_KEY", "");
     expect(await submitMeetingAction("diego", "qr", { status: "idle" }, form(proposal))).toMatchObject({ status: "error" });
+  });
+
+  it("tells a visitor who already has two open proposals so, instead of calling the card full", async () => {
+    useAdmin({ row: meetingRow(), submit: { full: true, guest: true } });
+    state.card = { fullName: "Diego Molina", acceptsMeetingRequests: true, links: [] };
+    expect(await submitMeetingAction("diego", "qr", { status: "idle" }, form(proposal))).toMatchObject({
+      status: "error",
+      message: "Ya tienes dos propuestas pendientes con Diego. Espera a que responda o cancela una desde tu email.",
+    });
   });
 });
 

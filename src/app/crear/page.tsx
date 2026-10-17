@@ -3,6 +3,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Logo } from "@/components/brand/logo";
+import { QrCode } from "@/components/card/qr-code";
 import { CreateFlow, type CreateMode, type Referrer } from "@/components/create/create-flow";
 import { DEFAULT_TYPEFACE, pickInitialTheme, randomPatternSeed } from "@/lib/card/design";
 import { parseDesignQuery } from "@/lib/card/design-query";
@@ -10,7 +11,7 @@ import { DEFAULT_PATTERN } from "@/lib/card/pattern";
 import { parseFromSlug, parseVia } from "@/lib/card/quick";
 import { isGoogleWalletLive } from "@/lib/config.server";
 import { findOwnerCard, getPublicCard } from "@/lib/data/cards";
-import { getTurnstileSiteKey, isGoogleAuthEnabled } from "@/lib/env";
+import { getSiteUrl, getTurnstileSiteKey, isGoogleAuthEnabled } from "@/lib/env";
 import { detectPlatform } from "@/lib/platform";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
 
@@ -51,6 +52,9 @@ export default async function CreateCardPage({ searchParams }: PageProps<"/crear
   };
   // Android only sees a Google pass once Google Wallet works (D4); until then, "Mi QR".
   const googlePass = platform === "android" && isGoogleWalletLive();
+  // The card's link doesn't exist yet (nor is its handle claimed): the preview's QR is a
+  // stand-in drawn here, on the server, so the qrcode library stays out of this page's bundle.
+  const previewQr = <QrCode value={`${getSiteUrl()}/crear`} label="Código QR de la tarjeta" className="size-[112px] text-ink" quietZone={1} />;
 
   return (
     <main className="min-h-dvh">
@@ -82,6 +86,7 @@ export default async function CreateCardPage({ searchParams }: PageProps<"/crear
           designChosen={chosen !== null}
           accountEmail={user?.email ?? null}
           previewStyle={googlePass ? "google" : "apple"}
+          previewQr={previewQr}
           previewWallet={platform === "android" && !googlePass ? null : googlePass ? "Google Wallet" : "Apple Wallet"}
           platform={platform}
           googleEnabled={mode !== "demo" && isGoogleAuthEnabled()}
