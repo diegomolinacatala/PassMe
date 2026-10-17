@@ -108,6 +108,14 @@ if (!sbUrl || !sbKey) {
     if (settings?.ok) ok("Migración 20261006120000 aplicada (zona horaria y ajustes de reuniones).");
     else fail("Falta la migración 20261006120000_owner_timezone_meeting_settings.sql.");
 
+    const hardening = await http(`${sbUrl}/rest/v1/rpc/links_are_well_formed`, {
+      method: "POST",
+      headers: { ...adminHeaders, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_links: [] }),
+    });
+    if (hardening?.ok) ok("Migración 20261017120000 aplicada (endurecimiento de la auditoría de seguridad).");
+    else fail("Falta la migración 20261017120000_security_audit.sql.");
+
     const bucket = await http(`${sbUrl}/storage/v1/bucket/avatars`, { headers: adminHeaders });
     if (bucket?.ok) {
       const info = (await bucket.json()) as { public?: boolean };

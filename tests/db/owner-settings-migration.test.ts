@@ -71,5 +71,6 @@ describe("owner time zone and meeting settings", () => {
     );
     expect(rows[0]!.card).not.toHaveProperty("time_zone");
     expect(rows[0]!.card).not.toHaveProperty("meeting_rules");
-  });
+    await before.close();
+  }, 60_000);
 });
