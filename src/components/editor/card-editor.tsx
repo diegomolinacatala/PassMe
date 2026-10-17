@@ -1,12 +1,16 @@
 "use client";
 
 import { Plus, TriangleAlert } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { saveCardAction } from "@/app/dashboard/actions";
 import { InlineError } from "@/components/ui/field";
+import { useHydrated } from "@/components/use-hydrated";
+import { useMediaQuery } from "@/components/use-media-query";
 import { describeErrors } from "@/lib/card/save-errors";
+import { LIMITS } from "@/lib/card/limits";
 import { passNameOverflows } from "@/lib/card/name";
-import { LIMITS, type FieldErrors } from "@/lib/card/schema";
+import type { FieldErrors } from "@/lib/card/schema";
+import { callAction } from "@/lib/client/call-action";
 import type { OwnerCard } from "@/lib/card/types";
 import type { ContactRequest } from "@/lib/card/contact";
 import { isPlaceholderSlug, suggestSlug } from "@/lib/card/slug";
@@ -46,8 +50,8 @@ import { WalletPanel, type WalletAvailability } from "./wallet-panel";
 interface CardEditorProps {
   initialCard: OwnerCard;
   stats: CardStats;
-  contacts: { available: boolean; requests: ContactRequest[]; /** Last "Ver" on the contacts notice (cookie). */ seenAt: string | null };
-  meetings: { available: boolean; items: MeetingItem[] };
+  contacts: { available: boolean; failed?: boolean; requests: ContactRequest[]; /** Last "Ver" on the contacts notice (cookie). */ seenAt: string | null };
+  meetings: { available: boolean; failed?: boolean; items: MeetingItem[] };
   wallet: WalletAvailability;
   /** This device (from the User-Agent): which wallet button to offer. */
   platform: Platform;
@@ -62,6 +66,10 @@ interface CardEditorProps {
 const SAVED_NOTICE_MS = 3000;
 /** How long "Cambios descartados · Deshacer" stays. */
 const DISCARDED_NOTICE_MS = 8000;
+/** The save never got an answer: nothing was lost on this screen. */
+const SAVE_UNREACHABLE = "No hemos podido conectar. Tus cambios siguen aquí.";
+/** Tailwind's `lg`: from here on the preview lives in the sticky column. */
+const WIDE_QUERY = "(min-width: 64rem)";
 
 /** Brings the first (or the next) field marked invalid into view and focuses it. */
 function focusInvalid(root: HTMLElement | null, after?: Element | null) {
@@ -120,7 +128,17 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, pla
   const siteHost = siteUrl.replace(/^https?:\/\//, "");
   // Built from the saved slug: links and QRs never point at an unsaved one.
   const publicUrl = (source: "qr" | "share") => `${siteUrl}/u/${encodeURIComponent(savedSlug)}?src=${source}`;
-  const preview = useMemo(() => draftToPublicCard(draft), [draft]);
+  // The preview follows the typing a beat behind: on a slow phone the keystroke comes first.
+  // Its QR (and the address under it) use the saved slug, like every other link here.
+  const deferredDraft = useDeferredValue(draft);
+  const preview = useMemo(() => draftToPublicCard({ ...deferredDraft, slug: savedSlug }), [deferredDraft, savedSlug]);
+  // A memoized element: React skips the whole pass while only the form changes.
+  const previewPanel = useMemo(() => <PreviewPanel card={preview} />, [preview]);
+  // Once hydrated, only the preview this layout shows is drawn (the server HTML has both).
+  const hydrated = useHydrated();
+  const wide = useMediaQuery(WIDE_QUERY);
+  const showInlinePreview = !hydrated || !wide;
+  const showSidePreview = !hydrated || wide;
   const errorCount = Object.keys(errors).length;
   const serverErrors: FieldErrors = serverResult && serverResult.draft === draft ? serverResult.errors : {};
 
@@ -140,10 +158,17 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, pla
       setStatus({ kind: "demo" });
       return;
     }
+    const sent = draft;
     startSaving(async () => {
-      const result = await saveCardAction(draftToInput(draft));
+      const call = await callAction(() => saveCardAction(draftToInput(sent)));
+      if (call.failed) {
+        // No answer (offline, a new deploy): the edits stay, ready to try again.
+        setStatus({ kind: "error", message: SAVE_UNREACHABLE });
+        return;
+      }
+      const result = call.result;
       if (result.ok) {
-        editor.markSaved(draftFromCard(result.card));
+        editor.markSaved(sent, draftFromCard(result.card));
         setSavedSlug(result.card.slug);
         setSavedPublished(result.card.isPublished);
         setSavedName(result.card.fullName);
@@ -153,8 +178,8 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, pla
         setSubmitted(false);
         setStatus(result.designPending ? { kind: "partial" } : { kind: "saved", at: Date.now() });
       } else {
-        setServerResult({ draft, errors: result.errors });
-        setStatus({ kind: "error", message: describeErrors(result.errors, draft) });
+        setServerResult({ draft: sent, errors: result.errors });
+        setStatus({ kind: "error", message: describeErrors(result.errors, sent) });
         setErrorJump((n) => n + 1);
       }
     });
@@ -300,7 +325,7 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, pla
         <div className="contents lg:block lg:min-w-0 lg:space-y-6">
           {/* On phones the live preview sits on top; on desktop it lives in the sticky column. */}
           <div ref={mobilePreview} className="max-lg:order-1 lg:hidden">
-            <PreviewPanel card={preview} />
+            {showInlinePreview ? previewPanel : null}
           </div>
           <Section {...sectionProps("quien")} description="Lo básico que aparece en tu tarjeta y en el pase.">
             <div className="space-y-5">
@@ -443,9 +468,7 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, pla
           preview stays in reach and the lower panels don't wait for the page's end.
         */}
         <div className="contents lg:sticky lg:top-20 lg:-mx-3 lg:block lg:max-h-[calc(100dvh-5.5rem)] lg:min-w-0 lg:space-y-6 lg:overflow-y-auto lg:overscroll-contain lg:px-3 lg:pb-28 lg:[scrollbar-width:thin]">
-          <div className="hidden lg:block">
-            <PreviewPanel card={preview} />
-          </div>
+          <div className="hidden lg:block">{showSidePreview ? previewPanel : null}</div>
           <Section
             {...sectionProps("cartera")}
             description="Tu tarjeta como un pase más, junto a tus tarjetas y billetes: se abre sin conexión y sin buscarla, y se actualiza sola cuando cambias algo."
@@ -462,12 +485,13 @@ export function CardEditor({ initialCard, stats, contacts, meetings, wallet, pla
             />
           </Section>
           <Section {...sectionProps("reuniones")}>
-            <MeetingsPanel items={meetings.items} available={meetings.available} enabled={savedAcceptsMeetings} demo={demo} />
+            <MeetingsPanel items={meetings.items} available={meetings.available} failed={meetings.failed} enabled={savedAcceptsMeetings} demo={demo} />
           </Section>
           <Section {...sectionProps("contactos")}>
             <ContactsPanel
               requests={contacts.requests}
               available={contacts.available}
+              failed={contacts.failed}
               enabled={savedAcceptsContacts}
               demo={demo}
             />

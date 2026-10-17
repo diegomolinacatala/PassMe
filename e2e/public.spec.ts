@@ -104,11 +104,12 @@ test.describe("public card", () => {
 });
 
 test.describe("api", () => {
-  test("health reports configuration booleans", async ({ request }) => {
+  test("health says only whether it is up, never which secrets are set", async ({ request }) => {
     const response = await request.get("/api/health");
     expect(response.ok()).toBe(true);
     const json = await response.json();
-    expect(json).toHaveProperty("appleWallet");
+    // Demo build: no Supabase, so not "ok"; the configuration details need the cron bearer token.
+    expect(json).toEqual({ ok: false });
     expect(JSON.stringify(json)).not.toMatch(/sb_secret|BEGIN/);
   });
 

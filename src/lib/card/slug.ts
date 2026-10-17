@@ -1,7 +1,14 @@
 /**
  * Public card handles: passme.app/u/<slug>.
  * Keep SLUG_RE and RESERVED_SLUGS in sync with the check constraint in
- * supabase/migrations (profiles_slug_format / profiles_slug_not_reserved).
+ * supabase/migrations (profiles_slug_format / profiles_slug_not_reserved), and
+ * NEWLY_RESERVED_* with public.slug_is_newly_reserved() (20261017120000_security_audit).
+ *
+ * Two tiers, like the database: RESERVED_SLUGS are enforced on every row and
+ * every lookup (`checkSlug`); the newly reserved ones only when a handle is
+ * claimed or changed (`checkNewSlug`), so an owner who already has one keeps a
+ * working card. Use `checkSlug` to look up or accept an existing handle and
+ * `checkNewSlug` for anything a person is choosing.
  */
 
 export const SLUG_MIN_LENGTH = 3;
@@ -44,8 +51,32 @@ export const RESERVED_SLUGS: ReadonlySet<string> = new Set([
   "www",
 ]);
 
+/** Reserved after launch (support-like names, the site's own pages): only claims are refused. */
+export const NEWLY_RESERVED_SLUGS: ReadonlySet<string> = new Set([
+  "soporte",
+  "ayuda",
+  "hola",
+  "equipo",
+  "seguridad",
+  "getpassme",
+  "oficial",
+  "crear",
+  "reunion",
+  "privacidad",
+  "terminos",
+  "aviso-legal",
+]);
+
+/** Nobody can claim a handle that starts like this ("passme-soporte"). */
+export const NEWLY_RESERVED_PREFIX = "passme-";
+
+export function isNewlyReservedSlug(slug: string): boolean {
+  return NEWLY_RESERVED_SLUGS.has(slug) || slug.startsWith(NEWLY_RESERVED_PREFIX);
+}
+
 export type SlugCheck = { ok: true } | { ok: false; reason: "length" | "format" | "reserved" };
 
+/** Shape and launch-time reserved words: valid for any handle that exists (lookups, saving your own). */
 export function checkSlug(slug: string): SlugCheck {
   if (slug.length < SLUG_MIN_LENGTH || slug.length > SLUG_MAX_LENGTH) {
     return { ok: false, reason: "length" };
@@ -53,6 +84,13 @@ export function checkSlug(slug: string): SlugCheck {
   if (!SLUG_RE.test(slug)) return { ok: false, reason: "format" };
   if (RESERVED_SLUGS.has(slug)) return { ok: false, reason: "reserved" };
   return { ok: true };
+}
+
+/** `checkSlug` plus the newly reserved handles: for a handle somebody is about to claim. */
+export function checkNewSlug(slug: string): SlugCheck {
+  const check = checkSlug(slug);
+  if (!check.ok) return check;
+  return isNewlyReservedSlug(slug) ? { ok: false, reason: "reserved" } : check;
 }
 
 export const SLUG_ERRORS: Record<Exclude<SlugCheck, { ok: true }>["reason"], string> = {
@@ -84,12 +122,15 @@ export function isPlaceholderSlug(slug: string): boolean {
 /** Handle suggested from the owner's name ("José Núñez" → "jose-nunez"), or null if unusable. */
 export function suggestSlug(fullName: string): string | null {
   const base = slugify(fullName, SLUG_MAX_LENGTH);
-  return checkSlug(base).ok ? base : null;
+  return checkNewSlug(base).ok ? base : null;
 }
 
-/** Builds a candidate slug from a seed (name or email local-part) plus a random suffix. */
+/**
+ * Builds a candidate slug from a seed (name or email local-part) plus a random suffix.
+ * A leading "passme" is dropped: nothing that starts with "passme-" can be claimed.
+ */
 export function slugCandidate(seed: string, suffix: string): string {
-  const base = slugify(seed.split("@")[0] ?? "") || "tarjeta";
+  const base = slugify(seed.split("@")[0] ?? "").replace(/^passme(?:-+|$)/, "") || "tarjeta";
   const padded = base.length < SLUG_MIN_LENGTH ? `${base}-card` : base;
   return `${padded}-${suffix}`.slice(0, SLUG_MAX_LENGTH).replace(/-+$/g, "");
 }
@@ -122,5 +163,5 @@ function withSuffix(base: string, suffix: string): string {
 export function slugAlternatives(taken: string): string[] {
   const base = taken.replace(/-\d+$/, "") || taken;
   const candidates = [withSuffix(base, "-2"), base.replace(/-/g, ""), withSuffix(base, "-3"), withSuffix(base, "-4"), withSuffix(base, "-5")];
-  return [...new Set(candidates)].filter((candidate) => candidate !== taken && checkSlug(candidate).ok);
+  return [...new Set(candidates)].filter((candidate) => candidate !== taken && checkNewSlug(candidate).ok);
 }

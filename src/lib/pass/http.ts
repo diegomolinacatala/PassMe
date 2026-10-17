@@ -28,7 +28,14 @@ export function passRateLimited(request: Request): Response {
 
 /** Turns a failed pass request into a readable page (navigations) or JSON (fetch). */
 export function passErrorResponse(request: Request, error: unknown, wallet: "apple" | "google"): Response {
-  if (!(error instanceof PassError)) log.error(`${wallet} pass generation failed`, {}, error);
+  if (!(error instanceof PassError)) {
+    log.error(`${wallet} pass generation failed`, {}, error);
+  } else if (error.code === "not_configured") {
+    // People just see "pronto", so this line is the only sign that production lost a credential.
+    log.error(`${wallet} wallet is not configured: pass requests are failing`, { status: error.status, detail: error.message });
+  } else if (error.code === "unavailable") {
+    log.warn(`${wallet} pass not built: a dependency is temporarily unavailable`, { detail: error.message });
+  }
   if (isNavigation(request)) {
     const token = new URL(request.url).searchParams.get("t");
     if (error instanceof PassError && error.status === 401) {

@@ -153,6 +153,38 @@ describe("admin login", () => {
     expect(state.cookies.size).toBe(0);
   });
 
+  it("counts 5 per client per 15 minutes and 1000 overall per hour in the shared counters", async () => {
+    const fake = fakeSupabase(() => ({ data: [{ allowed: true, retry_after: 0 }] }));
+    state.admin = fake.client;
+    await redirectOf(adminLoginAction({}, form({ username: "diego", password: CREDENTIALS.password })));
+    const args = fake.queries.map((q) => q.calls[0]![1][0] as { p_limit: number; p_window_seconds: number });
+    expect(args).toEqual([
+      expect.objectContaining({ p_limit: 5, p_window_seconds: 15 * 60 }),
+      expect.objectContaining({ p_limit: 1000, p_window_seconds: 60 * 60 }),
+    ]);
+  });
+
+  it("refuses everyone, even the right password, while the shared counters are down", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    state.admin = fakeSupabase(() => ({ error: { message: "connection refused", code: "08006" } })).client;
+    const result = await adminLoginAction({}, form({ username: "diego", password: CREDENTIALS.password }));
+    expect(result.error).toMatch(/ahora mismo/);
+    expect(result.error).not.toMatch(/Demasiados|incorrectos/);
+    expect(state.cookies.size).toBe(0);
+    // Not even per-instance memory is trusted: it never lets the 6th guess through either way.
+    for (let i = 0; i < 8; i += 1) {
+      expect((await adminLoginAction({}, form({ username: "diego", password: CREDENTIALS.password }))).error).toMatch(/ahora mismo/);
+    }
+  });
+
+  it("works again once the counters are back", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    state.admin = fakeSupabase(() => ({ error: { message: "down" } })).client;
+    expect((await adminLoginAction({}, form({ username: "diego", password: CREDENTIALS.password }))).error).toMatch(/ahora mismo/);
+    state.admin = fakeSupabase(() => ({ data: [{ allowed: true, retry_after: 0 }] })).client;
+    expect(await redirectOf(adminLoginAction({}, form({ username: "diego", password: CREDENTIALS.password })))).toBe("/admin");
+  });
+
   it("signs out by deleting the cookie", async () => {
     state.cookies.set(auth.ADMIN_COOKIE, { value: auth.createAdminToken(CREDENTIALS) });
     expect(await redirectOf(adminLogoutAction())).toBe("/admin/entrar");

@@ -1,21 +1,21 @@
 "use client";
 
-import { ArrowLeft, ArrowUpRight, CalendarCheck2, CalendarClock, CalendarX2, Check, Clock, Download, Mail, Phone, Undo2 } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, CalendarCheck2, CalendarClock, CalendarX2, Check, Clock, Download, Mail, Phone, RotateCw, Undo2 } from "lucide-react";
 import { useActionState, useEffect, useRef, useState, type ReactNode } from "react";
 import { respondMeetingAction, type MeetingResponseState } from "@/app/reunion/actions";
+import { ActionErrorBoundary } from "@/components/ui/action-error-boundary";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { CHOICE_FOCUS } from "@/components/ui/choice";
 import { Field, inputClasses } from "@/components/ui/field";
 import { NewTabHint } from "@/components/ui/new-tab-hint";
 import { Notice } from "@/components/ui/notice";
 import { SubmitButton } from "@/components/ui/submit-button";
-import { contactEmailHref, contactPhoneHref } from "@/lib/card/contact";
 import { rememberDetails } from "@/lib/card/draft-storage";
 import type { FieldErrors } from "@/lib/card/schema";
 import { cn } from "@/lib/cn";
 import { linkHref } from "@/lib/card/links";
 import { describeWhere, displayName, firstName, formatDuration, hasMapLink } from "@/lib/meetings/model";
-import { MEETING_LIMITS } from "@/lib/meetings/schema";
+import { MEETING_LIMITS } from "@/lib/meetings/constants";
 import type { MeetingAction } from "@/lib/meetings/state";
 import { addMinutes, formatDay, formatTime, otherZoneTime, timeZoneLabel } from "@/lib/meetings/time";
 import { viewGoogleCalendarUrl, type MeetingView } from "@/lib/meetings/view";
@@ -39,6 +39,7 @@ interface MeetingResponseProps {
 
 type Mode = "confirm" | "counter" | "decline" | "cancel";
 type Act = (formData: FormData) => void;
+type ResponseState = MeetingResponseState;
 
 const DONE_MESSAGES: Record<MeetingAction, (other: string) => string> = {
   confirm: () => "Confirmada. Os acabamos de enviar la invitación a los dos.",
@@ -88,13 +89,23 @@ function Title({ view }: { view: MeetingView }) {
   }
 }
 
-function StatusBanner({ state, other }: { state: MeetingResponseState; other: string }) {
+function StatusBanner({ state, other }: { state: ResponseState; other: string }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (state.status !== "idle") ref.current?.focus();
   }, [state]);
   if (state.status === "idle") return null;
   const error = state.status === "error";
+  if (state.status === "done" && state.emailsSkipped) {
+    // Saved, but PassMe's email budget (or setup) kept the notice from going out: say so, never "enviada".
+    return (
+      <Notice ref={ref} focusable tone="info">
+        {state.action === "confirm"
+          ? `Confirmada. No hemos podido enviar la invitación por email: añádela a tu calendario desde aquí y avisa a ${other}.`
+          : `Hecho, pero no hemos podido avisar por email a ${other}. Díselo tú.`}
+      </Notice>
+    );
+  }
   return (
     <Notice ref={ref} focusable tone={error ? "error" : "ok"}>
       {error ? state.message : DONE_MESSAGES[state.action](other)}
@@ -119,13 +130,13 @@ function Person({ view }: { view: MeetingView }) {
         {isOwner && view.guest.company ? <p className="text-sm text-muted">{view.guest.company}</p> : null}
         <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-sm">
           {email ? (
-            <a href={contactEmailHref(email)} className="inline-flex min-w-0 items-center gap-1.5 text-signal-deep hover:underline">
+            <a href={linkHref("email", email)} className="inline-flex min-w-0 items-center gap-1.5 text-signal-deep hover:underline">
               <Mail className="size-3.5 shrink-0" aria-hidden />
               <span className="truncate">{email}</span>
             </a>
           ) : null}
           {phone ? (
-            <a href={contactPhoneHref(phone)} className="inline-flex items-center gap-1.5 text-signal-deep hover:underline">
+            <a href={linkHref("phone", phone)} className="inline-flex items-center gap-1.5 text-signal-deep hover:underline">
               <Phone className="size-3.5 shrink-0" aria-hidden />
               {phone}
             </a>
@@ -598,8 +609,44 @@ function Footer({ view }: { view: MeetingView }) {
  * other times, or decline), wait for the other side, or manage a confirmed
  * meeting. Every change happens in place, with the result announced.
  */
-export function MeetingResponse({ id, signature, initial, preset, demo }: MeetingResponseProps) {
-  const [state, act, pending] = useActionState<MeetingResponseState, FormData>(respondMeetingAction.bind(null, id, signature), { status: "idle" });
+export function MeetingResponse(props: MeetingResponseProps) {
+  // A lost connection must not swap the page for the error screen: only the form says so.
+  return (
+    <ActionErrorBoundary fallback={() => <ConnectionLost />}>
+      <MeetingResponseForm {...props} />
+    </ActionErrorBoundary>
+  );
+}
+
+/** The answer went out but nothing came back: it may or may not have been saved. */
+function ConnectionLost() {
+  const ref = useRef<HTMLDivElement>(null);
+  // It replaces the form the person just used: take the focus with it.
+  useEffect(() => ref.current?.focus(), []);
+  return (
+    <Notice
+      ref={ref}
+      focusable
+      tone="error"
+      title="Se ha cortado la conexión"
+      action={
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="-my-1.5 -mr-2 inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-2.5 font-medium text-ink-soft transition-colors hover:bg-ink/[0.06] hover:text-ink"
+        >
+          <RotateCw className="size-3.5" aria-hidden /> Recargar
+        </button>
+      }
+    >
+      No sabemos si tu respuesta ha llegado. Recarga la página para ver cómo está antes de repetirla.
+    </Notice>
+  );
+}
+
+function MeetingResponseForm({ id, signature, initial, preset, demo }: MeetingResponseProps) {
+  // The Server Action itself (not a client wrapper), so a tap before hydration still posts.
+  const [state, act, pending] = useActionState<ResponseState, FormData>(respondMeetingAction.bind(null, id, signature), { status: "idle" });
   const view = state.status === "done" ? state.view : initial;
   const canAnswer = view.actions.includes("confirm");
 

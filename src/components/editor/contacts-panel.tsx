@@ -5,13 +5,15 @@ import { useEffect, useOptimistic, useRef, useState, useTransition, type ReactNo
 import { deleteContactRequestAction } from "@/app/dashboard/actions";
 import { Button } from "@/components/ui/button";
 import { InlineError } from "@/components/ui/field";
-import { contactEmailHref, contactPhoneHref, type ContactRequest } from "@/lib/card/contact";
+import { contactEmailHref, contactPhoneHref, type ContactRequest } from "@/lib/card/contact-info";
 import { cn } from "@/lib/cn";
 
 interface ContactsPanelProps {
   requests: ContactRequest[];
   /** False while the database migration for contact requests is pending. */
   available: boolean;
+  /** The list couldn't be read (a database error): `requests` is empty because of that, not because nobody wrote. */
+  failed?: boolean;
   /** The saved card shows the form. */
   enabled: boolean;
   demo: boolean;
@@ -19,7 +21,8 @@ interface ContactsPanelProps {
 
 const COLLAPSED_COUNT = 4;
 const SOURCE_LABEL: Record<ContactRequest["source"], string> = { qr: "QR", share: "Enlace", direct: "Web" };
-const dateFormat = new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short" });
+// Madrid's calendar, like the rest of the editor: the server and the browser must print the same day.
+const dateFormat = new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short", timeZone: "Europe/Madrid" });
 const ICON_BUTTON =
   "grid size-11 sm:size-10 place-items-center rounded-full text-ink-soft transition-colors hover:bg-ink/[0.06] hover:text-ink disabled:pointer-events-none";
 const EXPORT_BUTTON =
@@ -149,7 +152,7 @@ function ContactItem({ request, demo, confirming, onAskDelete, onCancelDelete, o
   );
 }
 
-export function ContactsPanel({ requests, available, enabled, demo }: ContactsPanelProps) {
+export function ContactsPanel({ requests, available, failed = false, enabled, demo }: ContactsPanelProps) {
   const [expanded, setExpanded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
@@ -171,9 +174,14 @@ export function ContactsPanel({ requests, available, enabled, demo }: ContactsPa
     }
     startTransition(async () => {
       removeOptimistic(request.id);
-      const result = await deleteContactRequestAction(request.id);
-      if (result.ok) setRemoved((prev) => new Set(prev).add(request.id));
-      else setError(result.error);
+      try {
+        const result = await deleteContactRequestAction(request.id);
+        if (result.ok) setRemoved((prev) => new Set(prev).add(request.id));
+        else setError(result.error);
+      } catch {
+        // Offline or a deploy in between: the contact comes back to the list (the optimistic removal is undone).
+        setError("No hemos podido borrarlo. Comprueba tu conexión e inténtalo de nuevo.");
+      }
     });
   }
 
@@ -181,7 +189,12 @@ export function ContactsPanel({ requests, available, enabled, demo }: ContactsPa
 
   return (
     <div id="contactos" ref={panel} tabIndex={-1} className="scroll-mt-6 outline-none">
-      {list.length === 0 ? (
+      {list.length === 0 && failed ? (
+        // Not "nobody yet": we couldn't read them, and saying otherwise would hide real contacts.
+        <p role="alert" className="text-sm text-danger">
+          No hemos podido cargar tus contactos. Recarga.
+        </p>
+      ) : list.length === 0 ? (
         <p className="text-sm text-muted">
           {enabled
             ? "Aún no te ha dejado nadie su contacto. Cuando alguien te lo deje, te avisaremos por email y lo verás aquí."

@@ -149,9 +149,18 @@ export interface PickerDay {
 }
 
 const strip = (value: string) => value.replace(/\.$/, "");
-const SHORT_WEEKDAY = new Intl.DateTimeFormat(LOCALE, { weekday: "short", timeZone: "UTC" });
-const SHORT_MONTH = new Intl.DateTimeFormat(LOCALE, { month: "short", timeZone: "UTC" });
-const LONG_DAY = new Intl.DateTimeFormat(LOCALE, { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
+
+/**
+ * Built on first use, not when the module loads: this file reaches every public
+ * card page, and a visitor who never opens the picker shouldn't pay for ICU data.
+ */
+function lazy<T>(make: () => T): () => T {
+  let value: T | undefined;
+  return () => (value ??= make());
+}
+const shortWeekday = lazy(() => new Intl.DateTimeFormat(LOCALE, { weekday: "short", timeZone: "UTC" }));
+const shortMonth = lazy(() => new Intl.DateTimeFormat(LOCALE, { month: "short", timeZone: "UTC" }));
+const longDay = lazy(() => new Intl.DateTimeFormat(LOCALE, { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }));
 
 /** A calendar day ("YYYY-MM-DD") for the picker; `label` overrides the short weekday. */
 export function pickerDay(key: string, label?: string): PickerDay {
@@ -159,10 +168,10 @@ export function pickerDay(key: string, label?: string): PickerDay {
   const noon = new Date(`${key}T12:00:00Z`);
   return {
     key,
-    label: label ?? strip(SHORT_WEEKDAY.format(noon)),
+    label: label ?? strip(shortWeekday().format(noon)),
     day: noon.getUTCDate(),
-    month: strip(SHORT_MONTH.format(noon)),
-    long: LONG_DAY.format(noon),
+    month: strip(shortMonth().format(noon)),
+    long: longDay().format(noon),
     weekend: [0, 6].includes(noon.getUTCDay()),
   };
 }
@@ -187,8 +196,18 @@ export function openingDayKey(now: Date, timeZone: string, days: ReadonlyArray<P
   return days.find((day) => !day.weekend && free(day.key) >= OPENING_MIN_FREE)?.key ?? days[0]!.key;
 }
 
+const formatters = new Map<string, Intl.DateTimeFormat>();
+
+/** One formatter per zone and set of options: the picker formats dozens of times per render. */
 function formatter(options: Intl.DateTimeFormatOptions, timeZone: string): Intl.DateTimeFormat {
-  return new Intl.DateTimeFormat(LOCALE, { ...options, timeZone: isTimeZone(timeZone) ? timeZone : DEFAULT_TIME_ZONE });
+  const zone = isTimeZone(timeZone) ? timeZone : DEFAULT_TIME_ZONE;
+  const key = `${zone}|${JSON.stringify(options)}`;
+  let cached = formatters.get(key);
+  if (!cached) {
+    cached = new Intl.DateTimeFormat(LOCALE, { ...options, timeZone: zone });
+    formatters.set(key, cached);
+  }
+  return cached;
 }
 
 /** "martes, 7 de octubre" */
@@ -282,6 +301,17 @@ const ZONE_NAMES: Record<string, string> = {
 export function timeZoneLabel(timeZone: string): string {
   const known = ZONE_NAMES[timeZone];
   if (known) return known === "UTC" ? "hora UTC" : `hora de ${known}`;
+  const cached = foreignLabels.get(timeZone);
+  if (cached) return cached;
+  const label = intlZoneName(timeZone);
+  if (foreignLabels.size < 100) foreignLabels.set(timeZone, label);
+  return label;
+}
+
+/** Zones outside the list: asking Intl is slow, and the picker renders the label on every update. */
+const foreignLabels = new Map<string, string>();
+
+function intlZoneName(timeZone: string): string {
   for (const timeZoneName of ["longGeneric", "long"] as const) {
     try {
       const name = new Intl.DateTimeFormat(LOCALE, { timeZone, timeZoneName })

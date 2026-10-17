@@ -7,6 +7,7 @@ import { buttonClasses } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { ShareLinkButton } from "@/components/ui/share-link-button";
+import { callAction, CONNECTION_FAILED } from "@/lib/client/call-action";
 import type { VisitSource } from "@/lib/env";
 
 export interface WelcomeReferrer {
@@ -63,7 +64,12 @@ export function WelcomeSendCard({ referrer, via, summary, shareUrl, demo }: Welc
   function send() {
     setError(null);
     startTransition(async () => {
-      const result = await sendMyCardAction(referrer.slug, via);
+      const call = await callAction(() => sendMyCardAction(referrer.slug, via));
+      if (call.failed) {
+        setError(CONNECTION_FAILED);
+        return;
+      }
+      const result = call.result;
       if (result.ok) {
         setSent(true);
         return;

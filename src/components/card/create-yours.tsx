@@ -4,7 +4,7 @@ import { BrandMotif } from "@/components/brand/brand-motif";
 import { Mark } from "@/components/brand/logo";
 import { buttonClasses } from "@/components/ui/button";
 import { BRAND } from "@/lib/brand";
-import { createPath } from "@/lib/card/quick";
+import { createPath } from "@/lib/card/paths";
 import type { VisitSource } from "@/lib/env";
 
 /**

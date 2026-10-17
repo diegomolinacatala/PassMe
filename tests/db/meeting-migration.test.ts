@@ -100,15 +100,15 @@ describe("meeting requests", () => {
        select $1, 'old' || g, 'old' || g || '@example.com', array[now() - interval '1 day'] from generate_series(1, 40) as g`,
       [ANA],
     );
-    expect((await submit("ana")).rows[0]!.result).toHaveProperty("id");
+    expect((await submit("ana", { email: "ines@example.com" })).rows[0]!.result).toHaveProperty("id");
     await db.query(
       `insert into public.meeting_requests (profile_id, guest_name, guest_email, slots)
        select $1, 'n' || g, 'x' || g || '@example.com', array[now() + interval '2 days'] from generate_series(1, 28) as g`,
       [ANA],
     );
-    expect((await submit("ana")).rows[0]!.result).toEqual({ full: true });
+    expect((await submit("ana", { email: "nuria@example.com" })).rows[0]!.result).toEqual({ full: true });
     await db.query(`update public.meeting_requests set status = 'declined' where guest_name like 'n%'`);
-    expect((await submit("ana")).rows[0]!.result).toHaveProperty("id");
+    expect((await submit("ana", { email: "nuria@example.com" })).rows[0]!.result).toHaveProperty("id");
   });
 
   it("shows proposals only to the card owner, who can delete them but not edit them", async () => {

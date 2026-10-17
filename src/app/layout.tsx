@@ -1,13 +1,16 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
 import { connection } from "next/server";
+import { CqFallback } from "@/components/card/cq-fallback";
 import { LIVE_REGION_ID } from "@/lib/announce";
 import { isGoogleWalletLive } from "@/lib/config.server";
 import { getSiteUrl } from "@/lib/env";
 import "./globals.css";
 
 const geist = Geist({ variable: "--font-geist", subsets: ["latin"], display: "swap" });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"], display: "swap" });
+// Only the small uppercase labels use the mono face: not worth a high-priority download on every page.
+// It is fetched when first drawn; until then the labels use next/font's size-adjusted fallback.
+const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"], display: "swap", preload: false });
 const instrumentSerif = Instrument_Serif({
   variable: "--font-instrument-serif",
   subsets: ["latin"],
@@ -52,6 +55,8 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     <html lang="es" className={`${geist.variable} ${geistMono.variable} ${instrumentSerif.variable}`}>
       <body>
         {children}
+        {/* Container query units for the pass previews on Safari < 16; does nothing elsewhere. */}
+        <CqFallback />
         {/* Filled by announce() (src/lib/announce.ts): "Enlace copiado" and other short notices. */}
         <div id={LIVE_REGION_ID} aria-live="polite" aria-atomic="true" className="sr-only" />
       </body>

@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, ChevronDown, Dices, Pipette, Undo2, WandSparkles } from "lucide-react";
-import { useId, useState, type CSSProperties, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { initials } from "@/components/card/avatar";
 import { CHOICE_FOCUS, CHOICE_INPUT } from "@/components/ui/choice";
 import { containerUnit, CSS_FONTS, editorialLines, PassArt } from "@/components/card/pass-art";
@@ -16,7 +16,6 @@ import {
   TYPEFACES,
   type CardTheme,
   type DesignFields,
-  type ResolvedDesign,
   type Typeface,
 } from "@/lib/card/design";
 import { hasVariations, PATTERN_KINDS, PATTERN_LABELS, type PatternKind } from "@/lib/card/pattern";
@@ -42,6 +41,15 @@ export function DesignField({ value, card, onChange }: DesignFieldProps) {
   const design = resolveDesign(value);
   const activeTheme = themeFor(value.accentColor, value.detailColor ?? design.detail);
   const name = card.fullName || "Tu nombre";
+  // The options are memoized and take stable callbacks: choosing one redraws that one, not all twenty-odd previews.
+  // They call whichever onChange is current.
+  const latestOnChange = useRef(onChange);
+  useEffect(() => {
+    latestOnChange.current = onChange;
+  });
+  const chooseTheme = useCallback((theme: CardTheme) => latestOnChange.current({ accentColor: theme.background, detailColor: theme.detail }), []);
+  const choosePattern = useCallback((pattern: PatternKind) => latestOnChange.current({ pattern }), []);
+  const chooseTypeface = useCallback((typeface: Typeface) => latestOnChange.current({ typeface }), []);
 
   return (
     <div className="space-y-6">
@@ -52,7 +60,7 @@ export function DesignField({ value, card, onChange }: DesignFieldProps) {
               key={theme.id}
               theme={theme}
               selected={activeTheme?.id === theme.id}
-              onSelect={() => onChange({ accentColor: theme.background, detailColor: theme.detail })}
+              onSelect={chooseTheme}
             />
           ))}
         </div>
@@ -65,10 +73,13 @@ export function DesignField({ value, card, onChange }: DesignFieldProps) {
               key={kind}
               kind={kind}
               selected={value.pattern === kind}
-              design={design}
               name={name}
               avatarUrl={card.avatarUrl}
-              onSelect={() => onChange({ pattern: kind })}
+              accentColor={value.accentColor}
+              detailColor={value.detailColor}
+              seed={value.patternSeed}
+              typeface={value.typeface}
+              onSelect={choosePattern}
             />
           ))}
         </div>
@@ -81,9 +92,10 @@ export function DesignField({ value, card, onChange }: DesignFieldProps) {
               key={typeface}
               typeface={typeface}
               selected={value.typeface === typeface}
-              design={design}
+              background={design.background}
+              foreground={design.foreground}
               name={name}
-              onSelect={() => onChange({ typeface })}
+              onSelect={chooseTypeface}
             />
           ))}
         </div>
@@ -166,10 +178,10 @@ function Choice({ name, label, selected, onSelect, className, children }: { name
   );
 }
 
-function ThemeSwatch({ theme, selected, onSelect }: { theme: CardTheme; selected: boolean; onSelect: () => void }) {
+const ThemeSwatch = memo(function ThemeSwatch({ theme, selected, onSelect }: { theme: CardTheme; selected: boolean; onSelect: (theme: CardTheme) => void }) {
   const fg = toHex(cardPalette(theme.background).foreground);
   return (
-    <Choice name="design-theme" label={theme.name} selected={selected} onSelect={onSelect} className="items-stretch gap-1.5 rounded-xl">
+    <Choice name="design-theme" label={theme.name} selected={selected} onSelect={() => onSelect(theme)} className="items-stretch gap-1.5 rounded-xl">
       <span
         className={cn(
           "relative block aspect-[5/4] overflow-hidden rounded-xl shadow-hairline transition-transform duration-300 ease-[var(--ease-spring)] group-hover:-translate-y-0.5",
@@ -200,31 +212,40 @@ function ThemeSwatch({ theme, selected, onSelect }: { theme: CardTheme; selected
       </span>
     </Choice>
   );
-}
+});
 
+// Primitive props only, so the memo holds while the owner types their name or edits a link.
 interface MotifOptionProps {
   kind: PatternKind;
   selected: boolean;
-  design: ResolvedDesign;
   name: string;
   avatarUrl: string | null;
-  onSelect: () => void;
+  accentColor: string;
+  detailColor: string | null;
+  seed: number;
+  typeface: Typeface;
+  onSelect: (kind: PatternKind) => void;
 }
 
 /** The owner's own card, drawn with this motif. */
-function MotifOption({ kind, selected, design, name, avatarUrl, onSelect }: MotifOptionProps) {
+const MotifOption = memo(function MotifOption({ kind, selected, name, avatarUrl, accentColor, detailColor, seed, typeface, onSelect }: MotifOptionProps) {
+  const design = useMemo(
+    () => resolveDesign({ accentColor, detailColor, pattern: kind, patternSeed: seed, typeface }),
+    [accentColor, detailColor, kind, seed, typeface],
+  );
   return (
-    <Choice name="design-motif" label={PATTERN_LABELS[kind].name} selected={selected} onSelect={onSelect} className="gap-2 rounded-xl">
+    <Choice name="design-motif" label={PATTERN_LABELS[kind].name} selected={selected} onSelect={() => onSelect(kind)} className="gap-2 rounded-xl">
       <span
         className={cn(
           "block overflow-hidden rounded-xl shadow-hairline transition-transform duration-300 ease-[var(--ease-spring)] group-hover:-translate-y-0.5",
           selected ? "ring-2 ring-ink ring-offset-2 ring-offset-card" : "opacity-90 group-hover:opacity-100",
         )}
+        data-cq=""
         style={{ containerType: "inline-size" }}
         aria-hidden="true"
       >
         <PassArt
-          design={{ ...design, pattern: kind }}
+          design={design}
           variant="strip"
           name={name}
           initials={initials(name)}
@@ -242,7 +263,7 @@ function MotifOption({ kind, selected, design, name, avatarUrl, onSelect }: Moti
       </span>
     </Choice>
   );
-}
+});
 
 interface VariationControlProps {
   seed: number;
@@ -314,22 +335,23 @@ function sampleStyle(typeface: Typeface): CSSProperties {
 interface TypefaceOptionProps {
   typeface: Typeface;
   selected: boolean;
-  design: ResolvedDesign;
+  background: string;
+  foreground: string;
   name: string;
-  onSelect: () => void;
+  onSelect: (typeface: Typeface) => void;
 }
 
-function TypefaceOption({ typeface, selected, design, name, onSelect }: TypefaceOptionProps) {
+const TypefaceOption = memo(function TypefaceOption({ typeface, selected, background, foreground, name, onSelect }: TypefaceOptionProps) {
   const [first, rest] = editorialLines(name);
   const surname = rest.split(" ")[0] ?? "";
   return (
-    <Choice name="design-typeface" label={TYPEFACE_LABELS[typeface].name} selected={selected} onSelect={onSelect} className="gap-1.5 rounded-xl">
+    <Choice name="design-typeface" label={TYPEFACE_LABELS[typeface].name} selected={selected} onSelect={() => onSelect(typeface)} className="gap-1.5 rounded-xl">
       <span
         className={cn(
           "flex h-14 items-center overflow-hidden rounded-xl px-2.5 shadow-hairline transition-transform duration-300 ease-[var(--ease-spring)] group-hover:-translate-y-0.5",
           selected && "ring-2 ring-ink ring-offset-2 ring-offset-card",
         )}
-        style={{ backgroundColor: design.background, color: design.foreground }}
+        style={{ backgroundColor: background, color: foreground }}
         aria-hidden="true"
       >
         <span className="truncate leading-none" style={sampleStyle(typeface)}>
@@ -347,7 +369,7 @@ function TypefaceOption({ typeface, selected, design, name, onSelect }: Typeface
       </span>
     </Choice>
   );
-}
+});
 
 interface InkPickerProps {
   label: string;

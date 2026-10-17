@@ -285,7 +285,8 @@ test.describe("P5.7 after sending, one call to create", () => {
 });
 
 test.describe("P5.8 on a computer, the QR to take it to the phone", () => {
-  test("a QR of the card next to it from 1024 px", async ({ page }) => {
+  test("a QR of the card next to it from 1024 px", async ({ page, isMobile }) => {
+    test.skip(isMobile, "phones never get the desktop QR (it was hidden there anyway)");
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/u/demo");
     const qr = page.getByRole("img", { name: "Código QR de la tarjeta de Alex Rivera" });

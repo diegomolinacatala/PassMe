@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { listUpdatedSerials } from "@/lib/data/wallet";
 import { log } from "@/lib/log";
-import { emptyResponse, getWebServiceContext, isValidDeviceId } from "@/lib/pass/web-service";
+import { emptyResponse, isValidDeviceId, openWebService, unavailableResponse } from "@/lib/pass/web-service";
 
 export const runtime = "nodejs";
 
@@ -10,7 +10,7 @@ export async function GET(
   request: NextRequest,
   { params }: RouteContext<"/api/wallet/v1/devices/[deviceLibraryId]/registrations/[passTypeId]">,
 ) {
-  const context = getWebServiceContext();
+  const context = await openWebService(request);
   if (!context.ok) return context.response;
   const { deviceLibraryId, passTypeId } = await params;
   if (!isValidDeviceId(deviceLibraryId) || passTypeId !== context.ctx.config.passTypeId) return emptyResponse(404);
@@ -22,6 +22,6 @@ export async function GET(
     return Response.json(result, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     log.error("wallet serial list failed", {}, error);
-    return emptyResponse(500);
+    return unavailableResponse();
   }
 }

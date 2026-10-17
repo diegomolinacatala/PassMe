@@ -8,6 +8,7 @@ import { buttonClasses } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { ShareLinkButton } from "@/components/ui/share-link-button";
 import { AddToWalletButton, passHref, QrShortcutButton } from "@/components/wallet/add-to-wallet-button";
+import { callAction, CONNECTION_FAILED } from "@/lib/client/call-action";
 import { cn } from "@/lib/cn";
 import type { VisitSource } from "@/lib/env";
 import { phoneWalletAction, type Platform } from "@/lib/platform";
@@ -82,9 +83,10 @@ export function WelcomePanel(props: WelcomePanelProps) {
   function openOnPhone() {
     setHandoffError(null);
     startTransition(async () => {
-      const result = await createHandoffLinkAction();
-      if (result.ok) setHandoff(result.url);
-      else setHandoffError(result.error);
+      const call = await callAction(() => createHandoffLinkAction());
+      if (call.failed) setHandoffError(CONNECTION_FAILED);
+      else if (call.result.ok) setHandoff(call.result.url);
+      else setHandoffError(call.result.error);
     });
   }
 

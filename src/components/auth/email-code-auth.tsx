@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowUpRight, LoaderCircle, Pencil } from "lucide-react";
-import { useActionState, useCallback, useEffect, useId, useRef, useState } from "react";
+import { useActionState, useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { useFormStatus } from "react-dom";
 import { authAction, signInWithGoogle, type AuthState } from "@/app/login/actions";
 import { InlineError, inputClasses } from "@/components/ui/field";
@@ -10,6 +10,8 @@ import { Notice } from "@/components/ui/notice";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { Turnstile } from "@/components/ui/turnstile";
 import { formatCountdown, inboxFor, LOGIN_CODE_LENGTH } from "@/lib/auth/code";
+import { isInAppBrowser } from "@/lib/auth/webview";
+import { callAction, CONNECTION_FAILED } from "@/lib/client/call-action";
 import type { Platform } from "@/lib/platform";
 import { CodeInput } from "./code-input";
 import { EmailTypoHint } from "./email-typo-hint";
@@ -49,6 +51,27 @@ export interface EmailCodeAuthProps {
 
 type CodeState = Extract<AuthState, { step: "code" }>;
 
+const noSubscription = () => () => {};
+
+/**
+ * authAction, minus the crash: with no answer (offline, a new deploy) the
+ * screen stays where it was, with what was typed, and says so. A code that
+ * worked still redirects as before.
+ */
+async function authOrStay(previous: AuthState, formData: FormData): Promise<AuthState> {
+  const call = await callAction(() => authAction(previous, formData));
+  if (!call.failed) return call.result;
+  if (formData.get("intent") === "send" || previous.step === "email") {
+    return { step: "email", email: String(formData.get("email") ?? previous.email ?? ""), error: CONNECTION_FAILED };
+  }
+  return { ...previous, error: CONNECTION_FAILED, notice: undefined, rejected: false };
+}
+
+/** Read after hydration (the server HTML always has the button): no mismatch. */
+function useInAppBrowser(): boolean {
+  return useSyncExternalStore(noSubscription, () => isInAppBrowser(navigator.userAgent), () => false);
+}
+
 /**
  * Passwordless sign-in: email → 8-digit code, all on this screen. The code is
  * the fast path (iOS suggests it from Mail above the keyboard; on Android it
@@ -58,7 +81,7 @@ type CodeState = Extract<AuthState, { step: "code" }>;
 export function EmailCodeAuth(props: EmailCodeAuthProps) {
   const { initialEmail, initialError, initialState, continueTo, onCodeSent, onStepChange, autoFocus } = props;
   const [state, dispatch, pending] = useActionState<AuthState, FormData>(
-    authAction,
+    authOrStay,
     initialState ?? { step: "email", email: initialEmail, error: initialError },
   );
 
@@ -114,6 +137,8 @@ function EmailStep({ next, continueTo, email, error, state, dispatch, pending, g
   const errorId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState(email);
+  // Google turns away in-app browsers (Instagram, LinkedIn…): there, only the code.
+  const inAppBrowser = useInAppBrowser();
   return (
     <div>
       <form action={dispatch} className="space-y-4">
@@ -154,7 +179,7 @@ function EmailStep({ next, continueTo, email, error, state, dispatch, pending, g
         <SubmitButton pendingLabel="Enviando el código…">Enviarme un código</SubmitButton>
       </form>
 
-      {googleEnabled ? (
+      {googleEnabled && !inAppBrowser ? (
         <>
           <div className="my-5 flex items-center gap-3 text-xs text-muted" aria-hidden="true">
             <span className="h-px flex-1 bg-line" /> o <span className="h-px flex-1 bg-line" />

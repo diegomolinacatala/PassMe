@@ -46,8 +46,9 @@ export function TiltCard({ children, className, radiusClassName = "rounded-2xl",
   );
   const { ref, active, enabled } = useTilt({ max, onFrame });
 
+  // 3D only where the tilt exists: on a phone the pass is still, and a 3D context would just be extra layers.
   return (
-    <div ref={ref} className={cn("relative [perspective:1200px]", className)}>
+    <div ref={ref} className={cn("relative", enabled && "[perspective:1200px]", className)}>
       {shadow ? (
         <div
           ref={contact}
@@ -57,10 +58,10 @@ export function TiltCard({ children, className, radiusClassName = "rounded-2xl",
         />
       ) : null}
       <div
-        className={cn("[transform-style:preserve-3d]", idle && enabled && "animate-sway")}
+        className={cn(enabled && "[transform-style:preserve-3d]", idle && enabled && "animate-sway")}
         style={{ animationPlayState: active ? "paused" : undefined }}
       >
-        <div ref={surface} className="relative [transform-style:preserve-3d]" style={{ willChange: enabled ? "transform" : undefined }}>
+        <div ref={surface} className={cn("relative", enabled && "[transform-style:preserve-3d]")} style={{ willChange: enabled ? "transform" : undefined }}>
           {children}
           <div
             ref={sheen}

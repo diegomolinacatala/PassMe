@@ -3,7 +3,15 @@
 import { Mark } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 
-export default function ErrorBoundary({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+interface ErrorBoundaryProps {
+  error: Error & { digest?: string };
+  /** Next 16.3+: fetches the segment again and re-renders it (what "Reintentar" should do). */
+  retry?: () => void;
+  /** Only re-renders what's already on the client: the fallback when `retry` isn't there. */
+  reset: () => void;
+}
+
+export default function ErrorBoundary({ error, retry, reset }: ErrorBoundaryProps) {
   return (
     <main className="grid min-h-dvh place-items-center px-6 py-16">
       <div className="max-w-sm text-center">
@@ -20,7 +28,7 @@ export default function ErrorBoundary({ error, reset }: { error: Error & { diges
           ) : null}
           .
         </p>
-        <Button onClick={reset} className="mt-8">
+        <Button onClick={() => (retry ?? reset)()} className="mt-8">
           Reintentar
         </Button>
       </div>

@@ -31,6 +31,18 @@ const CLEANUP_OLDER_THAN_MS = 24 * 60 * 60_000;
 const MAX_MEMORY_KEYS = 10_000;
 const memoryAttempts = new Map<string, number[]>();
 
+/** Set once the missing secret key has been reported, so production logs it a single time. */
+let reportedMissingAdmin = false;
+
+/**
+ * What registering an attempt answered:
+ *  - "ok": go ahead and check the code;
+ *  - "locked": too many tries for this email (from here, or from everywhere);
+ *  - "unavailable": the counters couldn't be stored or read, so the code was NOT checked.
+ *    That is our problem, not the person's: it must not read as a lockout.
+ */
+export type OtpAttemptStatus = "ok" | "locked" | "unavailable";
+
 function keyedHash(input: string, plain: string): string {
   const secret = getSigningSecret();
   return secret ? createHmac("sha256", secret).update(input).digest("hex") : createHash("sha256").update(plain).digest("hex");
@@ -55,6 +67,14 @@ function recentMemoryAttempts(hash: string, now: number): number[] {
   return (memoryAttempts.get(hash) ?? []).filter((t) => now - t < OTP_LOCK_WINDOW_MS);
 }
 
+/** Takes back the newest in-memory attempt for `hash`. */
+function unregisterInMemory(hash: string): void {
+  const attempts = memoryAttempts.get(hash);
+  if (!attempts) return;
+  attempts.pop();
+  if (attempts.length === 0) memoryAttempts.delete(hash);
+}
+
 function registerInMemory(hash: string, limit: number, now: number): boolean {
   if (memoryAttempts.size > MAX_MEMORY_KEYS) {
     for (const key of memoryAttempts.keys()) {
@@ -67,11 +87,16 @@ function registerInMemory(hash: string, limit: number, now: number): boolean {
 }
 
 /**
- * Records a code attempt and says whether it may be checked. Returns false once
- * the email has used up its attempts from this client, or from everywhere, in
- * the window. Fails closed on DB errors.
+ * Records a code attempt and says whether it may be checked: "locked" once the
+ * email has used up its attempts from this client, or from everywhere, in the
+ * window. Fails closed on database errors ("unavailable": nothing was checked,
+ * and the attempt is not held against the person).
  */
-export async function registerOtpAttempt(email: string, client: string, now: number = Date.now()): Promise<boolean> {
+export async function registerOtpAttempt(
+  email: string,
+  client: string,
+  now: number = Date.now(),
+): Promise<OtpAttemptStatus> {
   const layers = [
     { hash: hashEmailForClient(email, client), limit: OTP_MAX_ATTEMPTS },
     { hash: hashEmail(email), limit: OTP_MAX_ATTEMPTS_PER_EMAIL },
@@ -80,14 +105,23 @@ export async function registerOtpAttempt(email: string, client: string, now: num
   const allowedInMemory = layers.map((layer) => registerInMemory(layer.hash, layer.limit, now)).every(Boolean);
 
   const admin = createAdminSupabase();
-  if (!admin) return allowedInMemory;
-  if (!allowedInMemory) return false;
+  if (!admin) {
+    if (process.env.NODE_ENV === "production" && !reportedMissingAdmin) {
+      reportedMissingAdmin = true;
+      log.error("code lockout is per-instance only: SUPABASE_SECRET_KEY is missing");
+    }
+    return allowedInMemory ? "ok" : "locked";
+  }
+  if (!allowedInMemory) return "locked";
+
+  const unavailable = (what: string, error: unknown): OtpAttemptStatus => {
+    log.error(what, {}, error);
+    for (const layer of layers) unregisterInMemory(layer.hash);
+    return "unavailable";
+  };
 
   const inserted = await admin.from("auth_otp_attempts").insert(layers.map((layer) => ({ email_hash: layer.hash })));
-  if (inserted.error) {
-    log.warn("otp attempt insert failed", {}, inserted.error);
-    return false;
-  }
+  if (inserted.error) return unavailable("otp attempt insert failed", inserted.error);
 
   const since = new Date(now - OTP_LOCK_WINDOW_MS).toISOString();
   const counts = await Promise.all(
@@ -100,10 +134,7 @@ export async function registerOtpAttempt(email: string, client: string, now: num
     ),
   );
   const failed = counts.find((result) => result.error);
-  if (failed) {
-    log.warn("otp attempt count failed", {}, failed.error);
-    return false;
-  }
+  if (failed) return unavailable("otp attempt count failed", failed.error);
 
   // Opportunistic cleanup keeps the table tiny even without the daily cron.
   if (Math.random() < 0.05) {
@@ -111,7 +142,35 @@ export async function registerOtpAttempt(email: string, client: string, now: num
     await admin.from("auth_otp_attempts").delete().lt("created_at", cutoff);
   }
 
-  return counts.every((result, i) => (result.count ?? 0) <= layers[i]!.limit);
+  return counts.every((result, i) => (result.count ?? 0) <= layers[i]!.limit) ? "ok" : "locked";
+}
+
+/**
+ * Gives back the attempt `registerOtpAttempt` just recorded, for when the code
+ * was never really judged (Supabase was down or rate-limiting us): a wrong guess
+ * counts, our own failure doesn't. Removes the newest row of each layer, which
+ * is equivalent for counting even if a parallel attempt landed in between.
+ */
+export async function forgetOtpAttempt(email: string, client: string): Promise<void> {
+  const hashes = [hashEmailForClient(email, client), hashEmail(email)];
+  for (const hash of hashes) unregisterInMemory(hash);
+
+  const admin = createAdminSupabase();
+  if (!admin) return;
+  const newest = await Promise.all(
+    hashes.map((hash) =>
+      admin.from("auth_otp_attempts").select("id").eq("email_hash", hash).order("id", { ascending: false }).limit(1),
+    ),
+  );
+  const failed = newest.find((result) => result.error);
+  if (failed) {
+    log.warn("otp attempt refund failed", {}, failed.error);
+    return;
+  }
+  const ids = newest.flatMap((result) => (result.data ?? []).map((row) => row.id));
+  if (ids.length === 0) return;
+  const { error } = await admin.from("auth_otp_attempts").delete().in("id", ids);
+  if (error) log.warn("otp attempt refund failed", {}, error);
 }
 
 /** After a successful login the email starts from zero again (from this client and overall). */

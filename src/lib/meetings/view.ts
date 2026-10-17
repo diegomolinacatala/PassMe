@@ -1,5 +1,5 @@
 import { googleCalendarUrl } from "./calendar";
-import { calendarLocation, meetingDescription, ownerContactEmail, type Meeting, type MeetingOwner } from "./model";
+import { calendarLocation, meetingDescription, ownerContactEmail, ownerNameFor, type Meeting, type MeetingOwner } from "./model";
 import type { MeetingFormat } from "./schema";
 import { allowedActions, meetingStage, openSlots, type MeetingAction, type MeetingParty, type MeetingStage, type MeetingStatus } from "./state";
 import { addMinutes, dateKey, zonedTimeToUtc } from "./time";
@@ -74,7 +74,7 @@ export function viewGoogleCalendarUrl(view: MeetingView): string | null {
   return googleCalendarUrl({
     start: view.confirmedStart,
     end: addMinutes(view.confirmedStart, view.durationMinutes),
-    summary: `Reunión con ${view.party === "owner" ? view.guest.name : view.owner.name}`,
+    summary: `Reunión con ${view.party === "owner" ? view.guest.name : ownerNameFor(view.party, view.owner.name)}`,
     description: meetingDescription(view, view.party, view.owner),
     location: calendarLocation(view, view.party),
   });

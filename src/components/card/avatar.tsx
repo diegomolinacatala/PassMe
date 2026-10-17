@@ -10,10 +10,12 @@ interface AvatarProps {
   /** Diameter in px. */
   size: number;
   className?: string;
+  /** The photo is one of the first things on the page: fetch it at high priority instead of waiting for layout. */
+  priority?: boolean;
 }
 
 /** Round avatar; falls back to serif initials on a translucent disc. */
-export function Avatar({ name, url, size, className }: AvatarProps) {
+export function Avatar({ name, url, size, className, priority }: AvatarProps) {
   const style = { width: size, height: size };
   if (url) {
     return (
@@ -26,6 +28,7 @@ export function Avatar({ name, url, size, className }: AvatarProps) {
         style={style}
         className={cn("shrink-0 rounded-full object-cover", className)}
         decoding="async"
+        fetchPriority={priority ? "high" : undefined}
       />
     );
   }

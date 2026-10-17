@@ -1,4 +1,5 @@
 import { CircleCheck } from "lucide-react";
+import { PassQr } from "@/components/card/pass-qr";
 import { HeroConfigurator } from "@/components/landing/hero-configurator";
 import { FinalCta, PrivacySection, QuickQuestions } from "@/components/landing/sections";
 import { SiteFooter } from "@/components/landing/site-footer";
@@ -36,7 +37,7 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
             </p>
           </div>
         ) : null}
-        <HeroConfigurator base={demo} initialDesign={initialDesign} />
+        <HeroConfigurator base={demo} initialDesign={initialDesign} qr={<PassQr slug={demo.slug} />} />
         <Storyboard card={demo} googleWallet={googleWallet} />
         <PrivacySection />
         <QuickQuestions />

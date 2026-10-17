@@ -38,8 +38,14 @@ export interface ArtFonts {
 
 export type Unit = (points: number) => number | string;
 
-/** Browser: points → a share of the nearest `container-type: inline-size` ancestor. */
-export const containerUnit: Unit = (points) => `${((points / 375) * 100).toFixed(4)}cqw`;
+/**
+ * Browser: points → a share of the nearest `container-type: inline-size` ancestor.
+ * Container query units need Safari 16: where they don't exist, <CqFallback>
+ * (once per page) writes 1% of each `[data-cq]` box's width, in px, to `--q`,
+ * and the unit reads that instead. Everywhere else `--q` is never set and
+ * `1cqw` is used as before. Satori never sees this: it gets a px `unit`.
+ */
+export const containerUnit: Unit = (points) => `calc(var(--q, 1cqw) * ${((points / 375) * 100).toFixed(4)})`;
 
 export const CSS_FONTS: ArtFonts = {
   serif: "var(--font-instrument-serif), Georgia, serif",

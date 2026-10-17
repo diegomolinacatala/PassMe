@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, type Ref } from "react";
-import { cleanCode } from "@/lib/auth/code";
+import { flushSync } from "react-dom";
+import { codeFromInput } from "@/lib/auth/code";
 import { cn } from "@/lib/cn";
 
 interface CodeInputProps {
@@ -68,9 +69,15 @@ export function CodeInput({
         name={name}
         value={value}
         onChange={(e) => {
-          const next = cleanCode(e.target.value).slice(0, length);
+          const next = codeFromInput(e.target.value, length);
+          if (next.length === length && next !== value && onComplete) {
+            // Until React re-renders, the field still holds the raw paste ("12345678 (caduca en
+            // 10 min)"): commit the clean digits first, so a form submitted from onComplete sends them.
+            flushSync(() => onChange(next));
+            onComplete(next);
+            return;
+          }
           onChange(next);
-          if (next.length === length && next !== value) onComplete?.(next);
         }}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}

@@ -44,7 +44,7 @@ export function rowToMeeting(row: MeetingRequestRow): Meeting {
 
 export type SubmitMeetingResult =
   | { ok: true; id: string; ownerId: string }
-  | { ok: false; reason: "closed" | "full" | "unavailable" };
+  | { ok: false; reason: "closed" | "full" | "guest_full" | "unavailable" };
 
 /** Stores a visitor's proposal for a card that takes them (validated by the caller). */
 export async function submitMeetingRequest(
@@ -73,8 +73,9 @@ export async function submitMeetingRequest(
     log.error("submit_meeting_request failed", { slug }, error);
     return { ok: false, reason: "unavailable" };
   }
-  const result = data as { id?: unknown; owner_id?: unknown; full?: unknown } | null;
-  if (result?.full === true) return { ok: false, reason: "full" };
+  const result = data as { id?: unknown; owner_id?: unknown; full?: unknown; guest?: unknown } | null;
+  // `guest`: this visitor already has two open proposals on the card (migration 20261017120000).
+  if (result?.full === true) return { ok: false, reason: result.guest === true ? "guest_full" : "full" };
   if (typeof result?.id === "string" && typeof result.owner_id === "string") {
     return { ok: true, id: result.id, ownerId: result.owner_id };
   }
@@ -86,33 +87,58 @@ export interface MeetingRecord {
   owner: MeetingOwner;
 }
 
+/**
+ * A meeting lookup that tells "there is no such meeting" from "we couldn't
+ * look": pages and actions say "ya no está" for the first and offer a retry
+ * for the second.
+ */
+export type MeetingLookup =
+  | { status: "found"; record: MeetingRecord }
+  | { status: "missing" }
+  | { status: "error" };
+
 /** A meeting with its card's owner (server only: the signed link was checked by the caller). */
-export async function getMeetingRecord(id: string): Promise<MeetingRecord | null> {
-  if (!isUuid(id)) return null;
+export async function findMeetingRecord(id: string): Promise<MeetingLookup> {
+  if (!isUuid(id)) return { status: "missing" };
   const admin = createAdminSupabase();
-  if (!admin) return null;
+  if (!admin) {
+    log.error("meeting lookup unavailable: no database access", { id });
+    return { status: "error" };
+  }
   const { data, error } = await admin.from("meeting_requests").select(COLUMNS).eq("id", id).maybeSingle();
   if (error) {
-    if (!MISSING_RELATION_CODES.has(error.code ?? "")) log.warn("meeting lookup failed", { id }, error);
-    return null;
+    // The table isn't there yet (migration pending): no meeting can exist.
+    if (MISSING_RELATION_CODES.has(error.code ?? "")) return { status: "missing" };
+    log.error("meeting lookup failed", { id }, error);
+    return { status: "error" };
   }
-  if (!data) return null;
+  if (!data) return { status: "missing" };
   const { profile, error: profileError } = await findMeetingOwner(admin, data.profile_id);
-  if (profileError || !profile) {
-    if (profileError) log.warn("meeting owner lookup failed", { id }, profileError);
-    return null;
+  if (profileError) {
+    log.error("meeting owner lookup failed", { id }, profileError);
+    return { status: "error" };
   }
+  if (!profile) return { status: "missing" };
   return {
-    meeting: rowToMeeting(data as MeetingRequestRow),
-    owner: {
-      id: profile.id,
-      slug: profile.slug,
-      name: profile.full_name,
-      email: null,
-      ...(canonicalTimeZone(profile.time_zone) ? { timeZone: canonicalTimeZone(profile.time_zone)! } : {}),
-      ...(profile.meeting_settings === undefined ? {} : { defaults: ownerDefaults(profile.meeting_settings) }),
+    status: "found",
+    record: {
+      meeting: rowToMeeting(data as MeetingRequestRow),
+      owner: {
+        id: profile.id,
+        slug: profile.slug,
+        name: profile.full_name,
+        email: null,
+        ...(canonicalTimeZone(profile.time_zone) ? { timeZone: canonicalTimeZone(profile.time_zone)! } : {}),
+        ...(profile.meeting_settings === undefined ? {} : { defaults: ownerDefaults(profile.meeting_settings) }),
+      },
     },
   };
+}
+
+/** The meeting, or null when it doesn't exist or couldn't be read. Prefer `findMeetingRecord` where the difference matters. */
+export async function getMeetingRecord(id: string): Promise<MeetingRecord | null> {
+  const lookup = await findMeetingRecord(id);
+  return lookup.status === "found" ? lookup.record : null;
 }
 
 /** Postgres / PostgREST codes for a missing column (migration 20261006120000 pending). */
@@ -154,13 +180,24 @@ export async function withOwnerEmail(owner: MeetingOwner): Promise<MeetingOwner>
   return { ...owner, email, contactEmail };
 }
 
+export type UpdateMeetingResult =
+  | { status: "updated"; meeting: Meeting }
+  /** Somebody changed (or removed) the meeting first: reload and look again. */
+  | { status: "conflict" }
+  /** The database failed: nothing was changed, trying again is fine. */
+  | { status: "error" };
+
 /**
  * Applies a change only if nobody changed the meeting meanwhile (the sequence
  * is the version): two taps on two devices can't both win.
  */
-export async function updateMeeting(id: string, expectedSequence: number, patch: MeetingPatch): Promise<Meeting | null> {
+export async function updateMeeting(id: string, expectedSequence: number, patch: MeetingPatch): Promise<UpdateMeetingResult> {
   const admin = createAdminSupabase();
-  if (!admin || !isUuid(id)) return null;
+  if (!isUuid(id)) return { status: "conflict" };
+  if (!admin) {
+    log.error("meeting update unavailable: no database access", { id });
+    return { status: "error" };
+  }
   const { data, error } = await admin
     .from("meeting_requests")
     .update(patch)
@@ -170,9 +207,9 @@ export async function updateMeeting(id: string, expectedSequence: number, patch:
     .maybeSingle();
   if (error) {
     log.error("meeting update failed", { id }, error);
-    return null;
+    return { status: "error" };
   }
-  return data ? rowToMeeting(data as MeetingRequestRow) : null;
+  return data ? { status: "updated", meeting: rowToMeeting(data as MeetingRequestRow) } : { status: "conflict" };
 }
 
 export interface UnansweredProposal {
@@ -185,10 +222,14 @@ export interface UnansweredProposal {
 /**
  * Visitors' proposals still waiting for the owner and touched in the last
  * `sinceDays` (cron only, admin client). The caller picks the expired ones.
+ * Null when the database couldn't be read (an empty list means there are none).
  */
-export async function listUnansweredGuestProposals(now: Date, sinceDays: number): Promise<UnansweredProposal[]> {
+export async function listUnansweredGuestProposals(now: Date, sinceDays: number): Promise<UnansweredProposal[] | null> {
   const admin = createAdminSupabase();
-  if (!admin) return [];
+  if (!admin) {
+    log.error("unanswered proposals lookup unavailable: no database access");
+    return null;
+  }
   const since = new Date(now.getTime() - sinceDays * 86_400_000).toISOString();
   const { data, error } = await admin
     .from("meeting_requests")
@@ -199,8 +240,10 @@ export async function listUnansweredGuestProposals(now: Date, sinceDays: number)
     .order("updated_at", { ascending: false })
     .limit(MAX_LISTED * 5);
   if (error) {
-    if (!MISSING_RELATION_CODES.has(error.code ?? "")) log.warn("unanswered proposals lookup failed", {}, error);
-    return [];
+    // Migration pending: nothing to tell anyone about.
+    if (MISSING_RELATION_CODES.has(error.code ?? "")) return [];
+    log.error("unanswered proposals lookup failed", {}, error);
+    return null;
   }
   const rows = (data ?? []) as MeetingRequestRow[];
   const ownerIds = [...new Set(rows.map((row) => row.profile_id))];
@@ -210,8 +253,8 @@ export async function listUnansweredGuestProposals(now: Date, sinceDays: number)
     .select("id, slug, full_name, is_published, accepts_meeting_requests")
     .in("id", ownerIds);
   if (profileError) {
-    log.warn("proposal owners lookup failed", {}, profileError);
-    return [];
+    log.error("proposal owners lookup failed", {}, profileError);
+    return null;
   }
   const owners = new Map((profiles ?? []).map((profile) => [profile.id, profile]));
   return rows.flatMap((row) => {
@@ -231,6 +274,8 @@ export interface OwnMeetings {
   /** False until migration 20261002120000 is applied. */
   available: boolean;
   meetings: Meeting[];
+  /** The list couldn't be read: it is empty because of the error, not because there are none. */
+  failed?: true;
 }
 
 /** The signed-in owner's meetings, newest first (RLS limits them to their own card). */
@@ -242,21 +287,30 @@ export async function listOwnMeetings(supabase: TypedSupabaseClient): Promise<Ow
     .limit(MAX_LISTED);
   if (error) {
     const missing = MISSING_RELATION_CODES.has(error.code ?? "");
-    if (!missing) log.warn("meetings list failed", {}, error);
-    return { available: !missing, meetings: [] };
+    if (missing) return { available: false, meetings: [] };
+    log.error("meetings list failed", {}, error);
+    return { available: true, meetings: [], failed: true };
   }
   return { available: true, meetings: (data as MeetingRequestRow[]).map(rowToMeeting) };
 }
 
-/** Whether the signed-in owner can see this meeting (RLS: their own card's only). */
-export async function ownsMeeting(supabase: TypedSupabaseClient, id: string): Promise<boolean> {
-  if (!isUuid(id)) return false;
+/**
+ * Whether the signed-in owner can see this meeting (RLS: their own card's only):
+ * "own", "none" (not theirs or gone) or "error" (couldn't check; worth a retry).
+ */
+export async function lookupOwnMeeting(supabase: TypedSupabaseClient, id: string): Promise<"own" | "none" | "error"> {
+  if (!isUuid(id)) return "none";
   const { data, error } = await supabase.from("meeting_requests").select("id").eq("id", id).maybeSingle();
   if (error) {
-    log.warn("meeting ownership check failed", {}, error);
-    return false;
+    log.error("meeting ownership check failed", {}, error);
+    return "error";
   }
-  return Boolean(data);
+  return data ? "own" : "none";
+}
+
+/** Whether the signed-in owner can see this meeting (false also when the check failed: see `lookupOwnMeeting`). */
+export async function ownsMeeting(supabase: TypedSupabaseClient, id: string): Promise<boolean> {
+  return (await lookupOwnMeeting(supabase, id)) === "own";
 }
 
 export type DeleteMeetingResult = { ok: true } | { ok: false; reason: "upcoming" | "failed" };

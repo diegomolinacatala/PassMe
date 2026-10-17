@@ -118,9 +118,13 @@ describe("sending the code", () => {
     expect(failed).toMatchObject({ step: "code", sentAt: 111, error: expect.stringMatching(/No hemos podido/) });
   });
 
-  it("stops after too many emails from one client", async () => {
-    fakeAuth({ signInWithOtp: async () => ({ error: null }) });
-    for (let i = 0; i < 10; i += 1) await authAction(EMAIL_STEP, form({ intent: "send", email: "ana@example.com" }));
+  it("stops after 10 emails from one client in 10 minutes", async () => {
+    const signInWithOtp = vi.fn(async () => ({ error: null }));
+    fakeAuth({ signInWithOtp });
+    for (let i = 0; i < 10; i += 1) {
+      expect(await authAction(EMAIL_STEP, form({ intent: "send", email: "ana@example.com" }))).toMatchObject({ step: "code" });
+    }
+    expect(signInWithOtp).toHaveBeenCalledTimes(10);
     expect(await authAction(EMAIL_STEP, form({ intent: "send", email: "ana@example.com" }))).toMatchObject({
       step: "email",
       error: expect.stringMatching(/Demasiados intentos/),
@@ -138,6 +142,71 @@ describe("checking the code", () => {
     fakeAuth({ verifyOtp: async () => ({ data: { user: null }, error: { message: "Token has expired or is invalid" } }) });
     const result = await authAction(codeStep(), form({ intent: "verify", email: "ana@example.com", code: "1234 5678" }));
     expect(result).toMatchObject({ step: "code", sentAt: 111, resendIn: 60, rejected: true, error: "Código incorrecto o caducado." });
+  });
+
+  it.each([
+    ["400", { status: 400, code: "validation_failed", message: "Token has expired or is invalid" }],
+    ["403 otp_expired", { status: 403, code: "otp_expired", message: "Email link is invalid or has expired" }],
+    ["422", { status: 422, message: "Unprocessable" }],
+    ["no status", { message: "Token has expired or is invalid" }],
+  ])("a %s from Supabase is a wrong code: the digits clear for another try", async (_name, error) => {
+    fakeAuth({ verifyOtp: async () => ({ data: { user: null }, error }) });
+    const result = await authAction(codeStep(), form({ intent: "verify", email: "ana@example.com", code: "12345678" }));
+    expect(result).toMatchObject({ step: "code", rejected: true, error: "Código incorrecto o caducado." });
+  });
+
+  it.each([
+    ["a 429", { name: "AuthApiError", status: 429, code: "over_request_rate_limit", message: "Too many requests" }],
+    ["a 500", { name: "AuthApiError", status: 500, message: "Internal" }],
+    ["a 503", { name: "AuthRetryableFetchError", status: 503, message: "Service unavailable" }],
+    ["a dropped connection", { name: "AuthRetryableFetchError", status: 0, message: "fetch failed" }],
+  ])("%s is not a wrong code: it keeps the digits and says it's on us", async (_name, error) => {
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    fakeAuth({ verifyOtp: async () => ({ data: { user: null }, error }) });
+    const result = await authAction(codeStep(), form({ intent: "verify", email: "ana@example.com", code: "12345678" }));
+    expect(result).toMatchObject({ step: "code", rejected: false, error: "No hemos podido comprobarlo. Inténtalo de nuevo." });
+    // Logged for us, with what Supabase said.
+    expect(errorLog).toHaveBeenCalledTimes(1);
+    expect(String(errorLog.mock.calls[0]![0])).toContain("verifyOtp could not judge the code");
+    if ("code" in error) expect(String(errorLog.mock.calls[0]![0])).toContain(error.code);
+  });
+
+  it("a thrown network error is treated the same way", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    fakeAuth({
+      verifyOtp: async () => {
+        throw new TypeError("fetch failed");
+      },
+    });
+    expect(await authAction(codeStep(), form({ intent: "verify", email: "ana@example.com", code: "12345678" }))).toMatchObject({
+      rejected: false,
+      error: "No hemos podido comprobarlo. Inténtalo de nuevo.",
+    });
+  });
+
+  it("gives the attempt back when Supabase couldn't answer, so outages never lock anyone out", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    fakeAuth({ verifyOtp: async () => ({ data: { user: null }, error: { status: 503, message: "down" } }) });
+    // Far more tries than the 5 a person gets...
+    for (let i = 0; i < 9; i += 1) {
+      expect(await authAction(codeStep(), form({ intent: "verify", email: "ana@example.com", code: "12345678" }))).toMatchObject({
+        error: "No hemos podido comprobarlo. Inténtalo de nuevo.",
+      });
+    }
+    // ...and a real wrong code afterwards is still judged as one, not as a lockout.
+    fakeAuth({ verifyOtp: async () => ({ data: { user: null }, error: { status: 400, message: "invalid" } }) });
+    expect(await authAction(codeStep(), form({ intent: "verify", email: "ana@example.com", code: "12345678" }))).toMatchObject({
+      rejected: true,
+      error: "Código incorrecto o caducado.",
+    });
+  });
+
+  it("still counts real wrong codes: the sixth try is locked", async () => {
+    fakeAuth({ verifyOtp: async () => ({ data: { user: null }, error: { status: 400, message: "invalid" } }) });
+    for (let i = 0; i < 5; i += 1) await authAction(codeStep(), form({ intent: "verify", email: "ana@example.com", code: "12345678" }));
+    expect(await authAction(codeStep(), form({ intent: "verify", email: "ana@example.com", code: "12345678" }))).toMatchObject({
+      error: expect.stringMatching(/Demasiados códigos incorrectos/),
+    });
   });
 
   it("asks for digits before calling Supabase", async () => {

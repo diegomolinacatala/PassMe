@@ -122,9 +122,9 @@ export function SaveBar({ dirty, saving, status, errorCount, onSave, onDiscard, 
       <div className="mx-auto max-w-[1240px] lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-8 lg:px-2 xl:gap-12">
         <div
           className={cn(
-            "flex flex-wrap items-center gap-x-3 gap-y-1 rounded-object border py-2 pr-2 pl-5 shadow-object backdrop-blur-md transition-colors duration-300 max-lg:mx-auto max-lg:max-w-[640px]",
+            "flex flex-wrap items-center gap-x-3 gap-y-1 rounded-object border py-2 pr-2 pl-5 shadow-object transition-colors lg:backdrop-blur-md duration-300 max-lg:mx-auto max-lg:max-w-[640px]",
             visible && "pointer-events-auto",
-            tone === "dirty" ? "border-ink bg-ink text-paper" : "hairline bg-card/90 text-ink",
+            tone === "dirty" ? "border-ink bg-ink text-paper" : "hairline bg-card/95 text-ink lg:bg-card/90",
           )}
         >
           <div className="flex min-w-[min(12rem,100%)] flex-1 items-center gap-3">

@@ -1,5 +1,6 @@
 import { CircleCheck, Globe } from "lucide-react";
 import type { ReactNode } from "react";
+import { PassQr } from "@/components/card/pass-qr";
 import { ProfileCard } from "@/components/card/profile-card";
 import { QrCode } from "@/components/card/qr-code";
 import { WalletPass } from "@/components/card/wallet-pass";
@@ -88,7 +89,7 @@ function WalletScene({ card }: { card: PublicCard }) {
         </div>
         <p className="mt-4 px-1 text-mark font-semibold tracking-wide text-ink/70 uppercase">Cartera</p>
         <div className="mt-2 transition-transform duration-700 ease-[var(--ease-out-expo)] group-hover:-translate-y-1">
-          <WalletPass card={card} className="max-w-none" />
+          <WalletPass card={card} className="max-w-none" qr={<PassQr slug={card.slug} />} />
         </div>
       </div>
     </div>
@@ -108,7 +109,7 @@ function ScanScene({ card }: { card: PublicCard }) {
       {/* What the camera sees: the pass, out of focus, and its QR sharp under the viewfinder. */}
       <div className="absolute inset-x-[14%] bottom-[17%]">
         <div className="opacity-90 blur-[1.5px]">
-          <WalletPass card={{ ...card, ...design }} className="max-w-none" />
+          <WalletPass card={{ ...card, ...design }} className="max-w-none" qr={<PassQr slug={card.slug} />} />
         </div>
         <div className="absolute inset-0 rounded-2xl bg-ink/35" />
         <div

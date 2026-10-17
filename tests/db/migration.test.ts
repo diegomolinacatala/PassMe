@@ -315,7 +315,8 @@ describe("motif refresh migration", () => {
       await old.query(`insert into public.profiles (id, slug, pattern) values ($1, $2, $3)`, [ids[i], `user-${i}`, pattern]);
     }
 
-    await applyMigrations(old, (file) => file >= REFRESH);
+    // Only this migration: later ones (20261017120000_security_audit) convert the retired motifs.
+    await applyMigrations(old, (file) => file >= REFRESH && file < "20261002120000_meeting_requests.sql");
 
     const { rows } = await old.query<{ pattern: string }>(`select pattern from public.profiles order by slug`);
     // The app reads the retired motifs as their successors; the older ones become values both versions know.

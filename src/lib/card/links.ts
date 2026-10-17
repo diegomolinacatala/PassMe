@@ -62,6 +62,18 @@ function digitsOnly(value: string): string {
   return value.replace(/\D/g, "");
 }
 
+/** "+44 (0)20…": a country code followed by the trunk prefix written in brackets. */
+const TRUNK_ZERO_RE = /^(\+\d{1,3})[\s.-]*\(0\)/;
+
+/**
+ * The digits to dial (no "+"). The "(0)" some people write after the country
+ * code ("+44 (0)20 7946 0958") is the national trunk prefix: it's dropped when
+ * calling from abroad, so it stays out of tel:, wa.me and the vCard.
+ */
+export function dialDigits(value: string): string {
+  return digitsOnly(value.trim().replace(TRUNK_ZERO_RE, "$1"));
+}
+
 /** Parses user input as an http(s) URL, adding https:// when no scheme is given. */
 export function parseHttpUrl(raw: string): URL | null {
   const input = raw.trim();
@@ -261,7 +273,7 @@ const DEFS: Record<LinkKind, LinkKindDef> = {
     placeholder: "+34 600 000 000",
     inputMode: "tel",
     normalize: (raw) => normalizePhone(raw, false),
-    href: (v) => `tel:${v.startsWith("+") ? "+" : ""}${digitsOnly(v)}`,
+    href: (v) => `tel:${v.trim().startsWith("+") ? "+" : ""}${dialDigits(v)}`,
     display: (v) => v,
   },
   whatsapp: {
@@ -271,7 +283,7 @@ const DEFS: Record<LinkKind, LinkKindDef> = {
     placeholder: "+34 600 000 000",
     inputMode: "tel",
     normalize: (raw) => normalizePhone(raw, true),
-    href: (v) => `https://wa.me/${digitsOnly(v)}`,
+    href: (v) => `https://wa.me/${dialDigits(v)}`,
     display: (v) => v,
   },
   linkedin: {

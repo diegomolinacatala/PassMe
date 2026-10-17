@@ -1,10 +1,11 @@
 import QRCode from "qrcode";
 import sharp from "sharp";
 import type { NextRequest } from "next/server";
-import { getPublicCard } from "@/lib/data/cards";
+import { lookupPublicCard } from "@/lib/data/cards";
 import { createSharedRateLimiter } from "@/lib/data/rate-limits";
 import { profileUrl } from "@/lib/env";
 import { log } from "@/lib/log";
+import { cardUnavailableResponse, tooManyRequestsResponse } from "@/lib/pass/public-responses";
 import { clientRateKey } from "@/lib/request";
 
 export const runtime = "nodejs";
@@ -29,15 +30,15 @@ const COMMON_HEADERS = {
 /** Print-ready QR of the public card (badges, paper cards, slides…): SVG, or a 1024 px PNG. */
 export async function GET(request: NextRequest, ctx: RouteContext<"/u/[slug]/qr">) {
   const { slug } = await ctx.params;
-  const card = await getPublicCard(slug);
-  if (!card) return new Response("Tarjeta no encontrada", { status: 404 });
+  const lookup = await lookupPublicCard(slug);
+  if (lookup.status === "error") return cardUnavailableResponse();
+  if (lookup.status === "missing") return new Response("Tarjeta no encontrada", { status: 404, headers: { "Cache-Control": "no-store" } });
+  const card = lookup.card;
 
   const asPng = request.nextUrl.searchParams.get("format") === "png";
   if (asPng) {
     const rate = await pngLimiter.check(clientRateKey(request.headers));
-    if (!rate.ok) {
-      return new Response("Demasiadas peticiones", { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } });
-    }
+    if (!rate.ok) return tooManyRequestsResponse(rate.retryAfterSeconds);
   }
   // Drawn at the final size so every module lands on whole pixels.
   const svg = await QRCode.toString(profileUrl(card.slug, "qr"), {

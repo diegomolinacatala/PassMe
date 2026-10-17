@@ -85,7 +85,10 @@ beforeEach(() => {
   pushes.sendPassUpdatePushes.mockReset();
   google.syncGoogleObject.mockReset();
 });
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.restoreAllMocks();
+});
 
 describe("events", () => {
   it("does nothing without an admin client or for the demo card", async () => {
@@ -209,10 +212,25 @@ describe("notifyWalletsOfUpdate", () => {
       "GOOGLE_WALLET_SERVICE_ACCOUNT_JSON",
       JSON.stringify({ client_email: "sa@x.iam.gserviceaccount.com", private_key: privateKey.export({ type: "pkcs8", format: "pem" }) }),
     );
+    vi.stubEnv("GOOGLE_WALLET_LIVE", "true");
     useAdmin(() => ({ data: profile() }));
     google.syncGoogleObject.mockRejectedValue(new Error("network"));
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
     await expect(service.notifyWalletsOfUpdate(USER)).resolves.toBeUndefined();
     expect(google.syncGoogleObject).toHaveBeenCalledOnce();
+  });
+
+  it("leaves Google Wallet alone until it is live: nobody holds an object yet", async () => {
+    const { generateKeyPairSync } = await import("node:crypto");
+    const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+    vi.stubEnv("GOOGLE_WALLET_ISSUER_ID", "3388000000012345678");
+    vi.stubEnv(
+      "GOOGLE_WALLET_SERVICE_ACCOUNT_JSON",
+      JSON.stringify({ client_email: "sa@x.iam.gserviceaccount.com", private_key: privateKey.export({ type: "pkcs8", format: "pem" }) }),
+    );
+    useAdmin(() => ({ data: profile() }));
+    await service.notifyWalletsOfUpdate(USER);
+    expect(google.syncGoogleObject).not.toHaveBeenCalled();
   });
 
   it("is a no-op without the admin client", async () => {
@@ -251,7 +269,7 @@ describe("APNs client", () => {
     stubApple();
     const { getAppleWalletConfig } = await import("@/lib/config.server");
     const summary = await realSendPushes(getAppleWalletConfig()!, ["not-hex", ""]);
-    expect(summary).toEqual({ sent: 0, failed: 0, invalidTokens: [] });
+    expect(summary).toEqual({ sent: 0, failed: 0, invalidTokens: [], outcomes: {} });
   });
 
   it("counts every push as failed when APNs is unreachable", async () => {

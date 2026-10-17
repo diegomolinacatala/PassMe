@@ -93,7 +93,8 @@ test.describe("hazla tuya (in the hero)", () => {
     await hero.getByRole("radio", { name: "Moderna" }).check();
     await hero.getByRole("link", { name: "Crear mi tarjeta" }).first().click();
 
-    await expect(page).toHaveURL(/\/crear\?tema=salvia&motivo=persiana&letra=moderna&variacion=\d+/);
+    // The design arrives in the link, then leaves the address bar so a reload keeps what the person picks next.
+    await expect(page).toHaveURL(/\/crear$/);
     // The name travels in this browser's draft, never in the link.
     await expect(page.getByLabel("Nombre y apellidos")).toHaveValue("Lucía Ferrer");
     await expect(page.getByText("Salvia, motivo Persiana y letra Moderna. La foto, luego en el editor.")).toBeVisible();

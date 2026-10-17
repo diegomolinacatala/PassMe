@@ -11,12 +11,18 @@ const SUPABASE_STUB_SQL = `
   create role anon nologin;
   create role authenticated nologin;
   create role service_role nologin bypassrls;
+  -- The role GoTrue (Supabase Auth) connects as: it owns the writes to auth.users.
+  create role supabase_auth_admin nologin;
 
   create schema auth;
   create table auth.users (
     id uuid primary key default gen_random_uuid(),
-    email text
+    email text,
+    -- GoTrue keeps '' here for users who never had a password (OTP, OAuth); NULL is possible too.
+    encrypted_password text
   );
+  grant usage on schema auth to supabase_auth_admin;
+  grant all on auth.users to supabase_auth_admin;
   create function auth.uid() returns uuid language sql stable as $$
     select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
   $$;
@@ -69,7 +75,7 @@ export async function createTestDatabase({ before }: { before?: string } = {}): 
 /** Runs `fn` as a Supabase role, optionally impersonating a user id. */
 export async function asRole<T>(
   db: PGlite,
-  role: "anon" | "authenticated" | "service_role",
+  role: "anon" | "authenticated" | "service_role" | "supabase_auth_admin",
   userId: string | null,
   fn: () => Promise<T>,
 ): Promise<T> {

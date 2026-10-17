@@ -142,6 +142,24 @@ describe("request helpers", () => {
     expect(key("not:an:ip:1:2:3:4:5:6")).toBe("not:an:ip:1:2:3:4:5:6");
   });
 
+  it("gives an IPv4-mapped IPv6 address the key of the plain IPv4, not a shared /64", () => {
+    const key = (ip: string) => clientRateKey(new Headers({ "x-vercel-forwarded-for": ip }));
+    expect(key("::ffff:203.0.113.7")).toBe("203.0.113.7");
+    expect(key("::FFFF:203.0.113.7")).toBe("203.0.113.7");
+    expect(key("0:0:0:0:0:ffff:203.0.113.7")).toBe("203.0.113.7");
+    // The same address written in hex (cb00:7107 = 203.0.113.7).
+    expect(key("::ffff:cb00:7107")).toBe("203.0.113.7");
+    expect(key("::ffff:203.0.113.7")).toBe(key("203.0.113.7"));
+    // Two different mapped clients no longer collide...
+    expect(key("::ffff:198.51.100.9")).not.toBe(key("::ffff:203.0.113.7"));
+    // ...and genuine IPv6 keeps its /64 bucket, including the loopback and NAT64-style prefixes.
+    expect(key("::1")).toBe("0:0:0:0::/64");
+    expect(key("64:ff9b::203.0.113.7")).toBe("64:ff9b:0:0::/64");
+    expect(key("2001:db8::ffff:1.2.3.4")).toBe("2001:db8:0:0::/64");
+    // A broken dotted tail isn't IPv6: it stays as it came.
+    expect(key("::ffff:999.1.1.1")).toBe("::ffff:999.1.1.1");
+  });
+
   it("reads request bodies only up to a byte limit", async () => {
     const post = (body: BodyInit, headers: Record<string, string> = {}) =>
       new Request("https://passme.test/api", { method: "POST", body, headers, duplex: "half" } as RequestInit);

@@ -26,7 +26,12 @@ export interface ApplePassInput {
   /** Present when the web service is enabled, so Wallet can fetch updates. */
   authenticationToken?: string;
   avatar?: Buffer | null;
-  /** The card is unpublished: the pass says "Tarjeta en pausa" until it's published again. */
+  /**
+   * The card is unpublished: the pass keeps only the "Tarjeta en pausa" status
+   * (plus the name and photo in the strip) and drops every other detail and
+   * link, so copies in other people's wallets stop carrying the owner's data.
+   * Publishing again rebuilds the full pass and pushes it.
+   */
   paused?: boolean;
 }
 
@@ -78,17 +83,17 @@ export function buildApplePassJson(input: ApplePassInput, config: Pick<AppleWall
   const design = resolveDesign(card);
   const palette = cardPalette(design.background, design.detail);
   const qrUrl = profileUrl(card.slug, "qr");
+  const paused = input.paused === true;
 
   // Store cards show up to four secondary + auxiliary fields in one row under the strip.
   const secondaryFields: PassField[] = [];
-  if (card.headline) secondaryFields.push({ key: "headline", label: "CARGO", value: card.headline });
-  if (card.location) secondaryFields.push({ key: "location", label: "UBICACIÓN", value: card.location });
+  if (!paused && card.headline) secondaryFields.push({ key: "headline", label: "CARGO", value: card.headline });
+  if (!paused && card.location) secondaryFields.push({ key: "location", label: "UBICACIÓN", value: card.location });
 
-  const auxiliaryFields: PassField[] = card.pronouns
+  const auxiliaryFields: PassField[] = !paused && card.pronouns
     ? [{ key: "pronouns", label: "PRONOMBRES", value: card.pronouns }]
     : [];
-  // Paused first, so it's never the field pushed out of the row.
-  if (input.paused) auxiliaryFields.unshift({ key: "status", label: "ESTADO", value: "Tarjeta en pausa" });
+  if (paused) auxiliaryFields.push({ key: "status", label: "ESTADO", value: "Tarjeta en pausa" });
 
   const webService =
     config.webServiceEnabled && input.authenticationToken
@@ -102,7 +107,7 @@ export function buildApplePassJson(input: ApplePassInput, config: Pick<AppleWall
     serialNumber: input.serialNumber,
     organizationName: "PassMe",
     description: `Tarjeta de contacto de ${card.fullName}`,
-    logoText: card.company || "PassMe",
+    logoText: (!paused && card.company) || "PassMe",
     backgroundColor: toRgbString(palette.background),
     foregroundColor: toRgbString(palette.foreground),
     labelColor: toRgbString(palette.label),
@@ -114,7 +119,7 @@ export function buildApplePassJson(input: ApplePassInput, config: Pick<AppleWall
       primaryFields: [],
       secondaryFields,
       auxiliaryFields,
-      backFields: backFields(card),
+      backFields: paused ? [] : backFields(card),
     },
     // No altText: Wallet would print the URL under the code and stretch the white
     // plate around it. The link is on the back of the pass anyway.

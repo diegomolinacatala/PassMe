@@ -1,5 +1,7 @@
 import "server-only";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { getSiteUrl, isSupabaseConfigured } from "./env";
+import { log } from "./log";
 
 /**
  * Server-only secrets. Certificates and keys can be given either as raw PEM
@@ -20,6 +22,29 @@ export function decodePem(value: string | undefined): string | null {
     return null;
   }
 }
+
+const reportedConfigProblems = new Set<string>();
+
+/** Test hook: let the one-time configuration errors be reported again. */
+export function resetConfigProblemReports(): void {
+  reportedConfigProblems.clear();
+}
+
+/**
+ * A wallet credential that is set but unusable (a mangled PEM, broken JSON)
+ * switches the feature off without any other sign: people just see "pronto".
+ * Reported once per process, by variable name only, never by value.
+ */
+function reportConfigProblem(feature: string, unusable: string[], missing: string[]): void {
+  if (reportedConfigProblems.has(feature)) return;
+  reportedConfigProblems.add(feature);
+  log.error(`${feature} is configured only in part or with unreadable values: the feature is OFF`, {
+    unusable: unusable.join(","),
+    missing: missing.join(","),
+  });
+}
+
+const isSet = (value: string | undefined): boolean => Boolean(value?.trim());
 
 export function getSupabaseSecretKey(): string | null {
   return process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY ?? null;
@@ -49,7 +74,23 @@ export function getAppleWalletConfig(): AppleWalletConfig | null {
   const signerCert = decodePem(process.env.APPLE_PASS_CERT);
   const signerKey = decodePem(process.env.APPLE_PASS_KEY);
   const wwdr = decodePem(process.env.APPLE_WWDR_CERT);
-  if (!passTypeId || !teamId || !signerCert || !signerKey || !wwdr) return null;
+  if (!passTypeId || !teamId || !signerCert || !signerKey || !wwdr) {
+    const vars: Array<[string, string | undefined, unknown]> = [
+      ["APPLE_PASS_TYPE_ID", process.env.APPLE_PASS_TYPE_ID, passTypeId],
+      ["APPLE_TEAM_ID", process.env.APPLE_TEAM_ID, teamId],
+      ["APPLE_PASS_CERT", process.env.APPLE_PASS_CERT, signerCert],
+      ["APPLE_PASS_KEY", process.env.APPLE_PASS_KEY, signerKey],
+      ["APPLE_WWDR_CERT", process.env.APPLE_WWDR_CERT, wwdr],
+    ];
+    if (vars.some(([, raw]) => isSet(raw))) {
+      reportConfigProblem(
+        "Apple Wallet",
+        vars.filter(([, raw, parsed]) => isSet(raw) && !parsed).map(([name]) => name),
+        vars.filter(([, raw]) => !isSet(raw)).map(([name]) => name),
+      );
+    }
+    return null;
+  }
 
   const webServiceEnabled =
     process.env.APPLE_WALLET_WEB_SERVICE !== "false" &&
@@ -96,7 +137,24 @@ export function getGoogleWalletConfig(): GoogleWalletConfig | null {
   const json = parseServiceAccount(process.env.GOOGLE_WALLET_SERVICE_ACCOUNT_JSON);
   const serviceAccountEmail = json?.client_email ?? process.env.GOOGLE_WALLET_SERVICE_ACCOUNT_EMAIL;
   const privateKey = decodePem(json?.private_key ?? process.env.GOOGLE_WALLET_PRIVATE_KEY);
-  if (!issuerId || !serviceAccountEmail || !privateKey) return null;
+  if (!issuerId || !serviceAccountEmail || !privateKey) {
+    const rawJson = process.env.GOOGLE_WALLET_SERVICE_ACCOUNT_JSON;
+    const anySet =
+      isSet(issuerId) || isSet(rawJson) || isSet(process.env.GOOGLE_WALLET_SERVICE_ACCOUNT_EMAIL) || isSet(process.env.GOOGLE_WALLET_PRIVATE_KEY);
+    if (anySet) {
+      const unusable: string[] = [];
+      const missing: string[] = [];
+      if (!isSet(issuerId)) missing.push("GOOGLE_WALLET_ISSUER_ID");
+      if (isSet(rawJson) && !json) unusable.push("GOOGLE_WALLET_SERVICE_ACCOUNT_JSON");
+      if (!serviceAccountEmail) missing.push("GOOGLE_WALLET_SERVICE_ACCOUNT_EMAIL");
+      if (!privateKey) {
+        const rawKey = json?.private_key ?? process.env.GOOGLE_WALLET_PRIVATE_KEY;
+        (isSet(rawKey) ? unusable : missing).push("GOOGLE_WALLET_PRIVATE_KEY");
+      }
+      reportConfigProblem("Google Wallet", unusable, missing);
+    }
+    return null;
+  }
 
   return {
     issuerId,
@@ -137,4 +195,17 @@ export function getConfigStatus(): ConfigStatus {
     appleWebService: apple?.webServiceEnabled ?? false,
     googleWallet: getGoogleWalletConfig() !== null,
   };
+}
+
+/**
+ * Whether an `Authorization: Bearer <CRON_SECRET>` header is right. Shared by
+ * the endpoints that stay closed to the public (health details). Closed when
+ * the secret is unset or shorter than 16 characters. Both sides are hashed
+ * first so the comparison is constant-time whatever length was sent.
+ */
+export function hasValidCronSecret(header: string | null): boolean {
+  const secret = process.env.CRON_SECRET;
+  if (!secret || secret.length < 16 || !header) return false;
+  const digest = (value: string) => createHash("sha256").update(value).digest();
+  return timingSafeEqual(digest(header), digest(`Bearer ${secret}`));
 }

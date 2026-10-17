@@ -6,6 +6,11 @@ import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
+/** "José Núñez" → "Jose-Nunez": accents come off first (not turned into dashes), then anything else non-alphanumeric. */
+function fileSlug(name: string): string {
+  return name.normalize("NFD").replace(/\p{M}+/gu, "").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "") || "contacto";
+}
+
 /**
  * Owner-only export of the contacts people left on their card:
  *   ?format=csv            → every request as a spreadsheet
@@ -25,7 +30,14 @@ export async function GET(request: NextRequest) {
   const format = params.get("format") === "csv" ? "csv" : "vcf";
   const id = params.get("id");
 
-  const { requests } = await listOwnContactRequests(supabase);
+  const { requests, failed } = await listOwnContactRequests(supabase);
+  if (failed) {
+    // Not an empty list: an empty file would look like "nobody left their contact".
+    return new Response("No hemos podido cargar tus contactos. Inténtalo de nuevo en un momento.", {
+      status: 503,
+      headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "private, no-store", "Retry-After": "10" },
+    });
+  }
   const selected = id ? requests.filter((r) => r.id === id) : requests;
   if (id && selected.length === 0) {
     if (isNavigation(request)) return NextResponse.redirect(new URL("/dashboard#contactos", request.url), { status: 303 });
@@ -34,10 +46,7 @@ export async function GET(request: NextRequest) {
 
   const date = new Date().toISOString().slice(0, 10);
   const single = selected.length === 1 && id ? selected[0]!.name : null;
-  const filename =
-    format === "csv"
-      ? `passme-contactos-${date}.csv`
-      : `${(single ?? "passme-contactos").normalize("NFD").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "") || "contacto"}.vcf`;
+  const filename = format === "csv" ? `passme-contactos-${date}.csv` : `${fileSlug(single ?? "passme-contactos")}.vcf`;
 
   const body = format === "csv" ? contactRequestsToCsv(selected) : contactRequestsToVCard(selected);
   return new Response(body, {

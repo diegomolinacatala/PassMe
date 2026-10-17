@@ -52,6 +52,8 @@ Sin tocar nada, `npm run dev` ya funciona en **modo demo**: landing, tarjeta de 
    5. [`supabase/migrations/20260929130000_contact_requests.sql`](../supabase/migrations/20260929130000_contact_requests.sql) — «Te dejo mi contacto»: quien ve tu tarjeta puede dejarte sus datos.
    6. [`supabase/migrations/20261001120000_motif_refresh.sql`](../supabase/migrations/20261001120000_motif_refresh.sql) — motivos Arco, Corriente, Persiana y Pliegue. `npm run doctor` no puede comprobar esta: si falta, el editor avisa al guardar de que el motivo nuevo no se ha guardado.
    7. [`supabase/migrations/20261002120000_meeting_requests.sql`](../supabase/migrations/20261002120000_meeting_requests.sql) — «Agendar reunión»: quien ve tu tarjeta te propone horas y tú confirmas desde el email.
+   8. [`supabase/migrations/20261006120000_owner_timezone_meeting_settings.sql`](../supabase/migrations/20261006120000_owner_timezone_meeting_settings.sql) — zona horaria del dueño y ajustes de reuniones.
+   9. [`supabase/migrations/20261017120000_security_audit.sql`](../supabase/migrations/20261017120000_security_audit.sql) — endurecimiento de la auditoría del 17/10/2026: tope de fotos por persona, enlaces bien formados, como mucho 2 propuestas vivas por visitante y tarjeta, la limpieza nunca borra reuniones por venir, nombres de enlace reservados (solo para enlaces nuevos), índices y una regla que vacía cualquier contraseña de `auth.users` (PassMe no las usa). Si el login diera problemas tras aplicarla, el comentario junto al *trigger* trae la línea para quitarlo.
 
    Cada una debe terminar con *Success. No rows returned*. Si ya aplicaste las anteriores, ejecuta solo las que falten. Mientras falte alguna la app sigue funcionando con lo que la base de datos ya conoce (lo avisa en los logs, y `npm run doctor` te dice cuál falta).
    - Alternativa con CLI: `npx supabase login && npx supabase init && npx supabase link --project-ref <ref> && npx supabase db push`.
@@ -68,6 +70,7 @@ Sin tocar nada, `npm run dev` ya funciona en **modo demo**: landing, tarjeta de 
    - El email lleva primero el **código de un solo uso** (8 dígitos con la configuración de abajo), que se escribe en la misma pantalla donde se pidió, y debajo un **botón que funciona en cualquier dispositivo** (`/auth/confirm`). Si cambias la caducidad, cambia también la frase «Caduca en 10 minutos» de la plantilla.
    - *Authentication → Sign In / Providers → Email*: pon **Email OTP Length** a `8` y **Email OTP Expiration** a `600` segundos (10 min). La app bloquea un email tras 5 intentos, pero la API de verificación de Supabase también es pública: un código de 8 dígitos que caduca pronto hace inviable adivinarlo por esa vía. (La pantalla de login ya acepta de 6 a 10 dígitos.)
    - *Authentication → Rate Limits*: deja **Token verifications** en un valor bajo (p. ej. 30 cada 5 min por IP).
+   - *Authentication → Sign In / Providers*: deja **Allow anonymous sign-ins** desactivado y, en *Email*, **Confirm email** activado. PassMe nunca usa contraseñas ni cuentas anónimas: la app rechaza esas sesiones y la migración `20261017120000_security_audit.sql` vacía cualquier contraseña, pero así cierras también la puerta en Supabase.
 6. **(Opcional) Login con Google** → *Authentication → Sign In / Providers → Google*:
    - En [Google Cloud Console](https://console.cloud.google.com/apis/credentials) crea un *OAuth client ID* (tipo *Web*) con *Authorized redirect URI* `https://<ref>.supabase.co/auth/v1/callback`.
    - Pega *Client ID* y *Client secret* en Supabase y pon `NEXT_PUBLIC_AUTH_GOOGLE_ENABLED=true`.
@@ -101,7 +104,7 @@ Sin tocar nada, `npm run dev` ya funciona en **modo demo**: landing, tarjeta de 
    - (Opcional) **Panel de estadísticas** en `/admin`: `ADMIN_USERNAME` (el que quieras) y `ADMIN_PASSWORD` (16 caracteres o más, generada: `openssl rand -base64 18` o el generador de tu gestor de contraseñas). Márcalas como *Sensitive* y solo para *Production*. Sin ellas `/admin` da 404. La sesión dura 3 días. Para cerrar todas las sesiones del panel (por ejemplo, si pierdes un portátil), cambia la contraseña y vuelve a desplegar.
 3. La región de las funciones ya viene fijada a **Frankfurt (fra1)** en `vercel.json` (misma zona que Supabase = menos latencia). Si creaste Supabase en otra región, cámbiala ahí (p. ej. `dub1` para Irlanda).
 4. *Deploy*. Después:
-   - Abre `https://TU-URL/api/health` → debe devolver `"supabase": true`.
+   - Abre `https://TU-URL/api/health` → debe devolver `{"ok":true}`. Para ver qué está configurado (sin enseñar ningún secreto): `curl -H "Authorization: Bearer $CRON_SECRET" https://TU-URL/api/health`, que añade `"supabase": true` y el resto.
    - En Supabase → *URL Configuration*, cambia *Site URL* a tu URL de producción.
 5. Cada vez que cambies una variable `NEXT_PUBLIC_*` hay que **volver a desplegar** (se incrustan al compilar).
 
@@ -117,7 +120,7 @@ Sin tocar nada, `npm run dev` ya funciona en **modo demo**: landing, tarjeta de 
    - Host `smtp.resend.com`, puerto `465`, usuario `resend`, contraseña = la API key.
    - Remitente: `PassMe <hola@tu-dominio.com>`.
 4. *Authentication → Rate Limits*: sube el límite de emails por hora (p. ej. 60).
-5. **Avisos de «Te dejo mi contacto» y «Agendar reunión»**: con la misma API key, pon en Vercel `RESEND_API_KEY` y `PASSME_EMAIL_FROM=PassMe <hola@tu-dominio.com>`. Cuando alguien deje su contacto en una tarjeta, su dueño recibe un email. Las reuniones lo necesitan, y también `PASSME_SIGNING_SECRET`: son los emails con los botones para confirmar y las invitaciones de calendario. Sin cualquiera de las dos, «Agendar reunión» no aparece en las tarjetas. Los emails de reuniones tienen un tope diario propio (`MEETING_EMAIL_DAILY_BUDGET`, 60 por defecto) para que nunca se queden sin cupo los códigos de acceso; si subes de plan en Resend, súbelo también. Con las reuniones activas conviene activar el CAPTCHA (1.7) para frenar a los bots.
+5. **Avisos de «Te dejo mi contacto» y «Agendar reunión»**: con la misma API key, pon en Vercel `RESEND_API_KEY` y `PASSME_EMAIL_FROM=PassMe <hola@tu-dominio.com>`. Cuando alguien deje su contacto en una tarjeta, su dueño recibe un email. Las reuniones lo necesitan, y también `PASSME_SIGNING_SECRET`: son los emails con los botones para confirmar y las invitaciones de calendario. Sin cualquiera de las dos, «Agendar reunión» no aparece en las tarjetas. Los emails de reuniones tienen un tope diario propio (`MEETING_EMAIL_DAILY_BUDGET`, 60 por defecto) y los avisos de contacto otro (`CONTACT_EMAIL_DAILY_BUDGET`, 20 por defecto), para que nunca se queden sin cupo los códigos de acceso; si subes de plan en Resend, súbelos también. Con las reuniones activas conviene activar el CAPTCHA (1.7) para frenar a los bots.
 
 ---
 
@@ -174,7 +177,7 @@ Necesitas el **Apple Developer Program** (99 $/año). Si te das de alta como emp
 
 ### Checklist final
 
-- [ ] `/api/health` → `supabase`, `supabaseSecretKey`, `signingSecret` en `true`
+- [ ] `curl -H "Authorization: Bearer $CRON_SECRET" https://TU-URL/api/health` → `supabase`, `supabaseSecretKey`, `signingSecret` en `true` (sin la cabecera solo responde `{"ok":true}`)
 - [ ] Login por email (código y botón) funciona en móvil y escritorio; al pedir el código aparece «¡Código enviado!» y la cuenta atrás para reenviar
 - [ ] Desde el móvil de otra persona: escanear tu QR → «Crea la tuya» → rellenar → email → código → ver su QR en la bienvenida
 - [ ] Guardar tarjeta, subir foto, ocultar un contacto → no aparece en `/u/<slug>`

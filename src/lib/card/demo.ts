@@ -1,12 +1,13 @@
-import type { ContactRequest } from "./contact";
-import { DEFAULT_MEETING_SETTINGS, rulesOf, type MeetingSettings } from "@/lib/meetings/settings";
+import { DEFAULT_MEETING_SETTINGS, rulesOf, type MeetingSettings } from "@/lib/meetings/rules";
+import type { ContactRequest } from "./contact-info";
+import { DEMO_SLUG } from "./demo-slug";
 import type { OwnerCard } from "./types";
 
 /**
  * Fictional sample card served at /u/demo and used as the editor's starting
  * point in demo mode (no Supabase configured). Uses example.com-style data only.
  */
-export const DEMO_SLUG = "demo";
+export { DEMO_SLUG };
 
 const DEMO_MEETING_SETTINGS: MeetingSettings = {
   ...DEFAULT_MEETING_SETTINGS,

@@ -82,6 +82,7 @@ export interface SentEmail {
   text: string;
   html: string;
   reply_to?: string;
+  headers?: Record<string, string>;
   attachments?: Array<{ filename: string; content: string; content_type: string }>;
 }
 

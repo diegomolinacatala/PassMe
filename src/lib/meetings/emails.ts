@@ -13,8 +13,8 @@
  *     the owner only once they have answered.
  */
 import { renderEmailHtml, renderEmailText, type EmailBody } from "@/lib/email-layout";
-import { describeWhen, describeWhenInline, describeWhere, displayName, formatDuration, type Meeting } from "./model";
-import { FORMAT_LABELS, isSafeName } from "./schema";
+import { describeWhen, describeWhenInline, describeWhere, displayName, formatDuration, ownerNameFor, type Meeting } from "./model";
+import { FORMAT_LABELS } from "./schema";
 import { otherParty, type MeetingParty } from "./state";
 import { addMinutes, formatSlotShort, formatTime, timeZoneLabel, zonesDiffer } from "./time";
 
@@ -51,7 +51,7 @@ function render(subject: string, body: EmailBody): MeetingEmail {
 
 /** Card names aren't held to the meeting rules: one that looks like a link stays out of a stranger's inbox. */
 function ownerName(ctx: MeetingEmailContext): string {
-  return isSafeName(ctx.owner.name) ? ctx.owner.name : "Tu contacto de PassMe";
+  return ownerNameFor("guest", ctx.owner.name);
 }
 
 function nameOf(ctx: MeetingEmailContext, party: MeetingParty): string {
@@ -77,6 +77,9 @@ function footerFor(ctx: MeetingEmailContext, recipient: MeetingParty, extra: str
 }
 
 const NO_REPLY = "Este correo no admite respuestas: usa los botones.";
+/** To the owner before they confirm: replying would show their address to the visitor (the email carries no Reply-To). */
+const OWNER_NO_REPLY = "Usa los botones de este correo: tu dirección no se comparte con quien propone hasta que confirmes.";
+const OWNER_NO_REPLY_PLAIN = "Este correo no admite respuestas: tu dirección no se comparte con quien propone hasta que confirmes.";
 
 /** Words from `author`, only when they go to the owner (see the rules above). */
 function noteFor(ctx: MeetingEmailContext, recipient: MeetingParty, author: string, allowed: boolean) {
@@ -125,7 +128,7 @@ export function proposalEmail(ctx: MeetingEmailContext, respondUrl: string): Mee
       { label: "Proponer otras horas", href: `${respondUrl}?accion=otra` },
       { label: "No puedo", href: `${respondUrl}?accion=no` },
     ],
-    footer: footerFor(ctx, recipient, [zoneLine(ctx, recipient, meeting.slots[0]!), ...(recipient === "guest" ? [NO_REPLY] : [])]),
+    footer: footerFor(ctx, recipient, [zoneLine(ctx, recipient, meeting.slots[0]!), recipient === "guest" ? NO_REPLY : OWNER_NO_REPLY]),
   });
 }
 
@@ -186,7 +189,7 @@ export function declinedEmail(ctx: MeetingEmailContext, links: { respond: string
     ],
     quote: noteFor(ctx, recipient, declinerName, true),
     buttons: recipient === "guest" ? [{ label: "Ver la respuesta", href: links.respond }] : undefined,
-    footer: footerFor(ctx, recipient, recipient === "guest" ? [NO_REPLY] : []),
+    footer: footerFor(ctx, recipient, [recipient === "guest" ? NO_REPLY : OWNER_NO_REPLY_PLAIN]),
   });
 }
 
@@ -216,7 +219,11 @@ export function cancelledEmail(ctx: MeetingEmailContext, { wasConfirmed, showNot
           : "Ya no hace falta que respondas a las horas que te propuso.",
       ],
       quote: noteFor(ctx, recipient, cancellerName, showNote),
-      footer: footerFor(ctx, recipient, wasConfirmed ? [`Responde a este correo para hablar con ${cancellerName}.`] : []),
+      footer: footerFor(
+        ctx,
+        recipient,
+        wasConfirmed ? [`Responde a este correo para hablar con ${cancellerName}.`] : recipient === "owner" ? [OWNER_NO_REPLY_PLAIN] : [],
+      ),
     },
   );
 }

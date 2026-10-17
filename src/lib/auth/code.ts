@@ -24,6 +24,20 @@ export function cleanCode(raw: string): string {
   return raw.replace(/\D/g, "").slice(0, MAX_CODE_DIGITS);
 }
 
+/** Runs of digits, allowing the single spaces or hyphens people put inside a code ("1234 5678", "1234-5678"). */
+const DIGIT_RUN_RE = /\d(?:[ -]?\d)*/g;
+
+/**
+ * The code in whatever landed in the code field: typed digits, or a pasted
+ * line from the email. A run of exactly `length` digits wins, so other numbers
+ * around it don't sneak in ("12345678 (caduca en 10 min)" → "12345678", and so
+ * does "Caduca en 10 min: 12345678"); otherwise the first `length` digits.
+ */
+export function codeFromInput(raw: string, length: number = LOGIN_CODE_LENGTH): string {
+  const exact = raw.match(DIGIT_RUN_RE)?.map((run) => run.replace(/\D/g, "")).find((digits) => digits.length === length);
+  return exact ?? cleanCode(raw).slice(0, length);
+}
+
 /**
  * Seconds Supabase asks to wait before sending another email
  * ("For security purposes, you can only request this after 42 seconds."), or null.

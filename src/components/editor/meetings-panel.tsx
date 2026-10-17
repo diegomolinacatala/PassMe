@@ -1,12 +1,14 @@
 "use client";
 
 import { ArrowUpRight, CalendarCheck2, CalendarClock, Hourglass, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { declineMeetingAction, deleteMeetingAction } from "@/app/dashboard/actions";
 import { buttonClasses } from "@/components/ui/button";
 import { InlineError } from "@/components/ui/field";
 import { NEW_TAB_SUFFIX } from "@/components/ui/new-tab-hint";
 import { undoKey, UndoNotice, type UndoItem } from "@/components/ui/undo-notice";
+import { callAction } from "@/lib/client/call-action";
 import { cn } from "@/lib/cn";
 import { firstName } from "@/lib/meetings/model";
 import { formatSlotShort } from "@/lib/meetings/time";
@@ -24,6 +26,8 @@ interface MeetingsPanelProps {
   items: MeetingItem[];
   /** False while the database migration for meetings is pending. */
   available: boolean;
+  /** The list couldn't be read (not the same as "none yet"). */
+  failed?: boolean;
   /** The saved card shows "Agendar reunión". */
   enabled: boolean;
   demo: boolean;
@@ -163,9 +167,12 @@ const GROUPS: ReadonlyArray<{ id: Exclude<Group, "closed">; title: string; icon:
 ];
 
 /** The owner's meetings: what needs an answer first, then what's coming, then the rest. */
-export function MeetingsPanel({ items, available, enabled, demo }: MeetingsPanelProps) {
+export function MeetingsPanel({ items, available, failed = false, enabled, demo }: MeetingsPanelProps) {
   const [showClosed, setShowClosed] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // A "no" that got no answer may still have reached the guest: the list from the server tells.
+  const [unsure, setUnsure] = useState(false);
+  const router = useRouter();
   const [, startTransition] = useTransition();
   const [removed, setRemoved] = useState<ReadonlySet<string>>(new Set());
   // Proposals declined from here: shown as such until the next load brings them back declined.
@@ -193,10 +200,13 @@ export function MeetingsPanel({ items, available, enabled, demo }: MeetingsPanel
     waiting.current = null;
     if (demo) return;
     startTransition(async () => {
-      const result = await deleteMeetingAction(id);
-      if (!result.ok) {
+      const call = await callAction(() => deleteMeetingAction(id));
+      if (call.failed) {
         unhide(id);
-        setError(result.error);
+        setError("No hemos podido quitarla: se ha cortado la conexión. Inténtalo de nuevo.");
+      } else if (!call.result.ok) {
+        unhide(id);
+        setError(call.result.error);
       }
     });
   }
@@ -204,30 +214,41 @@ export function MeetingsPanel({ items, available, enabled, demo }: MeetingsPanel
   // Leaving the page during the countdown still removes it.
   useEffect(
     () => () => {
-      if (waiting.current && !demo) void deleteMeetingAction(waiting.current);
+      const id = waiting.current;
+      if (id && !demo) void callAction(() => deleteMeetingAction(id));
     },
     [demo],
   );
 
   function decline(item: MeetingItem) {
     setError(null);
+    setUnsure(false);
     setStatus(null);
     const { id } = item.view;
-    const done = () => {
+    const done = (emailsSkipped = false) => {
+      const guest = firstName(item.view.guest.name);
       setDeclined((prev) => new Set(prev).add(id));
-      setStatus(`Le hemos dicho que no a ${firstName(item.view.guest.name)} con un mensaje amable.${demo ? " (Modo demo: no se ha enviado nada.)" : ""}`);
+      setStatus(
+        emailsSkipped
+          ? `Hecho, pero no hemos podido avisarle por email a ${guest}. Díselo tú si tienes cómo.`
+          : `Le hemos dicho que no a ${guest} con un mensaje amable.${demo ? " (Modo demo: no se ha enviado nada.)" : ""}`,
+      );
       requestAnimationFrame(() => panel.current?.focus());
     };
     if (demo) return done();
     startTransition(async () => {
-      const result = await declineMeetingAction(id);
-      if (result.ok) done();
-      else setError(result.error);
+      const call = await callAction(() => declineMeetingAction(id));
+      if (call.failed) {
+        setUnsure(true);
+        setError(`Se ha cortado la conexión y no sabemos si a ${firstName(item.view.guest.name)} le ha llegado tu respuesta. Actualiza la lista antes de repetirla.`);
+      } else if (call.result.ok) done(call.result.emailsSkipped === true);
+      else setError(call.result.error);
     });
   }
 
   function remove(item: MeetingItem) {
     setError(null);
+    setUnsure(false);
     setStatus(null);
     if (waiting.current) commit(waiting.current);
     waiting.current = item.view.id;
@@ -241,7 +262,12 @@ export function MeetingsPanel({ items, available, enabled, demo }: MeetingsPanel
 
   return (
     <div id="reuniones" ref={panel} tabIndex={-1} className="scroll-mt-6 outline-none">
-      {list.length === 0 ? (
+      {list.length === 0 && failed ? (
+        // Not "none yet": we couldn't read them, and saying otherwise would hide real proposals.
+        <p role="alert" className="text-sm text-danger">
+          No hemos podido cargar tus reuniones. Recarga.
+        </p>
+      ) : list.length === 0 ? (
         <p className="text-sm text-muted">
           {enabled
             ? "Aún no te han propuesto ninguna. Cuando pase, te llegará un email para confirmarla con un toque y la verás aquí."
@@ -313,6 +339,19 @@ export function MeetingsPanel({ items, available, enabled, demo }: MeetingsPanel
         <InlineError live className="mt-3">
           {error}
         </InlineError>
+      ) : null}
+      {error && unsure ? (
+        <button
+          type="button"
+          onClick={() => {
+            setError(null);
+            setUnsure(false);
+            router.refresh();
+          }}
+          className="mt-1 inline-flex min-h-11 items-center text-sm font-medium text-signal-deep underline-offset-4 hover:underline"
+        >
+          Actualizar la lista
+        </button>
       ) : null}
     </div>
   );

@@ -1,3 +1,5 @@
+import dynamic from "next/dynamic";
+import type { ReactNode } from "react";
 import { Mark } from "@/components/brand/logo";
 import { resolveDesign } from "@/lib/card/design";
 import type { PublicCard } from "@/lib/card/types";
@@ -5,7 +7,14 @@ import { cn } from "@/lib/cn";
 import { prettyProfileUrl, profileUrl } from "@/lib/env";
 import { Avatar, initials } from "./avatar";
 import { containerUnit, CSS_FONTS, PassArt } from "./pass-art";
-import { QrCode } from "./qr-code";
+
+/**
+ * The QR when the caller didn't bring one (see `qr` below): loaded on demand,
+ * so a page that passes its own never downloads the qrcode library.
+ */
+const FallbackQr = dynamic(() => import("./qr-code").then((module) => module.QrCode), {
+  loading: () => <span aria-hidden="true" className="block size-[112px]" />,
+});
 
 export type PassStyle = "apple" | "google";
 
@@ -13,6 +22,12 @@ interface WalletPassProps {
   card: PublicCard;
   style?: PassStyle;
   className?: string;
+  /**
+   * The QR, drawn by the caller on the server (<PassQr>): the qrcode library then
+   * stays out of the browser. Without it the pass draws its own, loading the
+   * library on demand and redrawing whenever the card's slug changes.
+   */
+  qr?: ReactNode;
 }
 
 interface Field {
@@ -39,13 +54,13 @@ function frontFields(card: PublicCard, style: PassStyle): Field[] {
  * lib/pass/apple.ts and lib/pass/google.ts, and renders the very same
  * <PassArt> the server turns into the strip / hero images.
  */
-export function WalletPass({ card, style = "apple", className }: WalletPassProps) {
+export function WalletPass({ card, style = "apple", className, qr: givenQr }: WalletPassProps) {
   const design = resolveDesign(card);
   const name = card.fullName || "Tu nombre";
   const slug = card.slug || "tu-nombre";
   const fields = frontFields(card, style);
   const art = (variant: "strip" | "hero") => (
-    <div style={{ containerType: "inline-size" }}>
+    <div data-cq="" style={{ containerType: "inline-size" }}>
       <PassArt
         design={design}
         variant={variant}
@@ -62,7 +77,9 @@ export function WalletPass({ card, style = "apple", className }: WalletPassProps
   // Apple shows the bare code (no altText); Google prints the short URL under it.
   const qr = (
     <div className="mx-auto w-fit rounded-xl bg-white p-2.5 shadow-sm">
-      <QrCode value={profileUrl(slug, "qr")} label="Código QR de la tarjeta" className="size-[112px] text-ink" quietZone={1} />
+      {givenQr ?? (
+        <FallbackQr value={profileUrl(slug, "qr")} label="Código QR de la tarjeta" className="size-[112px] text-ink" quietZone={1} />
+      )}
       {style === "google" ? (
         <p className="mt-1.5 max-w-[112px] truncate text-center font-mono text-mark leading-none text-black/60">
           {prettyProfileUrl(slug)}

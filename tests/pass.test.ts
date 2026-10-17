@@ -11,6 +11,8 @@ import { toPublicCard } from "@/lib/data/cards";
 import { buildApplePassJson, createApplePass } from "@/lib/pass/apple";
 import { buildGenericObject, createGoogleSaveUrl, googleObjectId } from "@/lib/pass/google";
 import { fetchAvatar } from "@/lib/pass/images";
+import { artFingerprint, artVersion } from "@/lib/pass/art";
+import { designVersion, resolveDesign } from "@/lib/card/design";
 import { createTestCerts, type TestCerts } from "./helpers/test-certs";
 
 const SITE = "https://passme.test";
@@ -247,34 +249,123 @@ describe("avatar downloads", () => {
   });
 });
 
-describe("paused passes (P8.5: unpublished card)", () => {
-  it("says the Apple pass is paused while the card is unpublished (without voiding it)", () => {
-    const json = buildApplePassJson({ card, serialNumber: "x", paused: true }, appleConfig);
+describe("paused passes (unpublished card)", () => {
+  const rich = {
+    ...card,
+    pronouns: "ella",
+    bio: "Diseño cosas.",
+    links: [
+      { id: "l-phone", kind: "phone" as const, value: "+34 600 111 222", visible: true },
+      { id: "l-mail", kind: "email" as const, value: "alex@example.com", visible: true },
+    ],
+  };
+
+  it("keeps only the status on the Apple pass (without voiding it)", () => {
+    const json = buildApplePassJson({ card: rich, serialNumber: "x", paused: true }, appleConfig);
     // Voiding could be permanent in Wallet; unpublishing isn't.
     expect(json).not.toHaveProperty("voided");
-    expect(json.storeCard.auxiliaryFields[0]).toEqual({ key: "status", label: "ESTADO", value: "Tarjeta en pausa" });
-    // Store cards show at most four secondary + auxiliary fields: the status is never the one dropped.
-    expect(json.storeCard.secondaryFields.length + json.storeCard.auxiliaryFields.length).toBeLessThanOrEqual(4);
+    expect(json.storeCard.auxiliaryFields).toEqual([{ key: "status", label: "ESTADO", value: "Tarjeta en pausa" }]);
+    expect(json.storeCard.secondaryFields).toEqual([]);
+    expect(json.storeCard.primaryFields).toEqual([]);
+    expect(json.storeCard.backFields).toEqual([]);
+    // Nothing about the person beyond what the strip artwork draws: no role, place, company, bio, links.
+    const text = JSON.stringify(json);
+    for (const secret of ["Product Designer", "Valencia", "600 111 222", "alex@example.com", "Diseño cosas", "Estudio Norte", "ella"]) {
+      expect(text, secret).not.toContain(secret);
+    }
+    expect(json.logoText).toBe("PassMe");
   });
 
-  it("restores a normal pass once the card is published again", () => {
+  it("restores the full pass once the card is published again", () => {
     for (const json of [
-      buildApplePassJson({ card, serialNumber: "x", paused: false }, appleConfig),
-      buildApplePassJson({ card, serialNumber: "x" }, appleConfig),
+      buildApplePassJson({ card: rich, serialNumber: "x", paused: false }, appleConfig),
+      buildApplePassJson({ card: rich, serialNumber: "x" }, appleConfig),
     ]) {
       expect(json).not.toHaveProperty("voided");
       expect(json.storeCard.auxiliaryFields.map((f) => f.key)).not.toContain("status");
+      expect(json.storeCard.secondaryFields.map((f) => f.key)).toEqual(["headline", "location"]);
+      expect(json.logoText).toBe("Estudio Norte");
+      expect(JSON.stringify(json.storeCard.backFields)).toContain("alex@example.com");
     }
   });
 
-  it("sets the Google object INACTIVE only when paused", () => {
-    const googleConfig: GoogleWalletConfig = {
-      issuerId: "3388000000012345678",
-      serviceAccountEmail: "wallet@passme-test.iam.gserviceaccount.com",
-      privateKey: "unused",
-      classSuffix: "passme_card_v1",
-    };
-    expect(buildGenericObject(googleConfig, { card, profileId: DEMO_CARD.id, paused: true }).state).toBe("INACTIVE");
-    expect(buildGenericObject(googleConfig, { card, profileId: DEMO_CARD.id }).state).toBe("ACTIVE");
+  const googleConfig: GoogleWalletConfig = {
+    issuerId: "3388000000012345678",
+    serviceAccountEmail: "wallet@passme-test.iam.gserviceaccount.com",
+    privateKey: "unused",
+    classSuffix: "passme_card_v1",
+  };
+
+  it("sets the Google object INACTIVE only when paused, and drops the subheader, text modules and links", () => {
+    const paused = buildGenericObject(googleConfig, { card: rich, profileId: DEMO_CARD.id, paused: true });
+    expect(paused.state).toBe("INACTIVE");
+    expect(paused).not.toHaveProperty("subheader");
+    expect(paused).not.toHaveProperty("textModulesData");
+    expect(paused).not.toHaveProperty("linksModuleData");
+    expect(paused.cardTitle.defaultValue.value).toBe("PassMe");
+    expect(paused.header.defaultValue.value).toBe("Alex Rivera");
+    const text = JSON.stringify(paused);
+    for (const secret of ["Product Designer", "Valencia", "600 111 222", "alex@example.com", "Diseño cosas", "Estudio Norte"]) {
+      expect(text, secret).not.toContain(secret);
+    }
+
+    const live = buildGenericObject(googleConfig, { card: rich, profileId: DEMO_CARD.id });
+    expect(live.state).toBe("ACTIVE");
+    expect(live.subheader?.defaultValue.value).toBe("Product Designer");
+    expect(live.textModulesData.map((m) => m.id)).toEqual(expect.arrayContaining(["company", "location", "pronouns", "bio"]));
+    expect(live.linksModuleData.uris.length).toBeGreaterThan(1);
+  });
+
+  it("expires a withdrawn Google object and leaves no name, photo, barcode or links", () => {
+    const withdrawn = buildGenericObject(googleConfig, {
+      card: { ...rich, avatarUrl: "https://x.supabase.co/storage/v1/object/public/avatars/u/a.jpg" },
+      profileId: DEMO_CARD.id,
+      withdrawn: true,
+    });
+    expect(withdrawn.state).toBe("EXPIRED");
+    expect(withdrawn.header.defaultValue.value).toBe("Tarjeta eliminada");
+    expect(withdrawn.logo.sourceUri.uri).toBe(`${SITE}/brand/wallet-logo.png`);
+    for (const key of ["subheader", "textModulesData", "linksModuleData", "barcode", "heroImage"]) expect(withdrawn).not.toHaveProperty(key);
+    expect(JSON.stringify(withdrawn)).not.toContain("Alex Rivera");
+  });
+});
+
+describe("artwork cache keys", () => {
+  // Two different designs whose old 32-bit FNV "version" is identical (found by inverting FNV-1a).
+  const victim = { ...card, fullName: "Ana Ruiz", avatarUrl: null, accentColor: "#F4EDE4", detailColor: "#2B1D14", pattern: "arco" as const, patternSeed: 424242, typeface: "clasica" as const };
+  const attacker = { ...card, fullName: "Soporte PassMe", avatarUrl: null, accentColor: "#F4EDE4", detailColor: "#0003C9", pattern: "arco" as const, patternSeed: 752329, typeface: "clasica" as const };
+
+  function legacyVersion(c: typeof victim): string {
+    const d = resolveDesign(c);
+    return designVersion(["strip", d.background, d.detail, d.pattern, d.seed, d.typeface, c.fullName, c.avatarUrl]);
+  }
+
+  it("documents the weakness: the old 32-bit version collides for these two designs", () => {
+    expect(legacyVersion(victim)).toBe(legacyVersion(attacker));
+  });
+
+  it("keys the render cache and the ?v= token on a SHA-256 of the full inputs", () => {
+    expect(artFingerprint(victim, "strip")).not.toBe(artFingerprint(attacker, "strip"));
+    expect(artFingerprint(victim, "strip")).toMatch(/^[0-9a-f]{64}$/);
+    expect(artVersion(victim, "strip")).not.toBe(artVersion(attacker, "strip"));
+    expect(artVersion(victim, "strip")).toMatch(/^[0-9a-f]{16}$/);
+    expect(artFingerprint(victim, "strip").startsWith(artVersion(victim, "strip"))).toBe(true);
+  });
+
+  it("is stable for the same inputs and only moves when the drawing does", () => {
+    expect(artVersion(victim, "hero")).toBe(artVersion({ ...victim, headline: "Other", bio: "x" }, "hero"));
+    expect(artVersion(victim, "hero")).not.toBe(artVersion({ ...victim, patternSeed: 1 }, "hero"));
+    // The hero has no text but the monogram's initial: a rename doesn't change it, except for that motif.
+    expect(artVersion(victim, "hero")).toBe(artVersion({ ...victim, fullName: "Otra Persona" }, "hero"));
+    expect(artVersion({ ...victim, pattern: "monograma" }, "hero")).not.toBe(artVersion({ ...victim, pattern: "monograma", fullName: "Otra Persona" }, "hero"));
+    // The strip does carry the name and the photo.
+    expect(artVersion(victim, "strip")).not.toBe(artVersion({ ...victim, fullName: "Otra Persona" }, "strip"));
+    expect(artVersion(victim, "strip")).not.toBe(artVersion({ ...victim, avatarUrl: "https://x/a.jpg" }, "strip"));
+  });
+
+  it("builds the hero URL with the SHA-based token", () => {
+    const googleConfig: GoogleWalletConfig = { issuerId: "1", serviceAccountEmail: "a@b", privateKey: "unused", classSuffix: "s" };
+    const object = buildGenericObject(googleConfig, { card: victim, profileId: DEMO_CARD.id });
+    expect(object.heroImage.sourceUri.uri).toBe(`${SITE}/u/demo/hero?v=${artVersion(victim, "hero")}`);
   });
 });

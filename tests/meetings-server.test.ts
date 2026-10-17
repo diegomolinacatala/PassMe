@@ -96,12 +96,16 @@ describe("meeting data", () => {
 });
 
 describe("meeting service", () => {
-  it("emails the owner each proposed time as a button, replying to the visitor", async () => {
+  it("emails the owner each proposed time as a button, without handing the owner's address to the visitor", async () => {
     useAdmin({ row: meetingRow() });
     const sent = mockResend();
     await service.notifyNewProposal(ID);
     const [email] = sent();
-    expect(email).toMatchObject({ to: ["diego@example.com"], subject: "Marta Gil te propone una reunión", reply_to: "marta@example.com" });
+    expect(email).toMatchObject({ to: ["diego@example.com"], subject: "Marta Gil te propone una reunión" });
+    // Replying to this email would show the owner's address before they've confirmed: the buttons are the way to answer.
+    expect(email).not.toHaveProperty("reply_to");
+    expect(email).not.toHaveProperty("headers");
+    expect(email!.text).toContain("tu dirección no se comparte");
     const respond = `https://getpassme.com/reunion/${ID}/${meetingSignature(ID, "owner")}`;
     expect(email!.html).toContain(`${respond}?hora=0`);
     expect(email!.html).toContain(`${respond}?hora=1`);
@@ -128,6 +132,9 @@ describe("meeting service", () => {
     expect(guestIcs).toContain(`UID:${ID}@getpassme.com`);
     expect(guestIcs).not.toContain("/reunion/");
     expect(toOwner).toMatchObject({ to: ["diego@example.com"], reply_to: "marta@example.com" });
+    // The visitor's address is unverified: their copy says how to stop getting these; the owner's doesn't need to.
+    expect(toGuest!.headers!["List-Unsubscribe"]).toContain("<https://getpassme.com/privacidad#reuniones>");
+    expect(toOwner).not.toHaveProperty("headers");
   });
 
   it("refuses a change that lost the race or isn't allowed", async () => {
@@ -136,10 +143,12 @@ describe("meeting service", () => {
     expect(await service.changeMeeting(loaded, "owner", { action: "decline", note: "" })).toEqual({
       ok: false,
       error: "Ha cambiado mientras respondías. Recarga la página para ver cómo está.",
+      reason: "conflict",
     });
     expect(await service.changeMeeting(loaded, "guest", { action: "confirm", slot: TUE_10 })).toEqual({
       ok: false,
       error: "Esta propuesta ya no admite cambios.",
+      reason: "not_allowed",
     });
   });
 
@@ -258,7 +267,7 @@ describe("expired proposals (P8.2, daily cron)", () => {
   it("emails only the expired one, with fixed text and a way back to the card, once", async () => {
     const fake = cronAdmin({ is_published: true, accepts_meeting_requests: true });
     const sent = mockResend();
-    expect(await service.notifyExpiredProposals(NOW)).toBe(1);
+    expect(await service.notifyExpiredProposals(NOW)).toMatchObject({ qualified: 1, attempted: 1, sent: 1, failed: 0, skipped: 0 });
     const emails = sent();
     expect(emails).toHaveLength(1);
     expect(emails[0]!.to).toEqual(["marta@example.com"]);

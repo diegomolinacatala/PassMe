@@ -63,6 +63,12 @@ export function parseApplePassAuth(header: string | null): string | null {
   return match ? match[1]! : null;
 }
 
+/**
+ * True only for the pass's own token. A missing row or a wrong token is a
+ * plain `false` (the caller answers 401); a database failure throws, so it
+ * is never mistaken for a bad token (Wallet drops a pass's updates on 401s,
+ * but retries on 5xx).
+ */
 export async function verifyApplePassToken(
   admin: TypedSupabaseClient,
   serial: string,
@@ -74,7 +80,8 @@ export async function verifyApplePassToken(
     .select("apple_auth_token")
     .eq("profile_id", serial)
     .maybeSingle();
-  if (error || !data) return false;
+  if (error) throw new Error(`pass token lookup failed: ${error.message}`);
+  if (!data) return false;
   return safeEqual(data.apple_auth_token, token);
 }
 
