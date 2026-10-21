@@ -32,7 +32,9 @@ export default function PrivacyPage() {
       body: [
         "Tu email, para que puedas entrar sin contraseña.",
         "Lo que tú escribes en tu tarjeta: nombre, cargo, empresa, ubicación, biografía, foto y los contactos que añadas. Los contactos que marcas como ocultos se guardan, pero nunca se muestran ni se envían a quien visita tu tarjeta.",
-        "Estadísticas de tu tarjeta (visitas, clics, contactos guardados). No guardamos direcciones IP ni usamos cookies de seguimiento: una visita se cuenta una vez por sesión del navegador.",
+        "Estadísticas de tu tarjeta (visitas, clics, contactos guardados), con el tipo de dispositivo (iPhone, Android u ordenador) y el país desde el que se visita, que deducimos de la conexión en el momento sin guardarla. No guardamos direcciones IP ni usamos cookies de seguimiento: una visita se cuenta una vez por sesión del navegador.",
+        "Si visitas la tarjeta de alguien, contamos la visita y lo que pulsas (guardar el contacto, un enlace) con ese tipo de dispositivo y ese país, sin saber quién eres.",
+        "Si creaste tu tarjeta desde la de otra persona (escaneando su QR o con su enlace), desde cuál llegaste.",
         "Si añades tu pase a Apple Wallet, el identificador del dispositivo y el token de notificaciones que Apple nos envía, solo para poder actualizar el pase.",
         "Si activas «Recibir contactos», los datos que otras personas te dejan (ver el apartado siguiente).",
         "Si activas «Recibir propuestas de reunión», las propuestas que recibes y tus respuestas (ver «Si usas “Agendar reunión”»).",
@@ -66,6 +68,7 @@ export default function PrivacyPage() {
         "Para prestarte el servicio: mostrar tu tarjeta a quien tú se la enseñes, generar tus pases de Apple Wallet y Google Wallet y mantenerlos actualizados (ejecución del contrato).",
         "Para proteger el servicio y a sus usuarios frente a abusos (interés legítimo).",
         "Para avisarte por email de que alguien te ha dejado su contacto, si tienes el formulario activado (el aviso no incluye sus datos: los ves en tu editor).",
+        "Para entender cómo se usa PassMe y mejorarlo (interés legítimo): quien gestiona PassMe ve en un panel privado los datos de cada cuenta (email, alta y último acceso, la tarjeta, si su pase está en Apple Wallet y desde cuándo, sus estadísticas y desde qué tarjeta llegó). De los contactos y reuniones que te dejan solo ve cuántos hay, nunca quién.",
         "Para organizar las reuniones que te proponen o propones con «Agendar reunión»: los emails de propuesta, confirmación, cambio o cancelación y la invitación de calendario (ejecución de lo que se ha pedido).",
         "No vendemos tus datos ni los usamos para publicidad.",
       ],
@@ -83,7 +86,7 @@ export default function PrivacyPage() {
       title: "Cuánto tiempo",
       body: [
         "Tu cuenta y tu tarjeta, hasta que la borres. Las estadísticas, unos 13 meses.",
-        "Al borrar la cuenta se eliminan tu tarjeta, tu foto, tus estadísticas, los contactos recibidos, las reuniones y los registros de dispositivos. Solo el texto de tus enlaces (/u/…) queda reservado 90 días para que nadie pueda suplantarte con tus QR antiguos.",
+        "Al borrar la cuenta se eliminan tu tarjeta, tu foto, tus estadísticas, los contactos recibidos, las reuniones, los registros de dispositivos y desde qué tarjeta llegaste. Solo el texto de tus enlaces (/u/…) queda reservado 90 días para que nadie pueda suplantarte con tus QR antiguos.",
       ],
     },
     {

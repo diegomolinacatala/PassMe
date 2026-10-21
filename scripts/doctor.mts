@@ -116,6 +116,13 @@ if (!sbUrl || !sbKey) {
     if (hardening?.ok) ok("Migración 20261017120000 aplicada (endurecimiento de la auditoría de seguridad).");
     else fail("Falta la migración 20261017120000_security_audit.sql.");
 
+    const [eventColumns, referrals] = await Promise.all([
+      http(`${sbUrl}/rest/v1/profile_events?select=platform,country&limit=1`, { headers: adminHeaders }),
+      http(`${sbUrl}/rest/v1/profile_referrals?select=profile_id&limit=1`, { headers: adminHeaders }),
+    ]);
+    if (eventColumns?.ok && referrals?.ok) ok("Migración 20261021120000 aplicada (CRM: móvil, país y quién trajo a quién).");
+    else fail("Falta la migración 20261021120000_crm_insights.sql.");
+
     const bucket = await http(`${sbUrl}/storage/v1/bucket/avatars`, { headers: adminHeaders });
     if (bucket?.ok) {
       const info = (await bucket.json()) as { public?: boolean };
@@ -185,9 +192,9 @@ else warn("Sin RESEND_API_KEY / PASSME_EMAIL_FROM: no se avisará por email de l
 if (env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && env.TURNSTILE_SECRET_KEY) ok("CAPTCHA (Cloudflare Turnstile) configurado.");
 else if (env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) warn("Hay NEXT_PUBLIC_TURNSTILE_SITE_KEY pero falta TURNSTILE_SECRET_KEY (el formulario de contacto no lo verificará).");
 else warn("Sin CAPTCHA (opcional, recomendado cuando haya tráfico real).");
-if (env.ADMIN_USERNAME?.trim() && (env.ADMIN_PASSWORD ?? "").length >= 16) ok("Panel privado /admin activado.");
-else if (env.ADMIN_USERNAME || env.ADMIN_PASSWORD) warn("El panel /admin necesita ADMIN_USERNAME y una ADMIN_PASSWORD de 16 caracteres o más.");
-else warn("Sin ADMIN_USERNAME / ADMIN_PASSWORD: el panel de estadísticas /admin está apagado (opcional).");
+if (env.ADMIN_USERNAME?.trim() && (env.ADMIN_PASSWORD ?? "").length >= 16) ok("CRM privado /crm activado.");
+else if (env.ADMIN_USERNAME || env.ADMIN_PASSWORD) warn("El CRM /crm necesita ADMIN_USERNAME y una ADMIN_PASSWORD de 16 caracteres o más.");
+else warn("Sin ADMIN_USERNAME / ADMIN_PASSWORD: el CRM /crm está apagado (opcional).");
 if ((env.CRON_SECRET ?? "").length >= 16) ok("CRON_SECRET configurado (limpieza diaria).");
 else warn("Sin CRON_SECRET (≥ 16 caracteres): la limpieza diaria de datos caducados no se ejecutará.");
 

@@ -3,8 +3,8 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { getSigningSecret } from "@/lib/config.server";
 
 /**
- * The private stats dashboard (/admin) has its own username and password, set
- * as server env vars (never in the repo). Without them /admin is a 404.
+ * The private CRM (/crm) has its own username and password, set
+ * as server env vars (never in the repo). Without them /crm is a 404.
  *
  * The session is a stateless signed cookie: `v1.<expiry>.<hmac>`. The HMAC key
  * is derived from the credentials, so changing ADMIN_PASSWORD signs everyone out.
@@ -29,7 +29,7 @@ export interface AdminCredentials {
 
 type Env = Record<string, string | undefined>;
 
-/** Null when the dashboard is off: no username, or a password shorter than 16 characters. */
+/** Null when the CRM is off: no username, or a password shorter than 16 characters. */
 export function getAdminCredentials(env: Env = process.env): AdminCredentials | null {
   const username = env.ADMIN_USERNAME?.trim().toLowerCase();
   const password = env.ADMIN_PASSWORD;

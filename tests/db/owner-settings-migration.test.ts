@@ -20,7 +20,7 @@ beforeAll(async () => {
   db = await createTestDatabase();
   await db.query(`insert into auth.users (id) values ($1)`, [ANA]);
   await db.query(`insert into public.profiles (id, slug, full_name, is_published) values ($1, 'ana', 'Ana Ruiz', true)`, [ANA]);
-});
+}, 60_000);
 
 describe("owner time zone and meeting settings", () => {
   it("defaults to Madrid and empty settings (the app reads '{}' as its defaults)", async () => {

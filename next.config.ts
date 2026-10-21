@@ -25,6 +25,13 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
+  // The private stats dashboard grew into the CRM (2026-10-21).
+  async redirects() {
+    return [
+      { source: "/admin", destination: "/crm", permanent: false },
+      { source: "/admin/:path*", destination: "/crm/:path*", permanent: false },
+    ];
+  },
 };
 
 export default nextConfig;

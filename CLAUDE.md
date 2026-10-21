@@ -16,11 +16,19 @@
   - En esta máquina no hay CLI de `gh`, `vercel` ni `supabase`.
   - El modo automático puede bloquear acciones destructivas de git (p. ej. borrar ramas remotas): déjaselas a Diego.
 
-# Estado actual (17/10/2026)
+# Estado actual (21/10/2026)
 
 **MVP en producción en https://getpassme.com.** La monetización está pensada pero **sin implementar** (ver «Monetización»).
 
-**Lo último (17/10/2026, fusionado en `main` y en producción): auditoría completa de seguridad, funcionamiento y móviles modestos.** Diego pidió auditarlo todo con `/orchestrate`, arreglar las brechas y optimizar para móviles peores. Ocho auditores en paralelo (acceso, tarjeta pública, reuniones, wallet, base de datos, rendimiento, fallos funcionales, errores silenciosos), cinco trabajadores para arreglar y dos revisores finales. Ningún hallazgo crítico; informe completo en [`docs/AUDITORIA-2026-10-17.md`](docs/AUDITORIA-2026-10-17.md). Lo principal:
+**Lo último (21/10/2026, rama `feat/crm`, PR abierto y sin fusionar): CRM privado en `https://getpassme.com/crm`.** Diego pidió «un CRM para ver todos los datos de mi negocio… quién tiene la tarjeta en su móvil, la gente que me ha añadido como contacto… lo que se pueda extraer legalmente», con credenciales. Sustituye al panel `/admin` (que ahora redirige a `/crm`) y usa **las mismas** `ADMIN_USERNAME`/`ADMIN_PASSWORD` que ya están en Vercel. Páginas:
+- **Resumen**: lo de antes más embudo (cuenta → tarjeta → publicada → Apple Wallet → visitas → contactos), con qué móvil y desde qué país visitan, cómo llegan los nuevos y quién trae gente, tarjetas más vistas, enlaces más pulsados y últimas altas.
+- **Usuarios**: buscador (nombre, email, enlace, empresa), filtros (publicadas, con pase, sin pase, sin tarjeta, sin entrar en 30 días), orden y **CSV**; cada persona tiene su **ficha** (cuenta, tarjeta, enlaces con sus clics, dispositivos Apple con fechas, visitas por día, móvil, país, a quién trajo, historial).
+- **Wallet**: quién tiene el pase en Apple Wallet (exacto, Apple avisa), quién pulsó «Añadir» y no lo tiene, quién pulsó Google (Google no avisa) y publicadas sin pase.
+- **Mis contactos**: la gente que dejó sus datos en **su** tarjeta o le propuso reunión, agrupada por persona, con exportar CSV/vCard; se lee con su sesión de PassMe (si no ha entrado en ese navegador, le pide entrar). «Guardar contacto» es anónimo por naturaleza: solo cuántos, con qué móvil y desde dónde.
+- **Actividad**: todo lo que pasa, día a día, con filtros.
+Límite legal (también en `/privacidad`): de los usuarios, todo; de los contactos y reuniones que reciben **otros**, solo cifras; los de Diego, completos con su sesión. Datos nuevos que empiezan a guardarse con la migración `20261021120000_crm_insights.sql`: tipo de móvil y país de cada visita (nunca la IP) y, para cada tarjeta nueva, desde qué tarjeta llegó (`profile_referrals`). Sin la migración todo funciona y el CRM avisa de que falta. Tests: 944 unitarios y de base de datos, E2E del CRM nuevo (`e2e/crm.spec.ts`, sustituye a `admin.spec.ts`). **Siguiente paso exacto:** Diego aplica la migración en el SQL Editor de Supabase, `npm run doctor` lo confirma, y fusiona el PR.
+
+**Antes (17/10/2026, fusionado en `main` y en producción): auditoría completa de seguridad, funcionamiento y móviles modestos.** Diego pidió auditarlo todo con `/orchestrate`, arreglar las brechas y optimizar para móviles peores. Ocho auditores en paralelo (acceso, tarjeta pública, reuniones, wallet, base de datos, rendimiento, fallos funcionales, errores silenciosos), cinco trabajadores para arreglar y dos revisores finales. Ningún hallazgo crítico; informe completo en [`docs/AUDITORIA-2026-10-17.md`](docs/AUDITORIA-2026-10-17.md). Lo principal:
 - Next 16.3.6 → 16.3.8 (6 avisos altos). `node-forge` sigue con un aviso sin parche, no explotable aquí (passkit solo firma).
 - iOS 15–16.3 no arrancaba el JavaScript (una regex con *lookbehind*): corregido, `browserslist` desde iOS 15.4 y `<CqFallback/>` para Safari < 16.
 - La tarjeta pública pasa de 1.115 a 695 KB de JS (Zod fuera del navegador, formularios bajo demanda, QR dibujado en el servidor); la portada, de 1.108 a 677 KB, y `/crear`, de 1.125 a 715 KB. Regla nueva en `AGENTS.md`: los componentes de cliente importan los módulos sin Zod (`tests/client-bundle.test.ts` lo vigila).
@@ -80,13 +88,14 @@ Lo último (01/10/2026, rama `feat/new-motifs` fusionada directamente en `main` 
 
 ## Pasos manuales para Diego (en orden)
 
-0. **Auditoría (17/10/2026):** migración aplicada, en producción y login confirmado (18/10/2026). Recomendado: activar Turnstile (`docs/SETUP.md` 1.7), que es lo único que frena los envíos masivos que llaman a Supabase directamente.
-1. «Agendar reunión»: activar «Deja que te propongan reuniones» en el editor y probarlo desde otro móvil. Los emails van por Resend: el plan gratuito (100 al día) se comparte con los códigos de acceso, y por eso las reuniones tienen su propio tope diario. Recomendado: activar el CAPTCHA (`docs/SETUP.md` 1.7) para frenar bots.
-2. Si no está hecho: Supabase → *Authentication → Emails → Templates* → **Magic Link** y **Confirm signup**: pegar el HTML de `supabase/templates/magic-link.html` y poner de asunto `{{ .Token }} es tu código de PassMe`.
-3. Probar en el iPhone: `getpassme.com/crear` → rellenar → email → código (debería sugerirse sobre el teclado) → bienvenida con el QR.
-4. Google Wallet: **acceso de publicación solicitado el 02/10/2026** (respuesta en 2–3 días hábiles, por email a `passmecorreo@gmail.com`). El emisor bueno es `3388000000023206663` (negocio `BCR2DN6D5LEJNFCZ`, creado con `passmecorreo@gmail.com`; el otro «PassMe», `…LEPFQCA`/`…23213462`, no lo usa la web). Hasta ahora **nadie ha podido guardar nunca un pase**: «Se ha producido un error. Vuelve a intentarlo.» en Chrome y en Android, tanto con la cuenta de Diego (*test user*) como con la administradora, incluso con un pase mínimo creado antes por la API. La API acepta la clase y el objeto completo de Diego, y la clave de firma es válida, pero `POST /walletobjects/v1/jwt` devuelve `INVALID_ARGUMENT` genérico para cualquier JWT del emisor. Cuando Google apruebe: volver a probar. Si sigue fallando, escribir a soporte desde *Contactar con el equipo* con el ID del emisor y este diagnóstico.
-5. (Recomendado) Activar «Continuar con Google» (`docs/SETUP.md` 1.6): el alta más rápida en Android y no gasta emails.
-6. Antes de cualquier evento: Supabase está limitado a 60 emails/hora y el plan gratuito de Resend a 100 al día. Una sala entera dándose de alta los agotaría; Google (paso 5) o subir de plan en Resend lo evitan.
+0. **CRM (21/10/2026):** en Supabase → *SQL Editor*, pegar y ejecutar `supabase/migrations/20261021120000_crm_insights.sql`; luego fusionar el PR de `feat/crm`. Entrar en `getpassme.com/crm` con el usuario y la contraseña de siempre del panel. Para ver «Mis contactos», entrar también con su email de PassMe en ese navegador.
+1. **Auditoría (17/10/2026):** migración aplicada, en producción y login confirmado (18/10/2026). Recomendado: activar Turnstile (`docs/SETUP.md` 1.7), que es lo único que frena los envíos masivos que llaman a Supabase directamente.
+2. «Agendar reunión»: activar «Deja que te propongan reuniones» en el editor y probarlo desde otro móvil. Los emails van por Resend: el plan gratuito (100 al día) se comparte con los códigos de acceso, y por eso las reuniones tienen su propio tope diario. Recomendado: activar el CAPTCHA (`docs/SETUP.md` 1.7) para frenar bots.
+3. Si no está hecho: Supabase → *Authentication → Emails → Templates* → **Magic Link** y **Confirm signup**: pegar el HTML de `supabase/templates/magic-link.html` y poner de asunto `{{ .Token }} es tu código de PassMe`.
+4. Probar en el iPhone: `getpassme.com/crear` → rellenar → email → código (debería sugerirse sobre el teclado) → bienvenida con el QR.
+5. Google Wallet: **acceso de publicación solicitado el 02/10/2026** (respuesta en 2–3 días hábiles, por email a `passmecorreo@gmail.com`). El emisor bueno es `3388000000023206663` (negocio `BCR2DN6D5LEJNFCZ`, creado con `passmecorreo@gmail.com`; el otro «PassMe», `…LEPFQCA`/`…23213462`, no lo usa la web). Hasta ahora **nadie ha podido guardar nunca un pase**: «Se ha producido un error. Vuelve a intentarlo.» en Chrome y en Android, tanto con la cuenta de Diego (*test user*) como con la administradora, incluso con un pase mínimo creado antes por la API. La API acepta la clase y el objeto completo de Diego, y la clave de firma es válida, pero `POST /walletobjects/v1/jwt` devuelve `INVALID_ARGUMENT` genérico para cualquier JWT del emisor. Cuando Google apruebe: volver a probar. Si sigue fallando, escribir a soporte desde *Contactar con el equipo* con el ID del emisor y este diagnóstico.
+6. (Recomendado) Activar «Continuar con Google» (`docs/SETUP.md` 1.6): el alta más rápida en Android y no gasta emails.
+7. Antes de cualquier evento: Supabase está limitado a 60 emails/hora y el plan gratuito de Resend a 100 al día. Una sala entera dándose de alta los agotaría; Google (paso 5) o subir de plan en Resend lo evitan.
 
 ## Configuración en producción
 
@@ -96,7 +105,7 @@ Lo último (01/10/2026, rama `feat/new-motifs` fusionada directamente en `main` 
   - Variables de producción configuradas: Supabase, Apple, Google, `PASSME_SIGNING_SECRET`, `NEXT_PUBLIC_SITE_URL=https://getpassme.com`, `CRON_SECRET`, `NEXT_PUBLIC_LEGAL_*`, `NEXT_PUBLIC_CONTACT_EMAIL` (`diegomolinacatala+passme@gmail.com`), `RESEND_API_KEY` (clave propia `passme-vercel`) y `PASSME_EMAIL_FROM=PassMe <hola@getpassme.com>`.
   - El cron diario `/api/cron/cleanup` está activo.
 - **Supabase**:
-  - Las 9 migraciones aplicadas (la última, `20261017120000_security_audit.sql`, el 17/10/2026). `npm run doctor` las comprueba todas menos la 6.ª (`20261001120000_motif_refresh.sql`, solo un `CHECK`), que no se puede comprobar desde fuera.
+  - 9 de las 10 migraciones aplicadas (la última, `20261017120000_security_audit.sql`, el 17/10/2026); falta `20261021120000_crm_insights.sql` (CRM). `npm run doctor` las comprueba todas menos la 6.ª (`20261001120000_motif_refresh.sql`, solo un `CHECK`), que no se puede comprobar desde fuera.
   - Site URL y Redirect URLs apuntan a `https://getpassme.com`.
   - Código de acceso de 8 dígitos que caduca en 600 s.
   - Plantillas *Magic Link* y *Confirm signup*: la versión nueva (código primero) está en `supabase/templates/magic-link.html`; pegarla si no se ha hecho (paso manual 2).
@@ -124,7 +133,7 @@ No empezar nada de esto hasta que Diego lo pida.
   - Primer año: unos 1.400–1.700 € entre cuota y gestoría, lo que se cubre con unos 40–50 suscriptores Pro.
   - Una sola alta en RETA cubre todas las actividades de una persona.
 - **Antes del primer cobro real (Diego)**: gestoría → alta en Hacienda (036, con ROI) y en autónomos (RETA, tarifa plana); añadir a la web las condiciones de contratación (renovación automática, cancelación, desistimiento de 14 días). NIF y dirección solo en las variables `NEXT_PUBLIC_LEGAL_*`, nunca en el repo.
-- **Lanzamiento**: embajadores que vayan a muchos eventos, con Pro gratis y un motivo exclusivo «Fundadores». Idea de producto: atribuir cada alta a la tarjeta desde la que llegó, para saber quién trae gente.
+- **Lanzamiento**: embajadores que vayan a muchos eventos, con Pro gratis y un motivo exclusivo «Fundadores». Desde el CRM (21/10/2026) cada alta nueva queda atribuida a la tarjeta desde la que llegó («Quién trae gente»), pero esa atribución la declara el navegador: antes de premiar a nadie por altas, hay que verificarla (p. ej. una cookie firmada al visitar `/u/<slug>`) y revisar las cuentas sospechosas.
 
 ## Después
 

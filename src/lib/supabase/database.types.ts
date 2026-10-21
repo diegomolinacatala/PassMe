@@ -95,6 +95,9 @@ export type Database = {
           kind: ProfileEventKind;
           source: ProfileEventSource;
           link_id: string | null;
+          /** 20261021120000: absent until the migration runs; NULL on older rows. */
+          platform?: "ios" | "android" | "other" | null;
+          country?: string | null;
           created_at: string;
         };
         Insert: {
@@ -213,6 +216,28 @@ export type Database = {
         };
         Relationships: [];
       };
+      /** 20261021120000: written and read with the secret key only. */
+      profile_referrals: {
+        Row: {
+          profile_id: string;
+          referrer_id: string | null;
+          via: ProfileEventSource;
+          created_at: string;
+        };
+        Insert: {
+          profile_id: string;
+          referrer_id?: string | null;
+          via?: ProfileEventSource;
+          created_at?: string;
+        };
+        Update: {
+          profile_id?: string;
+          referrer_id?: string | null;
+          via?: ProfileEventSource;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       apple_pass_registrations: {
         Row: {
           device_library_id: string;
@@ -253,6 +278,17 @@ export type Database = {
       };
       record_card_event: {
         Args: { p_slug: string; p_kind: string; p_source?: string; p_link_id?: string | null };
+        Returns: boolean;
+      };
+      record_card_event_v2: {
+        Args: {
+          p_slug: string;
+          p_kind: string;
+          p_source: string;
+          p_link_id: string | null;
+          p_platform: string | null;
+          p_country: string | null;
+        };
         Returns: boolean;
       };
       submit_contact_request: {

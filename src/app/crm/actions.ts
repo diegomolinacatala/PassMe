@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { credentialsMatch, getAdminCredentials } from "@/lib/admin/auth";
-import { endAdminSession, startAdminSession } from "@/lib/admin/session";
+import { CRM_LOGIN_PATH, CRM_PATH, endAdminSession, startAdminSession } from "@/lib/admin/session";
 import { createSharedRateLimiter } from "@/lib/data/rate-limits";
 import { log } from "@/lib/log";
 import { clientRateKey } from "@/lib/request";
@@ -29,7 +29,7 @@ const globalLimiter = createSharedRateLimiter({ name: "admin-login", limit: 1000
 const WRONG = "Usuario o contraseña incorrectos.";
 const TOO_MANY = "Demasiados intentos. Espera 15 minutos.";
 const UNAVAILABLE = "No podemos comprobar tus datos ahora mismo. Inténtalo en unos minutos.";
-const OFF = "El panel no está activado.";
+const OFF = "El CRM no está activado.";
 
 export async function adminLoginAction(_prev: AdminLoginState, formData: FormData): Promise<AdminLoginState> {
   const credentials = getAdminCredentials();
@@ -50,10 +50,10 @@ export async function adminLoginAction(_prev: AdminLoginState, formData: FormDat
   }
 
   await startAdminSession(credentials);
-  redirect("/admin");
+  redirect(CRM_PATH);
 }
 
 export async function adminLogoutAction(): Promise<void> {
   await endAdminSession();
-  redirect("/admin/entrar");
+  redirect(CRM_LOGIN_PATH);
 }

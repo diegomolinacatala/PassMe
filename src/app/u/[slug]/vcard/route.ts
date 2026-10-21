@@ -7,7 +7,7 @@ import { prettyProfileUrl, profileUrl } from "@/lib/env";
 import { log } from "@/lib/log";
 import { avatarForVCard, fetchAvatar } from "@/lib/pass/images";
 import { cardUnavailableResponse, tooManyRequestsResponse } from "@/lib/pass/public-responses";
-import { clientRateKey, isBot, parseVisitSource } from "@/lib/request";
+import { clientRateKey, isBot, parseVisitSource, visitorContext } from "@/lib/request";
 
 export const runtime = "nodejs";
 
@@ -44,7 +44,8 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/u/[slug]/vca
 
   if (!isBot(request.headers.get("user-agent"))) {
     const source = parseVisitSource(request.nextUrl.searchParams.get("src"));
-    after(() => recordEventBySlug(card.slug, { kind: "vcard", source }));
+    const visitor = visitorContext(request.headers);
+    after(() => recordEventBySlug(card.slug, { kind: "vcard", source, visitor }));
   }
 
   return new Response(body, {

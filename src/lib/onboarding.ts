@@ -1,7 +1,9 @@
 import "server-only";
+import { after } from "next/server";
 import { createPath, parseFromSlug, parseQuickDraft, parseVia, welcomePath } from "@/lib/card/quick";
 import type { FieldErrors } from "@/lib/card/schema";
 import { createCardFromDraft } from "@/lib/data/cards";
+import { recordReferral } from "@/lib/data/referrals";
 import type { VisitSource } from "@/lib/env";
 import { log } from "@/lib/log";
 import type { TypedSupabaseClient } from "@/lib/supabase/server";
@@ -39,6 +41,18 @@ export function parseOrigin(from: unknown, via: unknown): CardOrigin {
   return { from: slug, via: slug ? parseVia(via) : "direct" };
 }
 
+/**
+ * Who brought them, noted after the response: it never slows down a sign-up,
+ * and nothing about it (not even being outside a request) can fail one.
+ */
+function noteReferral(userId: string, origin: CardOrigin): void {
+  try {
+    after(() => recordReferral(userId, origin.from, origin.via));
+  } catch (error) {
+    log.warn("referral not scheduled", { userId }, error);
+  }
+}
+
 export type QuickCardOutcome = { ok: true; redirectTo: string } | { ok: false; error: string; errors?: FieldErrors };
 
 const UNEXPECTED = "No hemos podido crear tu tarjeta. Inténtalo de nuevo.";
@@ -61,6 +75,7 @@ export async function createQuickCard(
   try {
     const result = await createCardFromDraft(supabase, userId, parsed.data);
     if (!result.ok) return { ok: false, error: result.error };
+    if (result.created) noteReferral(userId, origin);
     const justCreated = result.created || now - Date.parse(result.card.updatedAt) < JUST_CREATED_MS;
     return { ok: true, redirectTo: justCreated ? welcomePath(origin.from, origin.via) : EXISTING_CARD_PATH };
   } catch (error) {

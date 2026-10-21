@@ -16,9 +16,15 @@ const state = vi.hoisted(() => ({
   ip: "203.0.113.1",
   supabase: null as unknown,
   createCard: vi.fn(),
+  recordReferral: vi.fn(async () => undefined),
 }));
 
 vi.mock("next/headers", () => ({ headers: async () => new Headers({ "x-forwarded-for": state.ip }) }));
+// Work scheduled for after the response runs right away here.
+vi.mock("next/server", async (original) => ({
+  ...(await original<typeof import("next/server")>()),
+  after: (task: () => unknown) => void task(),
+}));
 vi.mock("next/navigation", () => ({
   redirect: (url: string) => {
     throw new Redirect(url);
@@ -29,6 +35,7 @@ vi.mock("@/lib/supabase/server", () => ({
   getSessionUser: async () => null,
 }));
 vi.mock("@/lib/data/cards", () => ({ createCardFromDraft: state.createCard }));
+vi.mock("@/lib/data/referrals", () => ({ recordReferral: state.recordReferral }));
 
 const { authAction } = await import("@/app/login/actions");
 type AuthState = Parameters<typeof authAction>[0];
@@ -40,6 +47,7 @@ beforeEach(() => {
   state.ip = `203.0.113.${ipCounter}`;
   state.supabase = null;
   state.createCard.mockReset();
+  state.recordReferral.mockClear();
 });
 
 function form(fields: Record<string, string>): FormData {
@@ -242,6 +250,8 @@ describe("checking the code", () => {
     );
     expect(url).toBe("/dashboard?nueva=1&de=alex");
     expect(state.createCard).toHaveBeenCalledWith(state.supabase, "u1", expect.objectContaining({ fullName: "Ana" }));
+    // The CRM's "who brought whom": once, for the new card only.
+    expect(state.recordReferral).toHaveBeenCalledWith("u1", "alex", "direct");
   });
 
   it("goes to the editor when the account already had a card", async () => {
@@ -251,6 +261,7 @@ describe("checking the code", () => {
     expect(await redirectOf(authAction(codeStep(), form({ intent: "verify", email: "ana@example.com", code: "12345678", draft })))).toBe(
       "/dashboard?existente=1",
     );
+    expect(state.recordReferral).not.toHaveBeenCalled();
   });
 
   it("still shows the welcome when another tab created the card a moment ago", async () => {

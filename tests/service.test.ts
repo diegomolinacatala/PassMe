@@ -98,17 +98,41 @@ describe("events", () => {
     expect(fake.queries).toHaveLength(0);
   });
 
-  it("records visitor events in one validated database call", async () => {
+  it("records visitor events in one validated database call, with their device and country", async () => {
     const fake = useAdmin(() => ({ data: true }));
-    await recordEventBySlug("alex", { kind: "link_click", source: "qr", linkId: "l-email-1" });
+    await recordEventBySlug("alex", { kind: "link_click", source: "qr", linkId: "l-email-1", visitor: { platform: "ios", country: "ES" } });
     expect(fake.queries).toHaveLength(1);
-    expect(fake.queries[0]!.table).toBe("rpc:record_card_event");
-    expect(fake.queries[0]!.calls[0]![1][0]).toEqual({ p_slug: "alex", p_kind: "link_click", p_source: "qr", p_link_id: "l-email-1" });
+    expect(fake.queries[0]!.table).toBe("rpc:record_card_event_v2");
+    expect(fake.queries[0]!.calls[0]![1][0]).toEqual({
+      p_slug: "alex",
+      p_kind: "link_click",
+      p_source: "qr",
+      p_link_id: "l-email-1",
+      p_platform: "ios",
+      p_country: "ES",
+    });
+  });
+
+  it("doesn't retry the old call when the new one fails for another reason", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const fake = useAdmin(() => ({ error: { message: "timeout", code: "57014" } }));
+    await recordEventBySlug("alex", { kind: "view" });
+    expect(fake.queries.map((q) => q.table)).toEqual(["rpc:record_card_event_v2"]);
+  });
+
+  // Leaves the "new call is missing" note for a minute: the tests after it start from the old call.
+  it("records without device or country while migration 20261021120000 is pending, asking only once a minute", async () => {
+    const fake = useAdmin((q) => (q.table === "rpc:record_card_event_v2" ? { error: { message: "missing", code: "PGRST202" } } : { data: true }));
+    await recordEventBySlug("alex", { kind: "view", source: "share", visitor: { platform: "android", country: null } });
+    expect(fake.queries.map((q) => q.table)).toEqual(["rpc:record_card_event_v2", "rpc:record_card_event"]);
+    expect(fake.queries[1]!.calls[0]![1][0]).toEqual({ p_slug: "alex", p_kind: "view", p_source: "share", p_link_id: null });
+    await recordEventBySlug("alex", { kind: "view" });
+    expect(fake.queries.map((q) => q.table).slice(2)).toEqual(["rpc:record_card_event"]);
   });
 
   it("falls back to lookup + insert while the migration is pending", async () => {
     const fake = useAdmin((q) => {
-      if (q.table === "rpc:record_card_event") return { error: { message: "missing", code: "PGRST202" } };
+      if (q.table.startsWith("rpc:record_card_event")) return { error: { message: "missing", code: "PGRST202" } };
       return first(q) === "select" ? { data: { id: USER } } : {};
     });
     await recordEventBySlug("alex", { kind: "link_click", source: "qr", linkId: "l-email-1" });
