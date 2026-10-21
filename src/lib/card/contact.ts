@@ -4,6 +4,7 @@
  * Keep the limits in sync with supabase/migrations/20260929130000_contact_requests.sql.
  */
 import { z } from "zod";
+import { csvCell, csvFile } from "@/lib/csv";
 import { CONTACT_LIMITS, CONTACT_ONE_OF_ERROR, contactPhoneHref, type ContactRequest } from "./contact-info";
 import { normalizeLinkValue } from "./links";
 import { line, paragraph, toFieldErrors, type FieldErrors } from "./text";
@@ -78,24 +79,13 @@ export function contactRequestsToVCard(requests: ContactRequest[]): string {
     .join("");
 }
 
-/**
- * Quotes every cell and neutralizes spreadsheet formulas (CSV injection).
- * Phones are exempt: they are validated to digits and + ( ) . - only, so a
- * leading "+" can't start a dangerous formula and must stay readable.
- */
-function csvCell(value: string, { isPhone = false } = {}): string {
-  const safe = !isPhone && /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
-  return `"${safe.replace(/"/g, '""')}"`;
-}
-
 const CSV_HEADER = ["Fecha", "Nombre", "Email", "Teléfono", "Empresa", "Mensaje", "Origen"];
-const BOM = String.fromCharCode(0xfeff);
 
 /** CSV (UTF-8 with BOM so Excel opens accents correctly). */
 export function contactRequestsToCsv(requests: ContactRequest[]): string {
-  const header = CSV_HEADER.map((cell) => csvCell(cell)).join(",");
-  const rows = requests.map((r) =>
-    [
+  return csvFile(
+    CSV_HEADER,
+    requests.map((r) => [
       csvCell(r.createdAt),
       csvCell(r.name),
       csvCell(r.email ?? ""),
@@ -103,7 +93,6 @@ export function contactRequestsToCsv(requests: ContactRequest[]): string {
       csvCell(r.company),
       csvCell(r.message),
       csvCell(r.source),
-    ].join(","),
+    ]),
   );
-  return `${BOM}${[header, ...rows].join("\r\n")}\r\n`;
 }

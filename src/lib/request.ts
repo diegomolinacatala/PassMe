@@ -1,4 +1,5 @@
 import type { VisitSource } from "./env";
+import { detectPlatform, type Platform } from "./platform";
 
 const DEFAULT_NEXT = "/dashboard";
 
@@ -78,6 +79,21 @@ export function safeNextPath(next: string | null | undefined, fallback = DEFAULT
 
 export function parseVisitSource(value: string | null | undefined): VisitSource {
   return value === "qr" || value === "share" ? value : "direct";
+}
+
+/** What a card event may say about its visitor: kind of device and country, never the IP. */
+export interface VisitorContext {
+  platform: Platform;
+  country: string | null;
+}
+
+/** Vercel's two-letter country for the request's IP; null elsewhere (local runs) or when unknown. */
+export function visitorContext(headers: Headers): VisitorContext {
+  const country = headers.get("x-vercel-ip-country")?.trim().toUpperCase() ?? "";
+  return {
+    platform: detectPlatform(headers.get("user-agent")),
+    country: /^[A-Z]{2}$/.test(country) && country !== "XX" ? country : null,
+  };
 }
 
 /**

@@ -2,7 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 const PORT = Number(process.env.E2E_PORT ?? 3100);
 
-/** Test-only login for the private dashboard (/admin), which shows sample data in demo mode. */
+/** Test-only login for the private CRM (/crm), which shows sample data in demo mode. */
 export const E2E_ADMIN = { username: "admin", password: "e2e-admin-password" };
 
 /**

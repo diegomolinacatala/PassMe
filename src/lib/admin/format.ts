@@ -53,6 +53,21 @@ export function formatDate(instant: string | null): string {
   return instant ? dateTime.format(new Date(instant)).replace(".", "") : "—";
 }
 
+const sortable = new Intl.DateTimeFormat("en-CA", {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+  timeZone: ADMIN_TIME_ZONE,
+});
+
+/** "2026-10-06 17:39" in Madrid, for spreadsheets (sorts as text); "" without an instant. */
+export function formatSortableDateTime(instant: string | null): string {
+  return instant ? sortable.format(new Date(instant)).replace(", ", " ") : "";
+}
+
 /** "12:04" in Madrid. */
 export function formatClock(instant: Date): string {
   return clock.format(instant);

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { SLUG_MAX_LENGTH } from "@/lib/card/slug";
 import { recordEventBySlug } from "@/lib/data/events";
 import { createSharedRateLimiter } from "@/lib/data/rate-limits";
-import { clientRateKey, isBot, parseVisitSource, readTextLimited } from "@/lib/request";
+import { clientRateKey, isBot, parseVisitSource, readTextLimited, visitorContext } from "@/lib/request";
 
 export const runtime = "nodejs";
 
@@ -48,6 +48,7 @@ export async function POST(request: NextRequest) {
       kind,
       source: parseVisitSource(source),
       linkId: kind === "link_click" ? (linkId ?? null) : null,
+      visitor: visitorContext(request.headers),
     }),
   );
   return noContent;

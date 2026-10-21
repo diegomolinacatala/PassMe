@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { adminLoginAction, type AdminLoginState } from "@/app/admin/actions";
+import { adminLoginAction, type AdminLoginState } from "@/app/crm/actions";
 import { Field, InlineError, inputClasses } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 

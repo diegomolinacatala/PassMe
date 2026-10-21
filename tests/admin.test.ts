@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { A, B, C, contactRequest, event, iso, meeting, NOW, profile, rawData, referral, registration, user } from "./helpers/admin-raw";
 import { fakeSupabase, has, type RecordedQuery } from "./helpers/fake-supabase";
 
 /*
- * The private dashboard (/admin): its own login (env credentials, signed
- * cookie, rate limits), the numbers it shows and how it loads them.
+ * The private CRM (/crm): its own login (env credentials, signed cookie, rate
+ * limits), the summary's numbers and how it loads them. The other pages'
+ * logic is in tests/crm.test.ts.
  */
 
 class Redirect extends Error {
@@ -34,11 +36,13 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/lib/supabase/admin", () => ({ createAdminSupabase: () => state.admin }));
 
 const auth = await import("@/lib/admin/auth");
-const { adminLoginAction, adminLogoutAction } = await import("@/app/admin/actions");
+const { adminLoginAction, adminLogoutAction } = await import("@/app/crm/actions");
 const { hasAdminSession } = await import("@/lib/admin/session");
-const { buildAdminStats, dayKey, parseAdminPeriod } = await import("@/lib/admin/stats");
+const { buildAdminStats, parseAdminPeriod } = await import("@/lib/admin/stats");
+const { dayKey, periodStart } = await import("@/lib/admin/days");
 const { formatPercent, niceMax, formatShortDay } = await import("@/lib/admin/format");
 const { demoAdminRawData } = await import("@/lib/admin/demo");
+const { buildUserRows } = await import("@/lib/admin/users");
 const { loadAdminRawData } = await import("@/lib/data/admin-stats");
 type AdminRawData = Parameters<typeof buildAdminStats>[0];
 
@@ -122,7 +126,7 @@ describe("admin session token", () => {
 });
 
 describe("admin login", () => {
-  it("does nothing while the dashboard is off", async () => {
+  it("does nothing while the CRM is off", async () => {
     vi.stubEnv("ADMIN_PASSWORD", "");
     const result = await adminLoginAction({}, form({ username: "diego", password: CREDENTIALS.password }));
     expect(result.error).toMatch(/no está activado/);
@@ -135,11 +139,11 @@ describe("admin login", () => {
     expect(state.cookies.size).toBe(0);
   });
 
-  it("sets a strict, http-only cookie scoped to /admin and goes to the dashboard", async () => {
+  it("sets a strict, http-only cookie scoped to /crm and goes to the CRM", async () => {
     const url = await redirectOf(adminLoginAction({}, form({ username: "Diego", password: CREDENTIALS.password })));
-    expect(url).toBe("/admin");
+    expect(url).toBe("/crm");
     const cookie = state.cookies.get(auth.ADMIN_COOKIE);
-    expect(cookie?.options).toMatchObject({ httpOnly: true, sameSite: "strict", path: "/admin" });
+    expect(cookie?.options).toMatchObject({ httpOnly: true, sameSite: "strict", path: "/crm" });
     expect(await hasAdminSession(CREDENTIALS)).toBe(true);
   });
 
@@ -182,59 +186,52 @@ describe("admin login", () => {
     state.admin = fakeSupabase(() => ({ error: { message: "down" } })).client;
     expect((await adminLoginAction({}, form({ username: "diego", password: CREDENTIALS.password }))).error).toMatch(/ahora mismo/);
     state.admin = fakeSupabase(() => ({ data: [{ allowed: true, retry_after: 0 }] })).client;
-    expect(await redirectOf(adminLoginAction({}, form({ username: "diego", password: CREDENTIALS.password })))).toBe("/admin");
+    expect(await redirectOf(adminLoginAction({}, form({ username: "diego", password: CREDENTIALS.password })))).toBe("/crm");
   });
 
   it("signs out by deleting the cookie", async () => {
     state.cookies.set(auth.ADMIN_COOKIE, { value: auth.createAdminToken(CREDENTIALS) });
-    expect(await redirectOf(adminLogoutAction())).toBe("/admin/entrar");
+    expect(await redirectOf(adminLogoutAction())).toBe("/crm/entrar");
     expect(await hasAdminSession(CREDENTIALS)).toBe(false);
   });
 });
 
 describe("admin stats", () => {
-  const now = new Date("2026-10-06T10:00:00Z");
-  const iso = (daysAgo: number, hour = 10) => new Date(now.getTime() - daysAgo * 86_400_000 + (hour - 10) * 3_600_000).toISOString();
-  const A = "00000000-0000-4000-8000-00000000000a";
-  const B = "00000000-0000-4000-8000-00000000000b";
-  const C = "00000000-0000-4000-8000-00000000000c";
+  const now = NOW;
 
   function raw(overrides: Partial<AdminRawData> = {}): AdminRawData {
-    return {
-      demo: false,
+    return rawData({
       users: [
-        { id: A, email: "ana@example.com", createdAt: iso(60), lastSignInAt: iso(2) },
-        { id: B, email: "bea@example.com", createdAt: iso(3), lastSignInAt: iso(3) },
-        { id: C, email: "carla@example.com", createdAt: iso(1), lastSignInAt: null },
+        user(A, { email: "ana@example.com", createdAt: iso(60), lastSignInAt: iso(2) }),
+        user(B, { email: "bea@example.com", createdAt: iso(3), lastSignInAt: iso(3) }),
+        user(C, { email: "carla@example.com", createdAt: iso(1), lastSignInAt: null }),
       ],
       profiles: [
-        { id: A, slug: "ana", fullName: "Ana", isPublished: true, pattern: "orbitas", createdAt: iso(60) },
-        { id: B, slug: "bea", fullName: " ", isPublished: false, pattern: "halo", createdAt: iso(3) },
+        profile(A, {
+          slug: "ana",
+          fullName: "Ana",
+          pattern: "orbitas",
+          createdAt: iso(60),
+          links: [{ id: "link-1", kind: "linkedin", visible: true, label: "", value: "https://www.linkedin.com/in/ana" }],
+        }),
+        profile(B, { slug: "bea", fullName: " ", isPublished: false, pattern: "halo", createdAt: iso(3) }),
       ],
-      registrations: [
-        { serial: A, device: "iphone-ana" },
-        { serial: A, device: "watch-ana" },
-      ],
+      registrations: [registration(A, "iphone-ana"), registration(A, "watch-ana")],
       events: [
-        { profileId: A, kind: "view", source: "qr", createdAt: iso(0) },
-        { profileId: A, kind: "view", source: "share", createdAt: iso(0) },
-        { profileId: A, kind: "view", source: "direct", createdAt: iso(1) },
-        { profileId: A, kind: "vcard", source: "direct", createdAt: iso(1) },
-        { profileId: A, kind: "pass_apple", source: "direct", createdAt: iso(1) },
-        { profileId: B, kind: "view", source: "qr", createdAt: iso(2) },
-        { profileId: B, kind: "view", source: "qr", createdAt: iso(20) },
+        event(A, "view", { source: "qr", createdAt: iso(0), platform: "ios", country: "ES" }),
+        event(A, "view", { source: "share", createdAt: iso(0), platform: "android", country: "PT" }),
+        event(A, "view", { source: "direct", createdAt: iso(1), platform: "ios", country: "ES" }),
+        event(A, "vcard", { createdAt: iso(1) }),
+        event(A, "link_click", { createdAt: iso(1), linkId: "link-1" }),
+        event(A, "pass_apple", { createdAt: iso(1) }),
+        event(B, "view", { source: "qr", createdAt: iso(2) }),
+        event(B, "view", { source: "qr", createdAt: iso(20) }),
       ],
-      contactRequests: [
-        { profileId: A, createdAt: iso(1) },
-        { profileId: A, createdAt: iso(40) },
-      ],
-      meetings: [
-        { profileId: A, status: "confirmed", createdAt: iso(2) },
-        { profileId: B, status: "pending", createdAt: iso(30) },
-      ],
-      warnings: [],
+      contactRequests: [contactRequest(A, { createdAt: iso(1) }), contactRequest(A, { createdAt: iso(40) })],
+      meetings: [meeting(A, { status: "confirmed", createdAt: iso(2) }), meeting(B, { status: "pending", createdAt: iso(30) })],
+      referrals: [referral(B, A, { via: "qr" }), referral(C, null)],
       ...overrides,
-    };
+    });
   }
 
   it("counts installed Apple passes per card, not per device", () => {
@@ -280,14 +277,14 @@ describe("admin stats", () => {
   });
 
   it("caps the growth chart at 26 weeks and carries the older sign-ups in the total", () => {
-    const users = [{ id: A, email: null, createdAt: iso(400), lastSignInAt: null }, ...raw().users.slice(1)];
+    const users = [user(A, { email: null, createdAt: iso(400) }), ...raw().users.slice(1)];
     const weekly = buildAdminStats(raw({ users }), { days: 7, now }).weekly;
     expect(weekly).toHaveLength(26);
     expect(weekly.at(-1)!.total).toBe(3);
   });
 
   it("lists users newest first, joined with their card and activity", () => {
-    const users = buildAdminStats(raw(), { days: 7, now }).users;
+    const users = buildUserRows(raw(), periodStart(now, 7));
     expect(users.map((u) => u.id)).toEqual([C, B, A]);
     expect(users[2]).toMatchObject({
       name: "Ana",
@@ -305,9 +302,75 @@ describe("admin stats", () => {
   });
 
   it("still lists cards whose user couldn't be loaded", () => {
-    const stats = buildAdminStats(raw({ users: [] }), { days: 7, now });
-    expect(stats.users.map((u) => u.slug)).toEqual(["bea", "ana"]);
-    expect(stats.users[0]!.email).toBeNull();
+    const users = buildUserRows(raw({ users: [] }), periodStart(now, 7));
+    expect(users.map((u) => u.slug)).toEqual(["bea", "ana"]);
+    expect(users[0]!.email).toBeNull();
+  });
+
+  it("follows each account from sign-up to people reaching out", () => {
+    const funnel = buildAdminStats(raw(), { days: 7, now }).funnel;
+    expect(funnel.map((s) => [s.key, s.count])).toEqual([
+      ["accounts", 3],
+      ["cards", 2],
+      ["published", 1],
+      ["wallet", 1],
+      ["viewed", 2],
+      ["reached", 2],
+    ]);
+  });
+
+  it("splits visits by device and country, leaving out the ones without the data", () => {
+    const stats = buildAdminStats(raw(), { days: 7, now });
+    expect(stats.devices).toEqual([
+      { key: "ios", label: "iPhone", count: 2 },
+      { key: "android", label: "Android", count: 1 },
+    ]);
+    expect(stats.countries.map((c) => [c.key, c.label, c.count])).toEqual([
+      ["ES", "España", 2],
+      ["PT", "Portugal", 1],
+    ]);
+  });
+
+  it("says how new accounts arrived and who brings people", () => {
+    const stats = buildAdminStats(raw(), { days: 7, now });
+    expect(stats.origins).toEqual({ qr: 1, share: 0, direct: 0, ownWay: 1, unknown: 1 });
+    expect(stats.topReferrers).toEqual([{ key: A, label: "Ana", count: 1 }]);
+  });
+
+  it("still counts as 'from a card' someone whose referrer deleted their account", () => {
+    const stats = buildAdminStats(raw({ referrals: [referral(B, null, { via: "share" }), referral(C, null)] }), { days: 7, now });
+    expect(stats.origins).toEqual({ qr: 0, share: 1, direct: 0, ownWay: 1, unknown: 1 });
+    expect(stats.topReferrers).toEqual([]);
+  });
+
+  it("gives each country its share of every visit with one, not just of the top eight", () => {
+    const codes = ["ES", "PT", "FR", "IT", "DE", "MX", "AR", "CL", "CO", "PE"];
+    const events = codes.map((country) => event(A, "view", { country }));
+    const stats = buildAdminStats(raw({ events }), { days: 7, now });
+    expect(stats.countries).toHaveLength(8);
+    expect(stats.recorded.countries).toBe(10);
+  });
+
+  it("measures the share in Apple Wallet among published cards only", () => {
+    // B's card is paused, but its pass stays on the phone.
+    const stats = buildAdminStats(raw({ registrations: [registration(A, "iphone-ana"), registration(B, "iphone-bea")] }), { days: 7, now });
+    expect(stats.totals).toMatchObject({ appleCards: 2, publishedCards: 1, publishedWithPass: 1 });
+  });
+
+  it("counts whole calendar days in Madrid, like the chart", () => {
+    // 7 days ending on 6 Oct start at Madrid's midnight of 30 Sep (22:00 UTC on the 29th).
+    expect(new Date(periodStart(now, 7)).toISOString()).toBe("2026-09-29T22:00:00.000Z");
+    const edge = [event(A, "view", { createdAt: "2026-09-29T22:30:00Z" }), event(A, "view", { createdAt: "2026-09-29T21:30:00Z" })];
+    const stats = buildAdminStats(raw({ events: edge }), { days: 7, now });
+    expect(stats.period.views).toBe(1);
+    expect(stats.daily.reduce((n, d) => n + d.views, 0)).toBe(1);
+  });
+
+  it("ranks the most viewed cards and the most clicked kinds of link", () => {
+    const stats = buildAdminStats(raw(), { days: 7, now });
+    expect(stats.topCards[0]).toMatchObject({ id: A, name: "Ana", slug: "ana", views: 3, vcards: 1 });
+    expect(stats.topCards[1]).toMatchObject({ id: B, name: "Sin nombre", views: 1 });
+    expect(stats.linkKinds).toEqual([{ key: "LinkedIn", label: "LinkedIn", count: 1 }]);
   });
 
   it("maps retired motifs to their successors", () => {
@@ -321,7 +384,7 @@ describe("admin stats", () => {
   });
 
   it("works with nothing at all", () => {
-    const empty = raw({ users: [], profiles: [], registrations: [], events: [], contactRequests: [], meetings: [] });
+    const empty = rawData();
     const stats = buildAdminStats(empty, { days: 30, now });
     expect(stats.totals.users).toBe(0);
     expect(stats.daily).toHaveLength(30);
@@ -334,7 +397,9 @@ describe("admin stats", () => {
     expect(stats.totals.users).toBe(12);
     expect(stats.totals.appleCards).toBeGreaterThan(0);
     expect(stats.period.views).toBeGreaterThan(stats.period.vcards);
-    expect(stats.users.every((u) => u.email?.endsWith("@example.com"))).toBe(true);
+    expect(stats.recentUsers.every((u) => u.email?.endsWith("@example.com"))).toBe(true);
+    expect(stats.devices.length).toBeGreaterThan(0);
+    expect(stats.topReferrers.length).toBeGreaterThan(0);
   });
 
   it("accepts only the offered periods", () => {
@@ -377,31 +442,107 @@ describe("loading admin data", () => {
   }
 
   it("returns null without the secret key (demo mode)", async () => {
-    expect(await loadAdminRawData(30, now)).toBeNull();
+    expect(await loadAdminRawData({ days: 30, now })).toBeNull();
   });
+
+  const profileRow = {
+    id: "p1",
+    slug: "ana",
+    full_name: "Ana",
+    is_published: true,
+    pattern: "arco",
+    created_at: "2026-10-01T00:00:00Z",
+    updated_at: "2026-10-02T00:00:00Z",
+    headline: "Diseñadora",
+    company: "Norte",
+    location: "",
+    avatar_path: "p1/a.jpg",
+    bio: "  ",
+    accent_color: "#EF7A4A",
+    typeface: "clasica",
+    links: [
+      { id: "link-1", kind: "linkedin", value: "https://www.linkedin.com/in/ana", visible: true },
+      { id: "link-2", kind: "phone", value: "+34 600 000 000", label: "Privado", visible: false },
+    ],
+    accepts_contact_requests: true,
+    accepts_meeting_requests: false,
+  };
 
   it("reads every table, never the push tokens, and only the period's events", async () => {
     const { queries } = client(
       (q) => {
-        if (q.table === "profiles") return { data: [{ id: "p1", slug: "ana", full_name: "Ana", is_published: true, pattern: "arco", created_at: "2026-10-01T00:00:00Z" }] };
-        if (q.table === "apple_pass_registrations") return { data: [{ serial_number: "p1", device_library_id: "d1" }] };
+        if (q.table === "profiles") return { data: [profileRow] };
+        if (q.table === "apple_pass_registrations") return { data: [{ serial_number: "p1", device_library_id: "d1", created_at: "2026-10-03T00:00:00Z" }] };
+        if (q.table === "profile_referrals") return { data: [{ profile_id: "p1", referrer_id: null, via: "direct", created_at: "2026-10-01T00:00:00Z" }] };
         return { data: [] };
       },
-      [{ id: "p1", email: "ana@example.com", created_at: "2026-10-01T00:00:00Z", last_sign_in_at: null }],
+      [{ id: "p1", email: "ana@example.com", created_at: "2026-10-01T00:00:00Z", last_sign_in_at: null, app_metadata: { provider: "google" } }],
     );
 
-    const data = await loadAdminRawData(30, now);
+    const data = await loadAdminRawData({ days: 30, now });
     expect(data).toMatchObject({
       demo: false,
-      users: [{ id: "p1", email: "ana@example.com" }],
-      profiles: [{ id: "p1", slug: "ana", fullName: "Ana" }],
-      registrations: [{ serial: "p1", device: "d1" }],
+      users: [{ id: "p1", email: "ana@example.com", provider: "google" }],
+      profiles: [{ id: "p1", slug: "ana", fullName: "Ana", hasAvatar: true, hasBio: false, company: "Norte" }],
+      registrations: [{ serial: "p1", device: "d1", createdAt: "2026-10-03T00:00:00Z" }],
+      referrals: [{ profileId: "p1", referrerId: null, via: "direct" }],
+      insightsPending: false,
       warnings: [],
+      failed: false,
     });
     const registrations = queries.find((q) => q.table === "apple_pass_registrations")!;
     expect(JSON.stringify(registrations.calls)).not.toContain("push_token");
     const events = queries.find((q) => q.table === "profile_events")!;
-    expect(has(events, "gte", "created_at", "2026-09-06T10:00:00.000Z")).toBe(true);
+    // 30 calendar days in Madrid: from midnight on 7 Sep.
+    expect(has(events, "gte", "created_at", "2026-09-06T22:00:00.000Z")).toBe(true);
+    expect(has(events, "select", "profile_id, kind, source, created_at, link_id, platform, country")).toBe(true);
+  });
+
+  it("keeps hidden links' contents out, even here", async () => {
+    client((q) => (q.table === "profiles" ? { data: [profileRow] } : { data: [] }));
+    const data = await loadAdminRawData({ days: 30, now });
+    expect(data!.profiles[0]!.links).toEqual([
+      { id: "link-1", kind: "linkedin", visible: true, label: "", value: "https://www.linkedin.com/in/ana" },
+      { id: "link-2", kind: "phone", visible: false, label: "", value: "" },
+    ]);
+    expect(JSON.stringify(data)).not.toContain("600 000 000");
+  });
+
+  it("reads nothing about the people who leave a contact or propose a meeting", async () => {
+    const { queries } = client(() => ({ data: [] }));
+    await loadAdminRawData({ days: 30, now });
+    expect(has(queries.find((q) => q.table === "contact_requests")!, "select", "profile_id, source, created_at")).toBe(true);
+    expect(has(queries.find((q) => q.table === "meeting_requests")!, "select", "profile_id, status, format, created_at")).toBe(true);
+  });
+
+  it("scopes events, devices, contacts and meetings to one account for its page", async () => {
+    const { queries } = client(() => ({ data: [] }));
+    await loadAdminRawData({ days: 90, now, profileId: "p1" });
+    for (const table of ["profile_events", "contact_requests", "meeting_requests"]) {
+      expect(has(queries.find((q) => q.table === table)!, "eq", "profile_id", "p1"), table).toBe(true);
+    }
+    expect(has(queries.find((q) => q.table === "apple_pass_registrations")!, "eq", "serial_number", "p1")).toBe(true);
+    // Names and who brought whom still load in full.
+    expect(queries.find((q) => q.table === "profiles")!.calls.some(([method]) => method === "eq")).toBe(false);
+  });
+
+  it("works before migration 20261021120000: events without device or country, no referrals, and says so", async () => {
+    const { queries } = client((q) => {
+      if (q.table === "profile_events" && has(q, "select", "profile_id, kind, source, created_at, link_id, platform, country")) {
+        return { error: { message: "column profile_events.platform does not exist", code: "42703" } };
+      }
+      if (q.table === "profile_events") return { data: [{ profile_id: "p1", kind: "view", source: "qr", created_at: "2026-10-05T00:00:00Z", link_id: null }] };
+      if (q.table === "profile_referrals") return { error: { message: "relation does not exist", code: "PGRST205" } };
+      return { data: [] };
+    });
+    const data = await loadAdminRawData({ days: 30, now });
+    expect(data!.insightsPending).toBe(true);
+    expect(data!.warnings).toEqual([]);
+    expect(data!.failed).toBe(false);
+    expect(data!.events).toEqual([
+      { profileId: "p1", kind: "view", source: "qr", createdAt: "2026-10-05T00:00:00Z", linkId: null, platform: null, country: null },
+    ]);
+    expect(queries.filter((q) => q.table === "profile_events")).toHaveLength(2);
   });
 
   it("pages through more than 1000 rows", async () => {
@@ -412,15 +553,16 @@ describe("loading admin data", () => {
       eventPages += 1;
       return { data: page(eventPages === 1 ? 1000 : 250) };
     });
-    const data = await loadAdminRawData(30, now);
+    const data = await loadAdminRawData({ days: 30, now });
     expect(eventPages).toBe(2);
     expect(data!.events).toHaveLength(1250);
   });
 
   it("keeps going when one table fails, and says so", async () => {
     client((q) => (q.table === "meeting_requests" ? { error: { message: "relation does not exist" } } : { data: [] }));
-    const data = await loadAdminRawData(30, now);
+    const data = await loadAdminRawData({ days: 30, now });
     expect(data!.meetings).toEqual([]);
     expect(data!.warnings).toEqual(["No se han podido cargar las reuniones."]);
+    expect(data!.failed).toBe(true);
   });
 });
